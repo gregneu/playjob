@@ -1,0 +1,261 @@
+---
+alwaysApply: false
+---
+
+3d Models
+📐 ОБНОВЛЕННЫЕ ПРАВИЛА ДЛЯ ROUNDED VOXELS:
+1. Базовая функция создания закругленного вокселя:
+javascript// ГЛАВНАЯ ФУНКЦИЯ - всегда используй её!
+function createRoundedBox(width, height, depth, radius, smoothness) {
+    const shape = new THREE.Shape();
+    const x = width / 2 - radius;
+    const y = height / 2 - radius;
+    
+    // Рисуем профиль с закругленными углами
+    shape.moveTo(-x, -y);
+    shape.lineTo(x, -y);
+    shape.quadraticCurveTo(x + radius, -y, x + radius, -y + radius);
+    shape.lineTo(x + radius, y - radius);
+    shape.quadraticCurveTo(x + radius, y, x, y);
+    shape.lineTo(-x, y);
+    shape.quadraticCurveTo(-x - radius, y, -x - radius, y - radius);
+    shape.lineTo(-x - radius, -y + radius);
+    shape.quadraticCurveTo(-x - radius, -y, -x, -y);
+    
+    const extrudeSettings = {
+        depth: depth,
+        bevelEnabled: true,
+        bevelSegments: smoothness, // 2-4 для баланса качества/производительности
+        steps: 1,
+        bevelSize: radius,
+        bevelThickness: radius,
+        curveSegments: smoothness * 4
+    };
+    
+    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geometry.translate(0, 0, -depth/2);
+    return geometry;
+}
+2. Оптимальные параметры закругления:
+javascriptconst voxelSize = 0.3;     // Базовый размер
+const roundness = 0.08;     // Радиус закругления (20-30% от размера)
+const detail = 2;           // Детализация (1-4, где 2 оптимально)
+
+// Для разных типов объектов:
+const roundnessMap = {
+    organic: voxelSize * 0.3,   // Природные объекты - более мягкие
+    structural: voxelSize * 0.2, // Здания - средне закругленные  
+    decorative: voxelSize * 0.4  // Декор - максимально мягкие
+};
+3. Материалы для rounded voxels:
+javascript// Используй Phong для лучших бликов на закругленных поверхностях
+const material = new THREE.MeshPhongMaterial({ 
+    color: color,
+    shininess: 30,        // Блики на закругленных гранях
+    specular: 0x222222,   // Цвет бликов
+    emissive: 0x000000,   // Для светящихся объектов
+    emissiveIntensity: 0  // 0.5-0.7 для огня
+});
+4. Команды для Cursor с rounded voxels:
+javascript// КОМАНДА: "Создай rounded voxel объект"
+"Create a rounded voxel object in THREE.js:
+1. Use ExtrudeGeometry with Shape for rounded corners
+2. Radius = 20-30% of voxel size for organic look
+3. BevelSegments = 2 for performance, 4 for quality
+4. Material: MeshPhongMaterial with shininess: 30
+5. Add subtle size variations (0.9-1.1x) for organic feel"
+
+// КОМАНДА: "Оптимизация rounded voxels"
+"Optimize rounded voxels:
+1. Create single geometry, clone for instances
+2. Use InstancedMesh for repeated voxels
+3. Merge geometries with same material
+4. LOD: reduce bevelSegments for distant objects"
+5. Правила стилизации:
+Органические объекты (деревья, камни):
+javascript// Вариации размера для естественности
+const size = voxelSize * (0.8 + Math.random() * 0.4);
+// Больше закругления
+const radius = size * 0.35;
+Архитектурные объекты:
+javascript// Стабильный размер
+const size = voxelSize;
+// Умеренное закругление
+const radius = size * 0.2;
+Детали и акценты:
+javascript// Мелкие детали
+const size = voxelSize * 0.5;
+// Максимальное закругление для мягкости
+const radius = size * 0.4;
+6. Особенности rounded voxel стиля:
+
+НЕ делай острые углы - всё должно быть мягким
+Добавляй вариации размера (±20%) для органичности
+Используй Phong материал для красивых бликов
+Группируй воксели с одинаковыми параметрами для оптимизации
+Эмиссия для светящихся объектов (огонь, лампы)
+
+7. Пример полного объекта:
+javascriptfunction createRoundedTree() {
+    const group = new THREE.Group();
+    
+    // Ствол - меньше закругления
+    for(let y = 0; y < 3; y++) {
+        const geometry = createRoundedBox(
+            voxelSize, voxelSize, voxelSize, 
+            voxelSize * 0.15, 2
+        );
+        const trunk = new THREE.Mesh(geometry, trunkMaterial);
+        trunk.position.y = y * voxelSize;
+        group.add(trunk);
+    }
+    
+    // Крона - больше закругления и вариаций
+    for(let y = 3; y < 10; y++) {
+        // случайные вариации размера
+        const variation = 0.8 + Math.random() * 0.4;
+        const size = voxelSize * variation;
+        const geometry = createRoundedBox(
+            size, size, size,
+            size * 0.35, 2
+        );
+        // позиции с небольшим шумом
+        const crown = new THREE.Mesh(geometry, leafMaterial);
+        crown.position.set(
+            (Math.random() - 0.5) * voxelSize,
+            y * voxelSize,
+            (Math.random() - 0.5) * voxelSize
+        );
+        group.add(crown);
+    }
+    
+    return group;
+}3d Models
+📐 ОБНОВЛЕННЫЕ ПРАВИЛА ДЛЯ ROUNDED VOXELS:
+1. Базовая функция создания закругленного вокселя:
+javascript// ГЛАВНАЯ ФУНКЦИЯ - всегда используй её!
+function createRoundedBox(width, height, depth, radius, smoothness) {
+    const shape = new THREE.Shape();
+    const x = width / 2 - radius;
+    const y = height / 2 - radius;
+    
+    // Рисуем профиль с закругленными углами
+    shape.moveTo(-x, -y);
+    shape.lineTo(x, -y);
+    shape.quadraticCurveTo(x + radius, -y, x + radius, -y + radius);
+    shape.lineTo(x + radius, y - radius);
+    shape.quadraticCurveTo(x + radius, y, x, y);
+    shape.lineTo(-x, y);
+    shape.quadraticCurveTo(-x - radius, y, -x - radius, y - radius);
+    shape.lineTo(-x - radius, -y + radius);
+    shape.quadraticCurveTo(-x - radius, -y, -x, -y);
+    
+    const extrudeSettings = {
+        depth: depth,
+        bevelEnabled: true,
+        bevelSegments: smoothness, // 2-4 для баланса качества/производительности
+        steps: 1,
+        bevelSize: radius,
+        bevelThickness: radius,
+        curveSegments: smoothness * 4
+    };
+    
+    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geometry.translate(0, 0, -depth/2);
+    return geometry;
+}
+2. Оптимальные параметры закругления:
+javascriptconst voxelSize = 0.3;     // Базовый размер
+const roundness = 0.08;     // Радиус закругления (20-30% от размера)
+const detail = 2;           // Детализация (1-4, где 2 оптимально)
+
+// Для разных типов объектов:
+const roundnessMap = {
+    organic: voxelSize * 0.3,   // Природные объекты - более мягкие
+    structural: voxelSize * 0.2, // Здания - средне закругленные  
+    decorative: voxelSize * 0.4  // Декор - максимально мягкие
+};
+3. Материалы для rounded voxels:
+javascript// Используй Phong для лучших бликов на закругленных поверхностях
+const material = new THREE.MeshPhongMaterial({ 
+    color: color,
+    shininess: 30,        // Блики на закругленных гранях
+    specular: 0x222222,   // Цвет бликов
+    emissive: 0x000000,   // Для светящихся объектов
+    emissiveIntensity: 0  // 0.5-0.7 для огня
+});
+4. Команды для Cursor с rounded voxels:
+javascript// КОМАНДА: "Создай rounded voxel объект"
+"Create a rounded voxel object in THREE.js:
+1. Use ExtrudeGeometry with Shape for rounded corners
+2. Radius = 20-30% of voxel size for organic look
+3. BevelSegments = 2 for performance, 4 for quality
+4. Material: MeshPhongMaterial with shininess: 30
+5. Add subtle size variations (0.9-1.1x) for organic feel"
+
+// КОМАНДА: "Оптимизация rounded voxels"
+"Optimize rounded voxels:
+1. Create single geometry, clone for instances
+2. Use InstancedMesh for repeated voxels
+3. Merge geometries with same material
+4. LOD: reduce bevelSegments for distant objects"
+5. Правила стилизации:
+Органические объекты (деревья, камни):
+javascript// Вариации размера для естественности
+const size = voxelSize * (0.8 + Math.random() * 0.4);
+// Больше закругления
+const radius = size * 0.35;
+Архитектурные объекты:
+javascript// Стабильный размер
+const size = voxelSize;
+// Умеренное закругление
+const radius = size * 0.2;
+Детали и акценты:
+javascript// Мелкие детали
+const size = voxelSize * 0.5;
+// Максимальное закругление для мягкости
+const radius = size * 0.4;
+6. Особенности rounded voxel стиля:
+
+НЕ делай острые углы - всё должно быть мягким
+Добавляй вариации размера (±20%) для органичности
+Используй Phong материал для красивых бликов
+Группируй воксели с одинаковыми параметрами для оптимизации
+Эмиссия для светящихся объектов (огонь, лампы)
+
+7. Пример полного объекта:
+javascriptfunction createRoundedTree() {
+    const group = new THREE.Group();
+    
+    // Ствол - меньше закругления
+    for(let y = 0; y < 3; y++) {
+        const geometry = createRoundedBox(
+            voxelSize, voxelSize, voxelSize, 
+            voxelSize * 0.15, 2
+        );
+        const trunk = new THREE.Mesh(geometry, trunkMaterial);
+        trunk.position.y = y * voxelSize;
+        group.add(trunk);
+    }
+    
+    // Крона - больше закругления и вариаций
+    for(let y = 3; y < 10; y++) {
+        // случайные вариации размера
+        const variation = 0.8 + Math.random() * 0.4;
+        const size = voxelSize * variation;
+        const geometry = createRoundedBox(
+            size, size, size,
+            size * 0.35, 2
+        );
+        // позиции с небольшим шумом
+        const crown = new THREE.Mesh(geometry, leafMaterial);
+        crown.position.set(
+            (Math.random() - 0.5) * voxelSize,
+            y * voxelSize,
+            (Math.random() - 0.5) * voxelSize
+        );
+        group.add(crown);
+    }
+    
+    return group;
+}

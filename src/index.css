@@ -1,0 +1,1501 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #fafbfc;
+  color: #1a1a1a;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.2s ease;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.1s ease-out;
+}
+
+/* Project preview styles */
+.preview-wireframe {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  gap: 8px;
+  height: 100%;
+}
+
+.wireframe-header {
+  height: 6px;
+  background: #cbd5e1;
+  border-radius: 3px;
+  width: 60%;
+}
+
+.wireframe-content {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.wireframe-sidebar {
+  width: 30%;
+  height: 80px;
+  background: #e2e8f0;
+  border-radius: 4px;
+}
+
+.wireframe-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wireframe-block {
+  height: 12px;
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.preview-dashboard {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  padding: 12px;
+  color: white;
+  font-size: 8px;
+  height: 100%;
+}
+
+.dashboard-nav {
+  height: 4px;
+  background: #334155;
+  border-radius: 2px;
+  margin-bottom: 8px;
+}
+
+.dashboard-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.dashboard-widget {
+  height: 25px;
+  background: #475569;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-flow {
+  background: #fef3c7;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.flow-node {
+  width: 30px;
+  height: 20px;
+  background: #f59e0b;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 6px;
+}
+
+.flow-arrow {
+  width: 12px;
+  height: 2px;
+  background: #d97706;
+}
+
+/* Type icons */
+.type-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.type-figma { background: #a259ff; }
+.type-archive { background: #64748b; }
+.type-next { background: #000; }
+.type-mobile { background: #3b82f6; }
+.type-web { background: #8b5cf6; }
+.type-game { background: #ef4444; }
+.type-analytics { background: #10b981; }
+
+/* Project cards */
+.project-card {
+  max-width: 320px;
+  min-width: 280px;
+  width: 100%;
+  height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.project-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.project-preview {
+  height: 60%;
+  flex-shrink: 0;
+}
+
+.project-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 16px;
+}
+
+.project-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Projects grid */
+.projects-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
+  justify-content: center;
+}
+
+/* Responsive grid */
+@media (max-width: 640px) {
+  .project-card {
+    max-width: none;
+    min-width: auto;
+  }
+  
+  .projects-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Стили для 2D UI бейджей ячеек */
+.cell-badge {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Анимации для бейджей */
+.badge {
+  animation: badgeAppear 0.3s ease-out;
+}
+
+@keyframes badgeAppear {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Hover эффекты */
+.badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: all 0.2s ease;
+}
+
+/* Адаптивность для маленьких экранов */
+@media (max-width: 768px) {
+  .badge {
+    min-width: 100px;
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+  
+  .badge-title {
+    font-size: 10px;
+  }
+  
+  .priority-number {
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+  }
+  
+  .progress-number {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+}
+
+/* Стили для курсора при наведении на интерактивные элементы */
+.interactive-cell {
+  cursor: pointer;
+}
+
+.interactive-cell:hover {
+  cursor: pointer;
+}
+
+/* Глобальные стили для курсора на canvas */
+canvas {
+  cursor: default;
+}
+
+/* Стили для курсора при наведении на здания и объекты */
+.building-hover {
+  cursor: pointer !important;
+}
+
+.project-center-hover {
+  cursor: pointer !important;
+}
+
+/* Принудительное изменение курсора для интерактивных элементов */
+.interactive-hover {
+  cursor: pointer !important;
+}
+
+/* Стили для canvas с интерактивными элементами */
+canvas.interactive-hover {
+  cursor: pointer !important;
+}
+
+/* Глобальные стили для курсора на canvas при hover */
+canvas:hover {
+  cursor: default;
+}
+
+canvas.interactive-hover:hover {
+  cursor: pointer !important;
+}
+
+/* Дополнительные стили для принудительного изменения курсора */
+canvas[style*="cursor: pointer"] {
+  cursor: pointer !important;
+}
+
+canvas[style*="cursor: default"] {
+  cursor: default !important;
+}
+
+/* Анимация пульсации для загрузки */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Анимация появления тикетов сверху вниз */
+@keyframes slideInFromTop {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ticket-card-animate {
+  animation: slideInFromTop 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  opacity: 0;
+}
+
+@keyframes borderGlow {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes selectedBuildingPulse {
+  0% {
+    opacity: 0.6;
+    scale: 1;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.05;
+  }
+  100% {
+    opacity: 0.6;
+    scale: 1;
+  }
+}
+
+@keyframes hexagonSpin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes hexagonPulse {
+  0% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+}
+
+@keyframes hexagonTrace {
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+.hexagon-loading {
+  fill: none;
+  stroke-width: 0.075;
+  transition: fill 0.5s ease;
+}
+
+.hexagon-background {
+  stroke: #000000;
+  opacity: 0.3;
+}
+
+.hexagon-trace {
+  stroke: #000000;
+  stroke-dasharray: 1 2;
+  stroke-dashoffset: 2;
+  stroke-linecap: round;
+  animation: hexagonTrace 1s ease-in-out infinite;
+}
+
+/* Автоматическое скрытие элементов при масштабировании */
+.zone-badge-auto-hide {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Скрываем при маленьком размере (далекая камера) */
+@media (max-width: 1px) {
+  .zone-badge-auto-hide {
+    opacity: 0;
+    transform: scale(0.1);
+    pointer-events: none;
+  }
+}
+
+/* Анимации для модалки тикета */
+@keyframes modalSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modalBackdropFadeIn {
+  0% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes modalContentSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-5px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modalGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(59, 130, 246, 0);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.modal-backdrop-animate {
+  animation: modalBackdropFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.modal-content-animate {
+  animation: modalContentSlideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-glow-animate {
+  animation: modalGlow 0.8s ease-out 0.2s;
+}
+
+/* Email Unfold Animation - как в примере */
+@keyframes modalUnfold {
+  0% {
+    width: 162px;
+    height: 32px;
+    border-radius: 16px;
+    box-shadow: none;
+  }
+  100% {
+    width: 1058px;
+    height: 800px;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+}
+
+@keyframes modalUnfoldBackdrop {
+  0% {
+    background: rgba(0,0,0,0);
+  }
+  100% {
+    background: rgba(0,0,0,0.4);
+  }
+}
+
+@keyframes modalContentFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes modalContentFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+}
+
+.modal-unfold {
+  animation: modalUnfold 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.modal-backdrop-unfold {
+  animation: modalUnfoldBackdrop 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.modal-content-unfold {
+  animation: modalContentFadeIn 0.2s 0.1s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+/* Начальное состояние для контента */
+.modal-content-unfold {
+  opacity: 0;
+  transform: scale(0.55);
+}
+
+.magic-input-glow {
+  position: relative;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    transparent 30%, 
+    rgba(185, 127, 249, 0.8) 45%, 
+    rgba(185, 127, 249, 1) 50%, 
+    rgba(185, 127, 249, 0.8) 55%, 
+    transparent 70%, 
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: borderGlow 3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.magic-input-glow::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    transparent 25%, 
+    rgba(185, 127, 249, 0.6) 40%, 
+    rgba(185, 127, 249, 1) 50%, 
+    rgba(185, 127, 249, 0.6) 60%, 
+    transparent 75%, 
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: borderGlow 3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  border-radius: 14px;
+  z-index: -1;
+  opacity: 0.8;
+}
+
+/* Принудительное изменение курсора через CSS переменные */
+:root {
+  --cursor-type: default;
+}
+
+canvas {
+  cursor: var(--cursor-type) !important;
+}
+
+/* Специальные стили для интерактивных элементов */
+.interactive-cell {
+  cursor: pointer !important;
+}
+
+/* Принудительное изменение курсора для всех элементов */
+* {
+  cursor: inherit;
+}
+
+/* Стили для body при интерактивном режиме */
+body.interactive-mode {
+  cursor: pointer !important;
+}
+
+body.interactive-mode * {
+  cursor: pointer !important;
+}
+
+/* Стили для canvas с data-атрибутами */
+canvas[data-cursor="pointer"] {
+  cursor: pointer !important;
+}
+
+canvas[data-cursor="default"] {
+  cursor: default !important;
+}
+
+/* Принудительное изменение курсора через data-атрибуты */
+[data-cursor="pointer"] {
+  cursor: pointer !important;
+}
+
+[data-cursor="default"] {
+  cursor: default !important;
+}
+
+/* CSS переменные для shadcn стилей */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222.2 84% 4.9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+}
+
+/* Утилиты для shadcn компонентов */
+.bg-background {
+  background-color: hsl(var(--background));
+}
+
+.bg-foreground {
+  background-color: hsl(var(--foreground));
+}
+
+.bg-primary {
+  background-color: hsl(var(--primary));
+}
+
+.bg-primary-foreground {
+  background-color: hsl(var(--primary-foreground));
+}
+
+.bg-secondary {
+  background-color: hsl(var(--secondary));
+}
+
+.bg-secondary-foreground {
+  background-color: hsl(var(--secondary-foreground));
+}
+
+.bg-muted {
+  background-color: hsl(var(--muted));
+}
+
+.bg-muted-foreground {
+  background-color: hsl(var(--muted-foreground));
+}
+
+.bg-accent {
+  background-color: hsl(var(--accent));
+}
+
+.bg-accent-foreground {
+  background-color: hsl(var(--accent-foreground));
+}
+
+.bg-destructive {
+  background-color: hsl(var(--destructive));
+}
+
+.bg-destructive-foreground {
+  background-color: hsl(var(--destructive-foreground));
+}
+
+.text-foreground {
+  color: hsl(var(--foreground));
+}
+
+.text-primary {
+  color: hsl(var(--primary));
+}
+
+.text-primary-foreground {
+  color: hsl(var(--primary-foreground));
+}
+
+.text-secondary {
+  color: hsl(var(--secondary));
+}
+
+.text-secondary-foreground {
+  color: hsl(var(--secondary-foreground));
+}
+
+.text-muted-foreground {
+  color: hsl(var(--muted-foreground));
+}
+
+.text-accent-foreground {
+  color: hsl(var(--accent-foreground));
+}
+
+.text-destructive {
+  color: hsl(var(--destructive));
+}
+
+.text-destructive-foreground {
+  color: hsl(var(--destructive-foreground));
+}
+
+.border-border {
+  border-color: hsl(var(--border));
+}
+
+.border-input {
+  border-color: hsl(var(--input));
+}
+
+.ring-ring {
+  --tw-ring-color: hsl(var(--ring));
+}
+
+/* Анимации для панелей */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Анимации для модальных окон */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-backdrop {
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+.modal-content {
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+/* ===== DRAG & DROP SYSTEM STYLES ===== */
+
+/* Убедись, что canvas может принимать drag events */
+canvas {
+  /* Важно: разрешаем pointer events */
+  pointer-events: auto !important;
+  
+  /* Убираем возможные конфликты с touch events */
+  touch-action: none;
+  
+  /* Убеждаемся, что canvas на верхнем слое */
+  position: relative;
+  z-index: 2000; /* Выше sidebar в обычном состоянии */
+}
+
+/* Контейнер Canvas должен быть интерактивным */
+.canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* Важно: НЕ используем pointer-events: none здесь! */
+}
+
+/* Fix для Three.js орбит контролов во время drag */
+.canvas-container.is-dragging {
+  /* Временно отключаем orbit controls во время drag */
+  cursor: copy !important;
+}
+
+.canvas-container.is-dragging canvas {
+  /* Визуальная индикация активной drag зоны */
+  box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.2);
+}
+
+/* Bottom Tapbar должен быть выше canvas по z-index */
+.bottom-tapbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 3000 !important; /* Выше чем canvas (2000) */
+  pointer-events: auto;
+}
+
+/* Build кнопка должна быть выше canvas по z-index */
+.build-button-container {
+  z-index: 3000 !important; /* Выше чем canvas (2000) */
+  position: fixed !important;
+}
+
+/* Drag ghost image стили */
+.drag-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  opacity: 0.8;
+  transform: translate(-50%, -50%);
+}
+
+/* Hover индикаторы для hexagon cells */
+.hex-hover-indicator {
+  animation: hexPulse 1s infinite;
+}
+
+@keyframes hexPulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Дополнительные стили для drag & drop состояний */
+.drag-active {
+  cursor: grabbing !important;
+}
+
+.drag-target-valid {
+  animation: validPulse 0.5s infinite;
+}
+
+.drag-target-invalid {
+  animation: invalidShake 0.3s infinite;
+}
+
+@keyframes validPulse {
+  0% {
+    box-shadow: 0 0 0 rgba(0, 255, 136, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(0, 255, 136, 0.4);
+  }
+}
+
+@keyframes invalidShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+/* Стили для drag preview элементов */
+.drag-preview-element {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  width: 120px;
+  height: 60px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+/* Стили для улучшенной визуализации drag состояний */
+.drag-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 255, 136, 0.1);
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.drag-overlay.active {
+  opacity: 1;
+}
+
+/* Стили для индикаторов drop zones */
+.drop-zone-indicator {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 2px dashed rgba(0, 255, 136, 0.6);
+  border-radius: 8px;
+  background: rgba(0, 255, 136, 0.1);
+  pointer-events: none;
+  z-index: 998;
+  animation: dropZonePulse 1s infinite;
+}
+
+@keyframes dropZonePulse {
+  0% {
+    border-color: rgba(0, 255, 136, 0.6);
+    background: rgba(0, 255, 136, 0.1);
+  }
+  50% {
+    border-color: rgba(0, 255, 136, 1);
+    background: rgba(0, 255, 136, 0.2);
+  }
+  100% {
+    border-color: rgba(0, 255, 136, 0.6);
+    background: rgba(0, 255, 136, 0.1);
+  }
+}
+
+/* Стили для улучшенной обратной связи при hover */
+.hex-cell-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hex-cell-hover:hover {
+  transform: scale(1.02);
+  filter: brightness(1.1);
+}
+
+/* Стили для drag handle элементов */
+.drag-handle {
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.drag-handle:hover {
+  cursor: grab;
+  transform: scale(1.05);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+/* Стили для улучшенной визуализации drag preview */
+.drag-preview-enhanced {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  min-width: 100px;
+  min-height: 40px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+  z-index: 10000;
+  opacity: 0.95;
+}
+
+/* Стили для анимации появления drag preview */
+@keyframes dragPreviewAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) rotate(-5deg);
+  }
+  100% {
+    opacity: 0.95;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.drag-preview-enhanced {
+  animation: dragPreviewAppear 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Стили для улучшенной визуализации drop targets */
+.drop-target-highlight {
+  position: relative;
+  overflow: visible;
+}
+
+.drop-target-highlight::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: linear-gradient(45deg, 
+    rgba(0, 255, 136, 0.3), 
+    rgba(0, 255, 136, 0.1), 
+    rgba(0, 255, 136, 0.3)
+  );
+  border-radius: 12px;
+  z-index: -1;
+  animation: dropTargetGlow 1.5s infinite;
+}
+
+@keyframes dropTargetGlow {
+  0% {
+    background: linear-gradient(45deg, 
+      rgba(0, 255, 136, 0.3), 
+      rgba(0, 255, 136, 0.1), 
+      rgba(0, 255, 136, 0.3)
+    );
+  }
+  50% {
+    background: linear-gradient(45deg, 
+      rgba(0, 255, 136, 0.6), 
+      rgba(0, 255, 136, 0.3), 
+      rgba(0, 255, 136, 0.6)
+    );
+  }
+  100% {
+    background: linear-gradient(45deg, 
+      rgba(0, 255, 136, 0.3), 
+      rgba(0, 255, 136, 0.1), 
+      rgba(0, 255, 136, 0.3)
+    );
+  }
+}
+
+/* Стили для улучшенной визуализации invalid drop targets */
+.drop-target-invalid::before {
+  background: linear-gradient(45deg, 
+    rgba(255, 68, 68, 0.3), 
+    rgba(255, 68, 68, 0.1), 
+    rgba(255, 68, 68, 0.3)
+  );
+  animation: dropTargetInvalidGlow 1s infinite;
+}
+
+/* === РАСШИРЕННЫЕ HOVER ЭФФЕКТЫ ДЛЯ DRAG & DROP === */
+
+/* Пульсирующая рамка для валидных drop targets */
+.drag-hover-valid {
+  position: relative;
+  animation: dragHoverValid 1.2s ease-in-out infinite;
+}
+
+@keyframes dragHoverValid {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    border-color: rgba(34, 197, 94, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.3);
+    border-color: rgba(34, 197, 94, 1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    border-color: rgba(34, 197, 94, 0.8);
+  }
+}
+
+/* Мерцающий эффект для невалидных drop targets */
+.drag-hover-invalid {
+  position: relative;
+  animation: dragHoverInvalid 0.8s ease-in-out infinite;
+}
+
+@keyframes dragHoverInvalid {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    border-color: rgba(239, 68, 68, 0.8);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 1);
+    opacity: 0.8;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    border-color: rgba(239, 68, 68, 0.8);
+    opacity: 1;
+  }
+}
+
+/* Эффект "притягивания" для центральных зон */
+.drag-hover-center {
+  position: relative;
+  animation: dragHoverCenter 1.5s ease-in-out infinite;
+}
+
+@keyframes dragHoverCenter {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6);
+  }
+  33% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.4);
+  }
+  66% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6);
+  }
+}
+
+/* Эффект "волны" для hover */
+.drag-hover-wave {
+  position: relative;
+  overflow: visible;
+}
+
+.drag-hover-wave::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: dragHoverWave 1s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes dragHoverWave {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
+}
+
+/* Эффект "магнитного притяжения" */
+.drag-magnetic {
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.drag-magnetic:hover {
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Эффект "пульсации границ" */
+.drag-pulse-border {
+  position: relative;
+}
+
+.drag-pulse-border::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ef4444, #10b981);
+  border-radius: inherit;
+  z-index: -1;
+  animation: dragPulseBorder 2s linear infinite;
+}
+
+@keyframes dragPulseBorder {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Эффект "свечения" для активных зон */
+.drag-glow {
+  position: relative;
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.4));
+  transition: filter 0.3s ease;
+}
+
+.drag-glow:hover {
+  filter: drop-shadow(0 0 16px rgba(59, 130, 246, 0.6));
+}
+
+/* Эффект "дыхания" для hover */
+.drag-breathe {
+  animation: dragBreathe 2s ease-in-out infinite;
+}
+
+@keyframes dragBreathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 1;
+  }
+}
+
+/* Эффект "мерцания" для привлечения внимания */
+.drag-attention {
+  animation: dragAttention 1.5s ease-in-out infinite;
+}
+
+@keyframes dragAttention {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  25% {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  75% {
+    opacity: 0.8;
+    transform: scale(0.99);
+  }
+}
+
+/* Эффект "покачивания" для невалидных targets */
+.drag-shake {
+  animation: dragShake 0.5s ease-in-out infinite;
+}
+
+@keyframes dragShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+/* Эффект "подсветки краев" */
+.drag-edge-glow {
+  position: relative;
+}
+
+.drag-edge-glow::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(59, 130, 246, 0.8) 25%, 
+    rgba(59, 130, 246, 1) 50%, 
+    rgba(59, 130, 246, 0.8) 75%, 
+    transparent 100%
+  );
+  border-radius: inherit;
+  z-index: -1;
+  animation: dragEdgeGlow 1.5s linear infinite;
+}
+
+@keyframes dragEdgeGlow {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Эффект "радиального свечения" */
+.drag-radial-glow {
+  position: relative;
+}
+
+.drag-radial-glow::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
+  border-radius: inherit;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  animation: dragRadialGlow 2s ease-in-out infinite;
+}
+
+@keyframes dragRadialGlow {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.6;
+  }
+}
+
+/* Эффект "пульсирующих точек" */
+.drag-dots {
+  position: relative;
+}
+
+.drag-dots::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background-image: 
+    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.8) 2px, transparent 2px),
+    radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.8) 2px, transparent 2px),
+    radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.8) 2px, transparent 2px),
+    radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.8) 2px, transparent 2px),
+    radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.8) 2px, transparent 2px);
+  background-size: 20px 20px;
+  border-radius: inherit;
+  z-index: -1;
+  animation: dragDots 1s ease-in-out infinite;
+}
+
+@keyframes dragDots {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes dropTargetInvalidGlow {
+  0% {
+    background: linear-gradient(45deg, 
+      rgba(255, 68, 68, 0.3), 
+      rgba(255, 68, 68, 0.1), 
+      rgba(255, 68, 68, 0.3)
+    );
+  }
+  50% {
+    background: linear-gradient(45deg, 
+      rgba(255, 68, 68, 0.6), 
+      rgba(255, 68, 68, 0.3), 
+      rgba(255, 68, 68, 0.6)
+    );
+  }
+  100% {
+    background: linear-gradient(45deg, 
+      rgba(255, 68, 68, 0.3), 
+      rgba(255, 68, 68, 0.1), 
+      rgba(255, 68, 68, 0.3)
+    );
+  }
+}
