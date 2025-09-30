@@ -843,56 +843,324 @@ export const ticketService = {
       console.error('❌ Exception moving ticket:', err)
       return null
     }
+  },
+
+  async assignTicketsToSprint(ticketIds: string[], sprintId: string | null, options?: { boardColumn?: 'planned' | 'in_sprint' }): Promise<number> {
+    if (!isSupabaseConfigured()) return 0
+    if (!Array.isArray(ticketIds) || ticketIds.length === 0) return 0
+
+    try {
+      const nowIso = new Date().toISOString()
+      const updates: Record<string, any> = {
+        updated_at: nowIso,
+        sprint_id: sprintId
+      }
+
+      if (options?.boardColumn) {
+        updates.board_column = options.boardColumn
+      } else if (sprintId) {
+        updates.board_column = 'in_sprint'
+      }
+
+      const query = supabase
+        .from('object_tickets')
+        .update(updates)
+        .in('id', ticketIds)
+        .select('id')
+
+      const { data, error } = await query
+      if (error) {
+        console.error('❌ assignTicketsToSprint error:', error)
+        return 0
+      }
+      return Array.isArray(data) ? data.length : 0
+    } catch (err) {
+      console.error('❌ assignTicketsToSprint exception:', err)
+      return 0
+    }
+  },
+
+  async removeTicketsFromSprint(ticketIds: string[]): Promise<number> {
+    if (!isSupabaseConfigured()) return 0
+    if (!Array.isArray(ticketIds) || ticketIds.length === 0) return 0
+
+    try {
+      const nowIso = new Date().toISOString()
+      const { data, error } = await supabase
+        .from('object_tickets')
+        .update({
+          sprint_id: null,
+          board_column: 'planned',
+          updated_at: nowIso
+        })
+        .in('id', ticketIds)
+        .select('id')
+
+      if (error) {
+        console.error('❌ removeTicketsFromSprint error:', error)
+        return 0
+      }
+      return Array.isArray(data) ? data.length : 0
+    } catch (err) {
+      console.error('❌ removeTicketsFromSprint exception:', err)
+      return 0
+    }
+  },
+
+  async markTicketsDone(ticketIds: string[], sprintId: string | null): Promise<number> {
+    if (!isSupabaseConfigured()) return 0
+    if (!Array.isArray(ticketIds) || ticketIds.length === 0) return 0
+
+    try {
+      const nowIso = new Date().toISOString()
+      const updates: Record<string, any> = {
+        status: 'done',
+        board_column: 'archived',
+        archived_at: nowIso,
+        updated_at: nowIso
+      }
+      if (sprintId !== undefined) {
+        updates.sprint_id = sprintId
+      }
+
+      const { data, error } = await supabase
+        .from('object_tickets')
+        .update(updates)
+        .in('id', ticketIds)
+        .select('id')
+
+      if (error) {
+        console.error('❌ markTicketsDone error:', error)
+        return 0
+      }
+      return Array.isArray(data) ? data.length : 0
+    } catch (err) {
+      console.error('❌ markTicketsDone exception:', err)
+      return 0
+    }
   }
 }
 
 // Sprint service
+type SprintStatus = 'draft' | 'active' | 'completed'
+
+interface SaveSprintStateParams {
+  sprintId?: string | null
+  projectId?: string
+  zoneObjectId?: string | null
+  name?: string
+  weeks?: number
+  plannedTicketIds?: string[]
+  doneTicketIds?: string[]
+  status?: SprintStatus
+  startedAt?: string | null
+  finishedAt?: string | null
+}
+
+const syncSprintZoneObjectName = async (zoneObjectId: string | null | undefined, name?: string) => {
+  if (!zoneObjectId || !name || !isSupabaseConfigured()) return
+  try {
+    const { error } = await supabase
+      .from('zone_objects')
+      .update({ title: name, updated_at: new Date().toISOString() })
+      .eq('id', zoneObjectId)
+      .in('object_type', ['mountain', 'sprint'])
+    if (error) {
+      console.error('syncSprintZoneObjectName error', error)
+    }
+  } catch (err) {
+    console.error('syncSprintZoneObjectName exception', err)
+  }
+}
+
 export const sprintService = {
-  async createSprint(projectId: string, zoneObjectId: string | null, name: string, weeks: number): Promise<any | null> {
+  async saveSprintState(params: SaveSprintStateParams): Promise<any | null> {
     if (!isSupabaseConfigured()) return null
+    const {
+      sprintId = null,
+      projectId,
+      zoneObjectId = null,
+      name,
+      weeks,
+      plannedTicketIds,
+      doneTicketIds,
+      status,
+      startedAt,
+      finishedAt
+    } = params
+
+    if (!sprintId && (!projectId || !zoneObjectId)) {
+      console.warn('saveSprintState requires sprintId or (projectId and zoneObjectId)')
+      return null
+    }
+
+    const nowIso = new Date().toISOString()
+
     try {
+      let targetId = sprintId
+
+      if (!targetId && projectId && zoneObjectId) {
+        const { data: existing, error: existingError } = await supabase
+          .from('sprints')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('zone_object_id', zoneObjectId)
+          .neq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (existingError) {
+          console.error('saveSprintState lookup error', existingError)
+          return null
+        }
+
+        if (Array.isArray(existing) && existing[0]) {
+          targetId = existing[0].id
+        }
+      }
+
+      const applyStatus = status as SprintStatus | undefined
+
+      if (targetId) {
+        const updates: Record<string, any> = { updated_at: nowIso }
+        if (name !== undefined) updates.name = name
+        if (weeks !== undefined) updates.weeks = weeks
+        if (plannedTicketIds !== undefined) updates.planned_ticket_ids = plannedTicketIds
+        if (doneTicketIds !== undefined) updates.done_ticket_ids = doneTicketIds
+        if (applyStatus) updates.status = applyStatus
+        if (applyStatus === 'active') {
+          updates.started_at = startedAt ?? nowIso
+        } else if (applyStatus === 'completed') {
+          updates.ended_at = finishedAt ?? nowIso
+        } else {
+          if (startedAt !== undefined) updates.started_at = startedAt
+          if (finishedAt !== undefined) updates.ended_at = finishedAt
+        }
+        if (zoneObjectId) updates.zone_object_id = zoneObjectId
+
+        const { data, error } = await supabase
+          .from('sprints')
+          .update(updates)
+          .eq('id', targetId)
+          .select('*')
+          .single()
+
+        if (error) {
+          console.error('saveSprintState update error', error)
+          return null
+        }
+
+        if (zoneObjectId && name !== undefined) {
+          await syncSprintZoneObjectName(zoneObjectId, name)
+        }
+
+        return data
+      }
+
+      if (!projectId) {
+        console.warn('saveSprintState: projectId is required to insert a sprint record')
+        return null
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
+      const recordStatus: SprintStatus = applyStatus ?? 'draft'
+      const insertPayload: Record<string, any> = {
+        project_id: projectId as string,
+        zone_object_id: zoneObjectId,
+        name: name ?? 'Sprint',
+        weeks: weeks ?? 2,
+        status: recordStatus,
+        planned_ticket_ids: plannedTicketIds ?? [],
+        done_ticket_ids: doneTicketIds ?? [],
+        started_at: recordStatus === 'active'
+          ? (startedAt ?? nowIso)
+          : (startedAt ?? null),
+        ended_at: recordStatus === 'completed'
+          ? (finishedAt ?? nowIso)
+          : (finishedAt ?? null),
+        created_by: user?.id ?? null,
+        created_at: nowIso,
+        updated_at: nowIso
+      }
+
       const { data, error } = await supabase
         .from('sprints')
-        .insert({ project_id: projectId, zone_object_id: zoneObjectId, name, weeks, status: 'active', started_at: new Date().toISOString(), created_by: user?.id || null })
+        .insert(insertPayload)
         .select('*')
         .single()
-      if (error) { console.error('createSprint error', error); return null }
-      
-      // Также обновляем title в таблице zone_objects для здания спринта
-      if (zoneObjectId) {
-        const { error: zoneObjectError } = await supabase
-          .from('zone_objects')
-          .update({ title: name, updated_at: new Date().toISOString() })
-          .eq('id', zoneObjectId)
-          .eq('object_type', 'mountain')
-        if (zoneObjectError) { console.error('createSprint zone_objects error', zoneObjectError) }
+
+      if (error) {
+        console.error('saveSprintState insert error', error)
+        return null
       }
-      
+
+      if (zoneObjectId && (name ?? insertPayload.name)) {
+        await syncSprintZoneObjectName(zoneObjectId, name ?? insertPayload.name)
+      }
+
       return data
-    } catch (err) { console.error('createSprint exception', err); return null }
+    } catch (err) {
+      console.error('saveSprintState exception', err)
+      return null
+    }
   },
 
-  async updateSprintName(sprintId: string, name: string): Promise<boolean> {
-    if (!isSupabaseConfigured()) return false
-    try {
-      // Обновляем имя спринта в таблице sprints
-      const { error: sprintError } = await supabase
-        .from('sprints')
-        .update({ name, updated_at: new Date().toISOString() })
-        .eq('id', sprintId)
-      if (sprintError) { console.error('updateSprintName error', sprintError); return false }
-      
-      // Также обновляем title в таблице zone_objects для здания спринта
-      const { error: zoneObjectError } = await supabase
-        .from('zone_objects')
-        .update({ title: name, updated_at: new Date().toISOString() })
-        .eq('sprint_id', sprintId)
-        .eq('object_type', 'mountain')
-      if (zoneObjectError) { console.error('updateSprintName zone_objects error', zoneObjectError); return false }
-      
-      return true
-    } catch (err) { console.error('updateSprintName exception', err); return false }
+  async createSprint(
+    projectId: string,
+    zoneObjectId: string | null,
+    name: string,
+    weeks: number,
+    plannedTicketIds: string[] = [],
+    doneTicketIds: string[] = []
+  ): Promise<any | null> {
+    return await sprintService.saveSprintState({
+      projectId,
+      zoneObjectId,
+      name,
+      weeks,
+      plannedTicketIds,
+      doneTicketIds,
+      status: 'active',
+      startedAt: new Date().toISOString()
+    })
+  },
+
+  async activateSprint(params: {
+    projectId: string
+    zoneObjectId: string | null
+    name: string
+    weeks: number
+    plannedTicketIds?: string[]
+    doneTicketIds?: string[]
+    sprintId?: string | null
+  }): Promise<any | null> {
+    return await sprintService.saveSprintState({
+      sprintId: params.sprintId,
+      projectId: params.projectId,
+      zoneObjectId: params.zoneObjectId,
+      name: params.name,
+      weeks: params.weeks,
+      plannedTicketIds: params.plannedTicketIds ?? [],
+      doneTicketIds: params.doneTicketIds ?? [],
+      status: 'active',
+      startedAt: new Date().toISOString()
+    })
+  },
+
+  async finishSprint(sprintId: string, updates?: { plannedTicketIds?: string[]; doneTicketIds?: string[]; finishedAt?: string | null; zoneObjectId?: string | null }): Promise<any | null> {
+    return await sprintService.saveSprintState({
+      sprintId,
+      plannedTicketIds: updates?.plannedTicketIds,
+      doneTicketIds: updates?.doneTicketIds,
+      finishedAt: updates?.finishedAt ?? new Date().toISOString(),
+      status: 'completed',
+      zoneObjectId: updates?.zoneObjectId ?? null
+    })
+  },
+
+  async updateSprintName(sprintId: string, name: string, zoneObjectId?: string | null): Promise<boolean> {
+    const result = await sprintService.saveSprintState({ sprintId, name, zoneObjectId: zoneObjectId ?? null })
+    return Boolean(result)
   },
 
   async getActiveSprint(projectId: string): Promise<any | null> {
@@ -924,6 +1192,22 @@ export const sprintService = {
       if (error) { console.error('getActiveSprintForObject error', error); return null }
       return (data && data[0]) || null
     } catch (err) { console.error('getActiveSprintForObject exception', err); return null }
+  },
+
+  async getCurrentSprintForObject(projectId: string, zoneObjectId: string): Promise<any | null> {
+    if (!isSupabaseConfigured()) return null
+    try {
+      const { data, error } = await supabase
+        .from('sprints')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('zone_object_id', zoneObjectId)
+        .neq('status', 'completed')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+      if (error) { console.error('getCurrentSprintForObject error', error); return null }
+      return (data && data[0]) || null
+    } catch (err) { console.error('getCurrentSprintForObject exception', err); return null }
   },
 
   async attachTicketToSprint(ticketId: string, sprintId: string): Promise<boolean> {
@@ -978,6 +1262,44 @@ export const sprintService = {
       if (error) { console.error('archiveSprintTickets error', error); return 0 }
       return Array.isArray(data) ? data.length : 0
     } catch (err) { console.error('archiveSprintTickets exception', err); return 0 }
+  },
+
+  async incrementProjectCrystals(projectId: string, amount: number): Promise<number | null> {
+    if (!isSupabaseConfigured()) return null
+    if (!projectId || !amount) return null
+
+    try {
+      const { data: project, error: fetchError } = await supabase
+        .from('projects')
+        .select('crystals')
+        .eq('id', projectId)
+        .single()
+
+      if (fetchError) {
+        console.error('incrementProjectCrystals fetch error:', fetchError)
+        return null
+      }
+
+      const current = typeof project?.crystals === 'number' ? project.crystals : 0
+      const nextValue = current + amount
+
+      const { data: updated, error: updateError } = await supabase
+        .from('projects')
+        .update({ crystals: nextValue })
+        .eq('id', projectId)
+        .select('crystals')
+        .single()
+
+      if (updateError) {
+        console.error('incrementProjectCrystals update error:', updateError)
+        return null
+      }
+
+      return typeof updated?.crystals === 'number' ? updated.crystals : nextValue
+    } catch (err) {
+      console.error('incrementProjectCrystals exception:', err)
+      return null
+    }
   },
 
   async getProject(projectId: string): Promise<any | null> {
@@ -1182,6 +1504,8 @@ export const linkService = {
 }
 
 // Функция для проверки существования поля color в таблице zone_objects
+let colorFieldCheckWarningLogged = false
+
 export const checkColorFieldExists = async (): Promise<boolean> => {
   if (!isSupabaseConfigured()) {
     console.warn('Supabase not configured, returning false')
@@ -1192,7 +1516,10 @@ export const checkColorFieldExists = async (): Promise<boolean> => {
     console.log('🎨 Checking if color field exists in zone_objects table...')
     
     // Temporarily disable color field check due to 400 error
-    console.warn('🎨 Color field check disabled due to 400 error')
+    if (!colorFieldCheckWarningLogged) {
+      console.warn('🎨 Color field check disabled due to 400 error')
+      colorFieldCheckWarningLogged = true
+    }
     return false
     
     // Пытаемся выбрать поле color
@@ -1219,6 +1546,8 @@ export const checkColorFieldExists = async (): Promise<boolean> => {
 }
 
 // Функция для получения количества назначенных тикетов пользователю в проекте
+let assignedTicketsRpcWarningLogged = false
+
 export const getUserAssignedTicketsCount = async (projectId: string, userId: string): Promise<number> => {
   console.log('🔍 getUserAssignedTicketsCount called with:', { projectId, userId })
   
@@ -1229,7 +1558,10 @@ export const getUserAssignedTicketsCount = async (projectId: string, userId: str
 
   try {
     // Temporarily disable RPC call due to 404 error
-    console.warn('📡 RPC function get_user_assigned_tickets_count disabled due to 404 error')
+    if (!assignedTicketsRpcWarningLogged) {
+      console.warn('📡 RPC function get_user_assigned_tickets_count disabled due to 404 error')
+      assignedTicketsRpcWarningLogged = true
+    }
     return 0
 
     console.log('📡 Calling RPC function get_user_assigned_tickets_count...')

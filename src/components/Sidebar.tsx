@@ -16,7 +16,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
   side = 'right',
-  width = 430,
+  width = 383,
   zIndex = 2147483600,
   header,
   footer,
@@ -91,5 +91,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }
 
 export default Sidebar
-
 

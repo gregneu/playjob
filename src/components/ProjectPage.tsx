@@ -45,6 +45,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
   const [showShareModal, setShowShareModal] = useState(false)
   // const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [assignedTicketsCount, setAssignedTicketsCount] = useState<number>(0)
+  const [, setProjectMembers] = useState<Array<{ id: string; full_name: string | null; email: string | null; role: string }>>([])
   
   // expose project globally for in-scene consumers like central flag text
   try { (window as any).currentProject = project } catch {}

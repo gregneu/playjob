@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS public.sprints (
   name TEXT NOT NULL DEFAULT 'Sprint',
   weeks INTEGER NOT NULL DEFAULT 2 CHECK (weeks BETWEEN 1 AND 4),
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','completed')),
+  planned_ticket_ids UUID[] NOT NULL DEFAULT '{}'::uuid[],
+  done_ticket_ids UUID[] NOT NULL DEFAULT '{}'::uuid[],
   started_at TIMESTAMPTZ,
   ended_at TIMESTAMPTZ,
   created_by UUID REFERENCES public.profiles(id),

@@ -17,6 +17,14 @@ interface TicketCardProps {
   sprintName?: string
   isDone?: boolean
   onSprintBadgeClick?: () => void
+  customBorderColor?: string
+  statusBadge?: {
+    label: string
+    background?: string
+    color?: string
+  }
+  fullWidth?: boolean
+  hidePriorityLabel?: boolean
 }
 
 const getPriorityIcon = (priority: TicketPriority | undefined): string => {
@@ -41,13 +49,32 @@ const getIconFilter = (_priority: TicketPriority | undefined): string => {
   return 'none'
 }
 
-export const TicketCard: React.FC<TicketCardProps> = ({ id, title, priority, assigneeId, assigneeName, draggable, onClick, onDragStart, onDragEnd, isPlannedInSprint, sprintName, isDone, onSprintBadgeClick }) => {
+export const TicketCard: React.FC<TicketCardProps> = ({
+  id,
+  title,
+  priority,
+  assigneeId,
+  assigneeName,
+  draggable,
+  onClick,
+  onDragStart,
+  onDragEnd,
+  isPlannedInSprint,
+  sprintName,
+  isDone,
+  onSprintBadgeClick,
+  customBorderColor,
+  statusBadge,
+  fullWidth,
+  hidePriorityLabel = false
+}) => {
   // ДОБАВЛЯЕМ ЛОГИРОВАНИЕ ПРИ РЕНДЕРЕ
   console.log('🎨 TicketCard: RENDERING ticket:', id, title, 'draggable:', draggable)
   
   const priorityLabel = getPriorityLabel(priority)
   const cardRef = useRef<HTMLDivElement>(null)
   const [mouseHover, setMouseHover] = useState(false)
+  const isClickable = Boolean(onClick)
 
   const SCALE_X = 8
   const SCALE_Y = 12
@@ -92,6 +119,15 @@ export const TicketCard: React.FC<TicketCardProps> = ({ id, title, priority, ass
       cardRef.current.style.transform = 'perspective(600px) rotateX(0deg) rotateY(0deg) translateZ(0px)'
     }
   }
+
+  const borderStyle = React.useMemo(() => {
+    if (customBorderColor) {
+      return `4px solid ${customBorderColor}`
+    }
+    if (isDone) return '4px solid #22C55E'
+    if (isPlannedInSprint) return '4px solid #B97FF9'
+    return '1px solid rgba(255, 255, 255, 0.2)'
+  }, [customBorderColor, isDone, isPlannedInSprint])
 
   return (
     <div
@@ -217,16 +253,17 @@ export const TicketCard: React.FC<TicketCardProps> = ({ id, title, priority, ass
       style={{
         display: 'flex',
         flexDirection: 'column',
-        border: isDone ? '4px solid #22C55E' : (isPlannedInSprint ? '4px solid #B97FF9' : '1px solid rgba(255, 255, 255, 0.2)'),
+        border: borderStyle,
         borderRadius: 18,
         background: 'rgba(0, 0, 0, 0.59)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         padding: 14,
         boxShadow: mouseHover ? '0 8px 32px rgba(0,0,0,0.15)' : '0 4px 14px rgba(0,0,0,0.06)',
-        cursor: draggable ? 'grab' : 'pointer',
+        cursor: draggable ? 'grab' : (isClickable ? 'pointer' : 'default'),
         height: 165,
-        maxWidth: '180px',
+        maxWidth: fullWidth ? '100%' : '180px',
+        width: fullWidth ? '100%' : 'auto',
         position: 'relative',
         transition: 'transform 0.1s ease-out, box-shadow 0.2s ease-out',
         transformStyle: 'preserve-3d',
@@ -234,7 +271,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({ id, title, priority, ass
       } as React.CSSProperties}
     >
       {/* Done badge */}
-      {isDone && (
+      {isDone && !statusBadge && (
         <div style={{
           position: 'absolute',
           top: -8,
@@ -252,7 +289,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({ id, title, priority, ass
         </div>
       )}
       {/* Sprint badge */}
-      {isPlannedInSprint && (
+      {isPlannedInSprint && !statusBadge && (
         <div 
           style={{
             position: 'absolute',
@@ -292,14 +329,38 @@ export const TicketCard: React.FC<TicketCardProps> = ({ id, title, priority, ass
           {sprintName || 'Sprint'}
         </div>
       )}
+      {statusBadge && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            background: statusBadge.background || 'rgba(79, 70, 229, 0.18)',
+            color: statusBadge.color || '#4C1D95',
+            borderRadius: 999,
+            padding: '2px 8px',
+            height: 23,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: 'Inter, sans-serif'
+          }}
+        >
+          {statusBadge.label}
+        </div>
+      )}
       {/* Header: priority */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: hidePriorityLabel ? 0 : 8, marginBottom: 6 }}>
         <img 
           src={`/icons/${getPriorityIcon(priority)}.svg`}
           alt={priorityLabel}
           style={{ width: 20, height: 20, filter: getIconFilter(priority) } as React.CSSProperties}
         />
-        <span style={{ fontSize: 12, color: '#CCCCCC', fontWeight: 600 }}>{priorityLabel}</span>
+        {!hidePriorityLabel && (
+          <span style={{ fontSize: 12, color: '#CCCCCC', fontWeight: 600 }}>{priorityLabel}</span>
+        )}
       </div>
       {/* Title - clamp */}
       <div style={{ flex: 1, marginBottom: 10, overflow: 'hidden' }}>

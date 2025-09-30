@@ -6,6 +6,7 @@ import { ZoneObjectComponent } from './buildings/BuildingComponents'
 import { Html } from '@react-three/drei'
 import { Stones, getStoneColorTint } from './Stones'
 import { Trees, getTreeColorTint } from './Trees'
+import BuildingProgressBubble from './BuildingProgressBubble'
 
 export const HexCellState = {
   DEFAULT: 'default',
@@ -52,6 +53,7 @@ interface UnifiedHexCellProps {
   isDragValid?: boolean // Валидное ли место для drop
   registerHoverTarget?: (key: string, mesh: THREE.Object3D) => void
   unregisterHoverTarget?: (key: string) => void
+  sprintProgress?: { total: number; done: number } | undefined
 }
 
 // Конвертация hex-координат в мировые для сетки с ПЛОСКИМ верхом
@@ -92,6 +94,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   isDragValid = false,
   registerHoverTarget,
   unregisterHoverTarget,
+  sprintProgress,
 }) => {
   console.log(`🏠 UnifiedHexCell [${q},${r}] rendering:`, {
     state,
@@ -100,6 +103,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
     hasRegisterFunction: !!registerHoverTarget,
     hasUnregisterFunction: !!unregisterHoverTarget
   })
+  const isSprintObject = Boolean(zoneObject && typeof zoneObject.type === 'string' && ['sprint', 'mountain'].includes(zoneObject.type.toLowerCase()))
   const meshRef = useRef<THREE.Mesh>(null!)
   const outlineRef = useRef<THREE.Mesh>(null!)
   const [hovered, setHovered] = useState(false)
@@ -493,7 +497,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
       )}
 
       {/* Bubble с количеством тикетов - по центру здания */}
-      {isZoneCenter && ticketCount > 0 && (
+      {isZoneCenter && ticketCount > 0 && !isSprintObject && (
         <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div 
             style={{
@@ -519,6 +523,12 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
           >
             {ticketCount}
           </div>
+        </Html>
+      )}
+
+      {isZoneCenter && isSprintObject && sprintProgress && sprintProgress.total > 0 && (
+        <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
+          <BuildingProgressBubble total={sprintProgress.total} done={sprintProgress.done} />
         </Html>
       )}
 

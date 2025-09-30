@@ -3,9 +3,11 @@
 
 export interface HybridDragData {
   type: 'story' | 'task' | 'bug' | 'test'
-  ticketId?: string
-  fromZoneObjectId?: string
+  ticketId: string | null
+  fromZoneObjectId: string | null
   isNewTicket?: boolean
+  isExistingTicket?: boolean
+  isSprintGhostRemoval?: boolean
 }
 
 export interface HybridDragState {
@@ -108,27 +110,94 @@ const handleNativeDragStart = (e: DragEvent) => {
   // Проверяем, что это наш draggable элемент
   const isTicketButton = target.hasAttribute('data-ticket-button')
   const isTicketCard = target.closest('.ticket-card')
-  
-  if (!isTicketButton && !isTicketCard) return
+  const isRocketGhost = target.closest('.rocket-ticket-ghost')
+
+  if (!isTicketButton && !isTicketCard && !isRocketGhost) return
   
   console.log('🎯 Valid drag target detected')
   
   // Извлекаем данные из dataTransfer
-  const ticketType = e.dataTransfer?.getData('text/plain') || 
-                    e.dataTransfer?.getData('application/x-ticket-type')
-  
-  if (!ticketType || !['story', 'task', 'bug', 'test'].includes(ticketType)) {
-    console.log('❌ Invalid ticket type:', ticketType)
-    return
+  const dataTransfer = e.dataTransfer
+  if (!dataTransfer) return
+
+  let dragData: HybridDragData | null = null
+
+  // Попытка получить данные удаления из ракеты
+  const removePayload = dataTransfer.getData('application/x-remove-from-sprint')
+  if (removePayload) {
+    try {
+      const parsed = JSON.parse(removePayload)
+      const ticketId = parsed?.ticketId
+      if (ticketId && typeof ticketId === 'string') {
+        dragData = {
+          type: 'task',
+          ticketId,
+          fromZoneObjectId: null,
+          isNewTicket: false,
+          isExistingTicket: false,
+          isSprintGhostRemoval: true
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to parse remove-from-sprint payload:', error)
+    }
   }
-  
+
+  // Попытка получить данные существующего тикета
+  const existingTicketPayload = dataTransfer.getData('application/x-existing-ticket')
+  if (!dragData && existingTicketPayload) {
+    try {
+      const parsed = JSON.parse(existingTicketPayload)
+      const { ticketId, fromZoneObjectId, type: existingType } = parsed || {}
+
+      if (!ticketId || typeof ticketId !== 'string') {
+        console.warn('❌ Invalid existing ticket payload (ticketId missing):', parsed)
+      } else if (!existingType || !['story', 'task', 'bug', 'test'].includes(existingType)) {
+        console.warn('❌ Invalid existing ticket type:', existingType)
+      } else {
+        const normalizedFromZoneObjectId =
+          typeof fromZoneObjectId === 'string'
+            ? fromZoneObjectId
+            : typeof fromZoneObjectId === 'number'
+              ? String(fromZoneObjectId)
+              : null
+
+        dragData = {
+          type: existingType,
+          ticketId,
+          fromZoneObjectId: normalizedFromZoneObjectId,
+          isExistingTicket: true,
+          isNewTicket: false
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to parse existing ticket payload:', error)
+    }
+  }
+
+  // Если данные существующего тикета не найдены, обрабатываем как новый тикет
+  if (!dragData) {
+    const ticketType = dataTransfer.getData('text/plain') ||
+                      dataTransfer.getData('application/x-ticket-type')
+
+    if (!ticketType || !['story', 'task', 'bug', 'test'].includes(ticketType)) {
+      console.log('❌ Invalid ticket type:', ticketType)
+      return
+    }
+
+    dragData = {
+      type: ticketType as any,
+      ticketId: null,
+      fromZoneObjectId: null,
+      isNewTicket: isTicketButton,
+      isExistingTicket: false
+    }
+  }
+
   // Обновляем глобальное состояние
   globalDragState = {
     isDragging: true,
-    dragData: {
-      type: ticketType as any,
-      isNewTicket: isTicketButton
-    },
+    dragData,
     dragElement: target
   }
   
@@ -154,7 +223,16 @@ const handleNativeDragOver = (e: DragEvent) => {
   if (!globalDragState.isDragging) return
   
   e.preventDefault()
-  e.dataTransfer!.dropEffect = 'copy'
+  if (e.dataTransfer) {
+    const { dragData } = globalDragState
+    if (dragData?.isSprintGhostRemoval) {
+      e.dataTransfer.dropEffect = 'move'
+    } else if (dragData?.isExistingTicket) {
+      e.dataTransfer.dropEffect = 'move'
+    } else {
+      e.dataTransfer.dropEffect = 'copy'
+    }
+  }
   
   // Диспатчим гибридное событие
   dispatchHybridEvent('hybrid-dragover', {

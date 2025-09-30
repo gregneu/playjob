@@ -77,6 +77,44 @@ export const RTSCamera: React.FC<RTSCameraProps> = ({
     }
   }, [fov])
 
+  const focusCameraOnPosition = useCallback((focusPosition: [number, number, number]) => {
+    const state = cameraState.current
+    const [x, rawY, z] = focusPosition
+    const targetY = typeof rawY === 'number' ? rawY : 0
+
+    state.target.set(x, targetY, z)
+
+    const desiredHeight = THREE.MathUtils.clamp(targetY + 12, minHeight, maxHeight)
+    const desiredDistance = THREE.MathUtils.clamp(desiredHeight * 1.1, minDistance, maxDistance)
+
+    state.height = desiredHeight
+    state.distance = desiredDistance
+
+    const newPosition = new THREE.Vector3(
+      state.target.x + Math.sin(state.rotation) * state.distance,
+      state.height,
+      state.target.z + Math.cos(state.rotation) * state.distance
+    )
+
+    state.position.copy(newPosition)
+
+    if (cameraRef.current) {
+      cameraRef.current.position.copy(newPosition)
+      cameraRef.current.lookAt(state.target.x, state.target.y, state.target.z)
+    }
+  }, [minHeight, maxHeight, minDistance, maxDistance])
+
+  useEffect(() => {
+    const handleCameraFocus = (event: Event) => {
+      const custom = event as CustomEvent<{ position?: [number, number, number] }>
+      if (!custom.detail?.position) return
+      focusCameraOnPosition(custom.detail.position)
+    }
+
+    window.addEventListener('camera-focus', handleCameraFocus as EventListener)
+    return () => window.removeEventListener('camera-focus', handleCameraFocus as EventListener)
+  }, [focusCameraOnPosition])
+
   // Обработчики клавиатуры
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (disabled || isModalOpen) return // Блокируем управление если камера отключена или модалка открыта

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import * as THREE from 'three'
 import { Canvas, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
@@ -31,10 +31,12 @@ import { ZoneColorPicker } from './ZoneColorPicker'
 import BottomTapbar from './BottomTapbar'
 import ConnectedRoadSystem from './ConnectedRoadSystem'
 import TicketDetailsModal from './TicketDetailsModal'
-import Sidebar from './Sidebar'
 import TicketCard from './TicketCard'
+import Sidebar from './Sidebar'
+import SprintSidebar, { type SprintSidebarTicket } from './SprintSidebar'
 import { RobotCar } from './RobotCar'
 import { WindProvider } from './WindSystem'
+import { type RocketTicketGhostStatus } from './RocketTicketGhost'
 import { 
   addHybridEventListener, 
   removeHybridEventListener,
@@ -54,6 +56,17 @@ interface EnhancedHexCell {
   taskName?: string
   progress?: number
   priority?: number
+}
+
+interface RocketTicketCopy {
+  ticketId: string
+  status: RocketTicketGhostStatus
+  title: string
+  ticketType: 'story' | 'task' | 'bug' | 'test'
+  priority?: 'v-low' | 'low' | 'medium' | 'high' | 'veryhigh' | null
+  assigneeId?: string | null
+  assigneeName?: string | null
+  originZoneObjectId: string | null
 }
 
 interface ZoneMarking {
@@ -187,20 +200,25 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   
   // Проверяем существование поля color в таблице zone_objects при загрузке компонента
   useEffect(() => {
-    checkColorFieldExists().then(exists => {
-      if (exists) {
-        console.log('✅ Color field exists in database')
-      } else {
-        console.warn('⚠️ Color field does not exist in database - color picker will not work')
-        console.warn('⚠️ Please add color field to zone_objects table manually')
-      }
-    })
+    let cancelled = false
+    checkColorFieldExists()
+      .then((exists) => {
+        if (cancelled) return
+        if (exists) {
+          console.log('✅ Color field exists in database')
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
   }, [])
   const [isSprintOpen, setIsSprintOpen] = useState(false)
   const [sprintObjectId, setSprintObjectId] = useState<string | null>(null)
   const [sprintWeeks, setSprintWeeks] = useState<number>(2)
   const [isSprintStarted, setIsSprintStarted] = useState(false)
   const [activeSprintId, setActiveSprintId] = useState<string | null>(null)
+  const [sprintStartedAt, setSprintStartedAt] = useState<Date | null>(null)
+  const [isSprintActionLoading, setIsSprintActionLoading] = useState(false)
+  const [isSprintStateLoaded, setIsSprintStateLoaded] = useState(false)
   
   // Улучшенные состояния для drag & drop
   const [isDraggingTicket, setIsDraggingTicket] = useState(false)
@@ -211,6 +229,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Ref для canvas и hover targets
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const hoverTargetsRef = useRef<Map<string, THREE.Object3D>>(new Map())
+  const rocketCopiesRef = useRef<RocketTicketCopy[]>([])
   
   // Функции для регистрации hover targets
   const registerHoverTarget = useCallback((key: string, mesh: THREE.Object3D) => {
@@ -224,7 +243,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     hoverTargetsRef.current.delete(key)
     console.log('🎯 hoverTargetsRef size after unregistration:', hoverTargetsRef.current.size)
   }, [])
-  const [sprintGhosts, setSprintGhosts] = useState<Array<{ id: string; index: number; title: string; priority: any; assignee_id?: string | null; locationObjectId?: string | null }>>([])
+  const [rocketTicketCopies, setRocketTicketCopies] = useState<RocketTicketCopy[]>([])
   const [plannedTickets, setPlannedTickets] = useState<Set<string>>(() => new Set()) // IDs of tickets planned for sprint (per-sprint building)
   const [sprintName, setSprintName] = useState<string>('Sprint')
   const [sprintTickets, setSprintTickets] = useState<Array<{ id: string; title: string; priority?: any; assignee_id?: string | null; zone_object_id?: string | null; sprint_id?: string | null; board_column?: string | null }>>([])
@@ -233,69 +252,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [globalPlannedTicketIds, setGlobalPlannedTicketIds] = useState<Set<string>>(() => new Set())
   const [plannedTicketNames, setPlannedTicketNames] = useState<Record<string, string>>({})
   const [plannedCountAtStart, setPlannedCountAtStart] = useState<number | null>(null)
+  const [sprintProgressByObject, setSprintProgressByObject] = useState<Record<string, { total: number; done: number }>>({})
   // useEffect(() => {
   //   supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null)).catch(() => setCurrentUserId(null))
   // }, [])
-
-  // Load planned tickets for current Sprint building on open / switch
-  useEffect(() => {
-    try {
-      if (!sprintObjectId) { setPlannedTickets(new Set()); return }
-      const key = `planned_tickets_${projectId}_${sprintObjectId}`
-      const saved = localStorage.getItem(key)
-      setPlannedTickets(saved ? new Set(JSON.parse(saved)) : new Set())
-      
-      // Загружаем имя спринта из базы данных, fallback на localStorage
-      const nameKey = `sprint_name_${projectId}_${sprintObjectId}`
-      const savedName = localStorage.getItem(nameKey)
-      
-      // Сначала пытаемся загрузить из БД
-      ;(async () => {
-        try {
-          console.log('=== LOADING SPRINT NAME FROM DB ===')
-          console.log('Project ID:', projectId)
-          console.log('Sprint Object ID:', sprintObjectId)
-          
-          const { supabase } = await import('../lib/supabase')
-          const { data, error } = await supabase
-            .from('sprints')
-            .select('name')
-            .eq('project_id', projectId)
-            .eq('zone_object_id', sprintObjectId)
-            .eq('status', 'active')
-            .order('started_at', { ascending: false })
-            .limit(1)
-          
-          console.log('Sprint query result:', { data, error })
-          
-          if (error) {
-            console.error('Sprint query error:', error)
-            setSprintName(savedName || 'Sprint')
-            return
-          }
-          
-          if (data && data[0] && data[0].name) {
-            console.log('Found sprint name in DB:', data[0].name)
-            setSprintName(data[0].name)
-            // Сохраняем в localStorage для кэширования
-            localStorage.setItem(nameKey, data[0].name)
-            // Обновляем activeSprintNames для отображения на карте
-            setActiveSprintNames(prev => ({
-              ...prev,
-              [sprintObjectId]: data[0].name
-            }))
-          } else {
-            console.log('No sprint found in DB, using localStorage fallback:', savedName)
-            // Fallback на localStorage
-            setSprintName(savedName || 'Sprint')
-          }
-        } catch (err) {
-          console.error('Failed to load sprint name from DB, using localStorage:', err)
-          setSprintName(savedName || 'Sprint')
-        }
-      })()
-    } catch { setPlannedTickets(new Set()) }
-  }, [projectId, sprintObjectId])
 
   // Save planned tickets to localStorage for the current Sprint building
   useEffect(() => {
@@ -304,6 +264,102 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       localStorage.setItem(`planned_tickets_${projectId}_${sprintObjectId}`, JSON.stringify(Array.from(plannedTickets)))
     } catch {}
   }, [plannedTickets, projectId, sprintObjectId])
+
+  useEffect(() => {
+    try {
+      if (!sprintObjectId) return
+      localStorage.setItem(`rocket_copies_${projectId}_${sprintObjectId}`, JSON.stringify(rocketTicketCopies))
+    } catch {}
+  }, [rocketTicketCopies, projectId, sprintObjectId])
+
+  // Save planned tickets to localStorage for the current Sprint building
+  useEffect(() => {
+    try {
+      if (!sprintObjectId) return
+      localStorage.setItem(`planned_tickets_${projectId}_${sprintObjectId}`, JSON.stringify(Array.from(plannedTickets)))
+    } catch {}
+  }, [plannedTickets, projectId, sprintObjectId])
+
+  useEffect(() => {
+    try {
+      if (!sprintObjectId) return
+      localStorage.setItem(`rocket_copies_${projectId}_${sprintObjectId}`, JSON.stringify(rocketTicketCopies))
+    } catch {}
+  }, [rocketTicketCopies, projectId, sprintObjectId])
+
+  useEffect(() => {
+    setPlannedTickets(new Set(rocketTicketCopies.filter(copy => copy.status === 'planned').map(copy => copy.ticketId)))
+  }, [rocketTicketCopies])
+
+  useEffect(() => {
+    rocketCopiesRef.current = rocketTicketCopies
+  }, [rocketTicketCopies])
+
+  useEffect(() => {
+    if (!sprintObjectId) return
+    const total = rocketTicketCopies.length
+    const done = rocketTicketCopies.filter((copy) => copy.status === 'done').length
+    setSprintProgressByObject(prev => ({
+      ...prev,
+      [sprintObjectId]: { total, done }
+    }))
+  }, [rocketTicketCopies, sprintObjectId])
+
+  useEffect(() => {
+    if (!sprintObjectId || !isSprintStateLoaded) return
+
+    const plannedIds = rocketTicketCopies.filter((copy) => copy.status === 'planned').map((copy) => copy.ticketId)
+    const doneIds = rocketTicketCopies.filter((copy) => copy.status === 'done').map((copy) => copy.ticketId)
+    const nameToPersist = (sprintName || 'Sprint').trim() || 'Sprint'
+
+    setSprintProgressByObject(prev => ({
+      ...prev,
+      [sprintObjectId]: {
+        total: plannedIds.length + doneIds.length,
+        done: doneIds.length
+      }
+    }))
+
+    if (!activeSprintId && !isSprintStarted && plannedIds.length === 0 && doneIds.length === 0 && nameToPersist === 'Sprint') {
+      return
+    }
+
+    const timer = setTimeout(() => {
+      ;(async () => {
+        try {
+          const { sprintService } = await import('../lib/supabase')
+          const result = await sprintService.saveSprintState({
+            sprintId: activeSprintId,
+            projectId,
+            zoneObjectId: sprintObjectId,
+            name: nameToPersist,
+            weeks: sprintWeeks,
+            plannedTicketIds: plannedIds,
+            doneTicketIds: doneIds,
+            status: isSprintStarted ? 'active' : 'draft',
+            startedAt: isSprintStarted ? (sprintStartedAt ? sprintStartedAt.toISOString() : null) : null
+          })
+          if (!activeSprintId && result && result.id) {
+            setActiveSprintId(result.id)
+          }
+        } catch (error) {
+          console.error('Failed to persist sprint state to Supabase', error)
+        }
+      })()
+    }, 350)
+
+    return () => clearTimeout(timer)
+  }, [
+    sprintObjectId,
+    projectId,
+    rocketTicketCopies,
+    sprintWeeks,
+    sprintName,
+    isSprintStarted,
+    sprintStartedAt,
+    activeSprintId,
+    isSprintStateLoaded
+  ])
 
   useEffect(() => {
     try {
@@ -323,12 +379,12 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         const { supabase } = await import('../lib/supabase')
         const { data, error } = await supabase
           .from('sprints')
-          .select('id,name,status')
+          .select('id,name,status,zone_object_id,planned_ticket_ids,done_ticket_ids')
           .eq('project_id', projectId)
-          .eq('status', 'active')
-        
+          .neq('status', 'completed')
+
         console.log('Active sprints query result:', { data, error })
-        
+
         if (error) {
           console.error('Active sprints query error:', error)
           return
@@ -336,16 +392,29 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         
         if (!cancelled) {
           const map: Record<string, string> = {}
+          const progress: Record<string, { total: number; done: number }> = {}
           if (Array.isArray(data)) {
             for (const s of data as any[]) { 
               if (s && s.id) {
                 map[s.id] = s.name || 'Sprint'
                 console.log(`Sprint ${s.id}: ${s.name || 'Sprint'}`)
+                const zoneId = s.zone_object_id
+                if (zoneId) {
+                  const planned = Array.isArray(s.planned_ticket_ids) ? s.planned_ticket_ids.length : 0
+                  const done = Array.isArray(s.done_ticket_ids) ? s.done_ticket_ids.length : 0
+                  progress[zoneId] = {
+                    total: planned + done,
+                    done
+                  }
+                }
               }
             }
           }
           console.log('Active sprint names map:', map)
           setActiveSprintNames(map)
+          if (Object.keys(progress).length > 0) {
+            setSprintProgressByObject(prev => ({ ...prev, ...progress }))
+          }
         }
       } catch (err) {
         console.error('Failed to load active sprint names:', err)
@@ -359,6 +428,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     try {
       const allIds = new Set<string>()
       const idToName: Record<string, string> = {}
+      const progressMap: Record<string, { total: number; done: number }> = {}
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
         if (!key) continue
@@ -374,6 +444,23 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                   allIds.add(tid)
                   if (name) idToName[tid] = name
                 }
+                if (!progressMap[objId]) {
+                  progressMap[objId] = { total: ids.length, done: 0 }
+                }
+              }
+            } catch {}
+          }
+        }
+        if (key.startsWith(`rocket_copies_${projectId}_`)) {
+          const objId = key.split(`rocket_copies_${projectId}_`)[1]
+          const raw = localStorage.getItem(key)
+          if (raw) {
+            try {
+              const copies = JSON.parse(raw)
+              if (Array.isArray(copies)) {
+                const total = copies.length
+                const done = copies.filter((item: any) => String(item?.status || '').toLowerCase() === 'done').length
+                progressMap[objId] = { total, done }
               }
             } catch {}
           }
@@ -381,6 +468,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       }
       setGlobalPlannedTicketIds(allIds)
       setPlannedTicketNames(idToName)
+      if (Object.keys(progressMap).length > 0) {
+        setSprintProgressByObject(prev => ({ ...prev, ...progressMap }))
+      }
     } catch {}
   }, [projectId])
 
@@ -405,72 +495,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   }, [plannedTickets, sprintName, sprintObjectId, recomputeGlobalPlanned])
 
   // Global listener for opening Sprint modal
-  useEffect(() => {
-    const onOpen = (e: any) => {
-      try { setSprintObjectId(e?.detail?.zoneObjectId || null) } catch {}
-      setIsSprintOpen(true)
-    }
-    window.addEventListener('open-sprint-modal' as any, onOpen as any)
-    return () => window.removeEventListener('open-sprint-modal' as any, onOpen as any)
-  }, [])
 
-  // Load active sprint state when sidebar opens (must be before any early returns)
-  // Handle planning and sprint ticket movement
-  useEffect(() => {
-    const onMoved = (e: any) => {
-      const { from, to, ticketId } = e.detail || {}
-      if (!ticketId || !sprintObjectId) return
-      
-      // PLANNING PHASE (before sprint starts)
-      if (!isSprintStarted) {
-        if (to === sprintObjectId) {
-          // Ticket dragged TO Sprint building -> add to planned, create placeholder, but DON'T move ticket physically
-          setPlannedTickets(prev => new Set([...prev, ticketId]))
-          const sourceList = (ticketsByZoneObject[from] || []) as any[]
-          const t = sourceList.find((x) => x.id === ticketId)
-          if (t) {
-            const insertAt = Math.max(0, sourceList.length)
-            setSprintGhosts(prev => prev.some(g => g.id === ticketId) ? prev : [...prev, { 
-              id: t.id, index: insertAt, title: t.title, priority: t.priority, 
-              assignee_id: t.assignee_id, locationObjectId: from 
-            }])
-          }
-          // PREVENT physical move during planning - ticket should stay in original building
-          return
-        } else if (from === sprintObjectId) {
-          // This shouldn't happen during planning since tickets don't physically move to Sprint
-          // But if it does, remove from planned and remove placeholder
-          setPlannedTickets(prev => { const next = new Set(prev); next.delete(ticketId); return next })
-          setSprintGhosts(prev => prev.filter(g => g.id !== ticketId))
-        }
-        // Allow normal moves between other buildings during planning
-        return
-      }
-      
-      // SPRINT ACTIVE PHASE
-      if (from === sprintObjectId && to && to !== sprintObjectId) {
-        // Ticket moved OUT of Sprint -> create ghost placeholder
-        const list = (ticketsByZoneObject[sprintObjectId] || []) as any[]
-        let idx = -1
-        try { idx = (window as any)._sprintDragIndex ?? -1 } catch {}
-        if (idx < 0) idx = list.findIndex((t) => t.id === ticketId)
-        const t = list.find((x) => x.id === ticketId)
-        const insertAt = idx < 0 ? Math.max(0, list.length) : idx
-        if (t) {
-          setSprintGhosts((prev) => prev.some((g) => g.id === ticketId) ? prev : [...prev, { 
-            id: t.id, index: insertAt, title: t.title, priority: t.priority, 
-            assignee_id: t.assignee_id, locationObjectId: to 
-          }])
-        }
-      }
-      if (to === sprintObjectId && plannedTickets.has(ticketId)) {
-        // Planned ticket moved INTO Sprint -> remove ghost, becomes real ticket (Done)
-        setSprintGhosts((prev) => prev.filter((g) => g.id !== ticketId))
-      }
-    }
-    window.addEventListener('ticket-moved' as any, onMoved as any, true)
-    return () => window.removeEventListener('ticket-moved' as any, onMoved as any, true)
-  }, [isSprintStarted, sprintObjectId, ticketsByZoneObject, plannedTickets])
 
   // Set global flag to prevent 3D rendering in UserAvatar components
   useEffect(() => {
@@ -514,57 +539,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [gridCells, setGridCells] = useState<EnhancedHexCell[]>([])
   const cameraRef = useRef<THREE.Camera | null>(null)
   const [hoveredCell, setHoveredCell] = useState<[number, number] | null>(null)
-  
-  // Обработчик события camera-focus для перемещения камеры к зданию спринта
-  useEffect(() => {
-    const handleCameraFocus = (event: CustomEvent) => {
-      console.log('Camera focus event received:', event.detail)
-      const { position } = event.detail
-      if (cameraRef.current && position) {
-        console.log('Camera ref exists, moving camera to:', position)
-        // Плавно перемещаем камеру к позиции
-        const camera = cameraRef.current as any
-        if (camera.position) {
-          console.log('Current camera position:', camera.position)
-          // Анимация перемещения камеры
-          const startPosition = camera.position.clone()
-          const endPosition = new THREE.Vector3(position[0], position[1] + 5, position[2])
-          console.log('Target camera position:', endPosition)
-          
-          // Простая анимация перемещения
-          const duration = 1000 // 1 секунда
-          const startTime = Date.now()
-          
-          const animate = () => {
-            const elapsed = Date.now() - startTime
-            const progress = Math.min(elapsed / duration, 1)
-            
-            // Easing function для плавности
-            const easeInOutCubic = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-            
-            const easedProgress = easeInOutCubic(progress)
-            
-            camera.position.lerpVectors(startPosition, endPosition, easedProgress)
-            
-            if (progress < 1) {
-              requestAnimationFrame(animate)
-            } else {
-              console.log('Camera animation completed')
-            }
-          }
-          
-          animate()
-        } else {
-          console.log('Camera position not available')
-        }
-      } else {
-        console.log('Camera ref not available or position missing')
-      }
-    }
-    
-    window.addEventListener('camera-focus', handleCameraFocus as any)
-    return () => window.removeEventListener('camera-focus', handleCameraFocus as any)
-  }, [])
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [isZoneMode, setIsZoneMode] = useState(false)
   
@@ -2091,10 +2065,36 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         return zone.color
       }
     }
-    
+
     console.log(`No zone color found for cell [${q}, ${r}]`)
     return null
   }
+
+  const buildZoneObjectData = useCallback((zoneObject: any, q: number, r: number) => {
+    return {
+      id: zoneObject.id,
+      type: (zoneObject as any).object_type || (zoneObject as any).type,
+      title: zoneObject.title,
+      description: zoneObject.description || `This is a ${(zoneObject as any).object_type} object in the zone.`,
+      status: zoneObject.status as 'open' | 'in_progress' | 'done',
+      priority: zoneObject.priority as 'v-low' | 'low' | 'medium' | 'high' | 'veryhigh',
+      storyPoints: (zoneObject as any).story_points || (zoneObject as any).storyPoints || 0,
+      zoneId: (zoneObject as any).zone_id || (zoneObject as any).zoneId || '',
+      cellPosition: [q, r] as [number, number],
+      createdAt: new Date((zoneObject as any).created_at || Date.now()),
+      isZoneCenter: Boolean((zoneObject as any).isZoneCenter),
+      zoneProgress: (zoneObject as any).zoneProgress as number | undefined
+    }
+  }, [])
+
+  const openSprintSidebar = useCallback((zoneObject: any, q: number, r: number) => {
+    console.log('[DEBUG] openSprintSidebar invoked for', zoneObject?.id, zoneObject?.object_type, 'coords', q, r)
+    const data = buildZoneObjectData(zoneObject, q, r)
+    setSelectedZoneObject(data as any)
+    setSprintObjectId(zoneObject.id)
+    setIsSprintOpen(true)
+    setIsZoneObjectDetailsOpen(false)
+  }, [buildZoneObjectData])
 
 
 
@@ -2151,29 +2151,27 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     // Если есть объект зоны и это не правый клик - открываем детальную панель
     if (zoneObject && !isRightClick) {
       console.log('Found zone object:', zoneObject)
+      try {
+        window.dispatchEvent(new CustomEvent('sprint-click-debug', { detail: { zoneObject } }))
+      } catch (error) {
+        console.error('sprint-click-debug dispatch failed', error)
+      }
       // Special case: Sprint (mapped type 'mountain') opens Sprint modal instead of sidebar
-      if ((zoneObject as any).object_type === 'mountain') {
-        const evt = new CustomEvent('open-sprint-modal', { detail: { zoneObjectId: zoneObject.id, q, r } })
-        window.dispatchEvent(evt)
+      const rawZoneType = (zoneObject as any).object_type ?? (zoneObject as any).type ?? ''
+      const zoneObjectType = String(rawZoneType).toLowerCase()
+      console.log('[SprintSidebar Routing] resolved type:', zoneObjectType, {
+        object_type: (zoneObject as any).object_type,
+        type: (zoneObject as any).type
+      })
+      if (zoneObjectType === 'mountain' || zoneObjectType === 'sprint') {
+        openSprintSidebar(zoneObject, q, r)
         return
       }
+      setIsSprintOpen(false)
+      setSprintObjectId(null)
       
       // Создаем объект для ZoneObjectDetailsPanel (с прогрессом зоны для центральных объектов)
-      const zoneObjectData = {
-        id: zoneObject.id,
-        type: (zoneObject as any).object_type,
-        title: zoneObject.title,
-        description: zoneObject.description || `This is a ${(zoneObject as any).object_type} object in the zone.`,
-        status: zoneObject.status as 'open' | 'in_progress' | 'done',
-        priority: zoneObject.priority as 'v-low' | 'low' | 'medium' | 'high' | 'veryhigh',
-        storyPoints: (zoneObject as any).story_points || (zoneObject as any).storyPoints || 0,
-        zoneId: (zoneObject as any).zone_id || (zoneObject as any).zoneId || '',
-        cellPosition: [q, r] as [number, number],
-        createdAt: new Date((zoneObject as any).created_at || Date.now()),
-        // важное: передаем флаги и прогресс для центральных объектов зон
-        isZoneCenter: Boolean((zoneObject as any).isZoneCenter),
-        zoneProgress: (zoneObject as any).zoneProgress as number | undefined
-      }
+      const zoneObjectData = buildZoneObjectData(zoneObject, q, r)
       
       console.log('Opening ZoneObjectDetailsPanel with data:', zoneObjectData)
       setSelectedZoneObject(zoneObjectData as any)
@@ -2376,7 +2374,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       console.log('Empty cell clicked, but zone mode not active:', { q, r })
       return
     }
-  }, [localBuildings, getBuildingForCell, getZoneInfo, getZoneColor, zones, setSelectedTask, setIsDetailsPanelOpen, getAvailableZoneColor])
+  }, [localBuildings, getBuildingForCell, getZoneInfo, getZoneColor, zones, setSelectedTask, setIsDetailsPanelOpen, getAvailableZoneColor, buildZoneObjectData, openSprintSidebar])
 
   // Удалено: функции для выбора зданий
 
@@ -2496,6 +2494,685 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     }
   }, [findCellUnderCursor, getZoneForCell, isZoneCenter, getZoneObjectForCell])
 
+  const findTicketDetails = useCallback((ticketId: string) => {
+    for (const [, list] of Object.entries(ticketsByZoneObject)) {
+      const items = Array.isArray(list) ? list : []
+      const found = items.find((item: any) => item && item.id === ticketId)
+      if (found) return found
+    }
+    return null
+  }, [ticketsByZoneObject])
+
+const getZoneObjectById = useCallback((zoneObjectId: string | null | undefined) => {
+  if (!zoneObjectId) return null
+  return zoneObjects.find((obj) => obj && obj.id === zoneObjectId) || null
+}, [zoneObjects])
+
+const normalizeRocketCopyRecord = (
+  raw: any,
+  fallback: Partial<RocketTicketCopy>,
+  findDetails: () => any
+): RocketTicketCopy => {
+  const details = findDetails()
+  return {
+    ticketId: fallback.ticketId || raw?.ticketId || raw?.id,
+    status: String(raw?.status).toLowerCase() === 'done' ? 'done' : 'planned',
+    title: raw?.title || fallback.title || details?.title || 'Ticket',
+    ticketType: (raw?.ticketType || raw?.type || fallback.ticketType || details?.type || 'task') as RocketTicketCopy['ticketType'],
+    priority: (raw?.priority ?? fallback.priority ?? details?.priority ?? null) as RocketTicketCopy['priority'],
+    assigneeId: raw?.assigneeId ?? raw?.assignee_id ?? fallback.assigneeId ?? details?.assignee_id ?? null,
+    assigneeName: raw?.assigneeName ?? raw?.assignee ?? fallback.assigneeName ?? (details as any)?.assignee ?? (details as any)?.assignee_name ?? null,
+    originZoneObjectId: raw?.originZoneObjectId ?? raw?.locationObjectId ?? fallback.originZoneObjectId ?? details?.zone_object_id ?? null
+  }
+}
+
+const useCachedRocketCopy = (
+  projectId: string,
+  findTicketDetails: (ticketId: string) => any
+) => {
+  return useCallback((zoneObjectId: string, ticketId: string): RocketTicketCopy | null => {
+    try {
+      const key = `rocket_copies_${projectId}_${zoneObjectId}`
+      const raw = localStorage.getItem(key)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return null
+      const entry = parsed.find((item: any) => {
+        const id = typeof item?.ticketId === 'string' ? item.ticketId : item?.id
+        return id === ticketId
+      })
+      if (!entry) return null
+      const hydrate = () => findTicketDetails(ticketId)
+      return normalizeRocketCopyRecord(entry, { ticketId }, hydrate)
+    } catch (err) {
+      console.error('Failed to read cached rocket copy', err)
+      return null
+    }
+  }, [projectId, findTicketDetails])
+}
+
+const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
+  if (!zoneObject) return false
+  const rawType = (zoneObject as any).object_type ?? (zoneObject as any).type
+  const type = String(rawType || '').toLowerCase()
+  return type === 'sprint' || type === 'mountain'
+  }, [])
+
+  const ensureSprintContext = useCallback((zoneObject: any | null | undefined) => {
+    if (!zoneObject || !zoneObject.id) return null
+    const zoneId = zoneObject.id
+    if (sprintObjectId !== zoneId) {
+      setSprintObjectId(zoneId)
+    }
+    return zoneId
+  }, [sprintObjectId])
+
+  const getCachedRocketCopy = useCachedRocketCopy(projectId, findTicketDetails)
+
+  useEffect(() => {
+    const onOpen = (e: any) => {
+      const detail = e?.detail || {}
+      try {
+        window.dispatchEvent(new CustomEvent('sprint-sidebar-open-event', { detail }))
+      } catch (error) {
+        console.error('failed to log sprint-sidebar-open-event', error)
+      }
+      const zoneObjectId = detail.zoneObjectId || detail.id || null
+      if (!zoneObjectId) {
+        console.warn('open-sprint-modal dispatched without zoneObjectId')
+        return
+      }
+
+      if (isSprintOpen && selectedZoneObject && (selectedZoneObject as any).id === zoneObjectId) {
+        return
+      }
+
+      const zoneObject = zoneObjects.find(obj => obj && obj.id === zoneObjectId)
+      if (!zoneObject) {
+        console.warn('open-sprint-modal: zone object not found for id', zoneObjectId)
+        return
+      }
+
+      const targetQ = typeof detail.q === 'number' ? detail.q : (zoneObject as any).q || 0
+      const targetR = typeof detail.r === 'number' ? detail.r : (zoneObject as any).r || 0
+
+      openSprintSidebar(zoneObject, targetQ, targetR)
+    }
+    window.addEventListener('open-sprint-modal' as any, onOpen as any)
+    return () => window.removeEventListener('open-sprint-modal' as any, onOpen as any)
+  }, [zoneObjects, openSprintSidebar, isSprintOpen, selectedZoneObject])
+
+  const buildRocketCopy = useCallback((ticketId: string, status: RocketTicketGhostStatus, originZoneObjectId: string | null): RocketTicketCopy => {
+    const details = findTicketDetails(ticketId)
+    return {
+      ticketId,
+      status,
+      title: details?.title || 'Ticket',
+      ticketType: (details?.type as RocketTicketCopy['ticketType']) || 'task',
+      priority: (details?.priority as RocketTicketCopy['priority']) ?? null,
+      assigneeId: details?.assignee_id ?? null,
+      assigneeName: ((details as any)?.assignee ?? (details as any)?.assignee_name) ?? null,
+      originZoneObjectId: originZoneObjectId ?? details?.zone_object_id ?? null
+    }
+  }, [findTicketDetails])
+
+  const upsertRocketCopy = useCallback((ticketId: string, status: RocketTicketGhostStatus, originZoneObjectId: string | null) => {
+    setRocketTicketCopies((prev) => {
+      const index = prev.findIndex((copy) => copy.ticketId === ticketId)
+      if (index === -1) {
+        return [...prev, buildRocketCopy(ticketId, status, originZoneObjectId)]
+      }
+      const next = [...prev]
+      const rebuilt = buildRocketCopy(ticketId, status, originZoneObjectId ?? prev[index].originZoneObjectId)
+      next[index] = { ...next[index], ...rebuilt, status }
+      return next
+    })
+  }, [buildRocketCopy])
+
+  const removeRocketCopy = useCallback((ticketId: string) => {
+    setRocketTicketCopies((prev) => prev.filter((copy) => copy.ticketId !== ticketId))
+  }, [])
+
+  // Load sprint state (planned/done ghosts, metadata) from Supabase / local fallback
+  useEffect(() => {
+    let cancelled = false
+
+    setIsSprintStateLoaded(false)
+    setActiveSprintId(null)
+    setPlannedCountAtStart(null)
+    setIsSprintStarted(false)
+    setSprintStartedAt(null)
+
+    const resetSprintState = () => {
+      if (cancelled) return
+      setRocketTicketCopies([])
+      setPlannedTickets(new Set())
+      setActiveSprintId(null)
+      setIsSprintStarted(false)
+      setSprintStartedAt(null)
+      setPlannedCountAtStart(null)
+      if (sprintObjectId) {
+        setSprintProgressByObject(prev => ({
+          ...prev,
+          [sprintObjectId]: { total: 0, done: 0 }
+        }))
+      }
+    }
+
+    if (!sprintObjectId) {
+      resetSprintState()
+      setSprintName('Sprint')
+      setSprintWeeks(2)
+      setIsSprintStateLoaded(true)
+      return
+    }
+
+    const loadFromSupabase = async () => {
+      try {
+        const { sprintService } = await import('../lib/supabase')
+        const remote = await sprintService.getCurrentSprintForObject(projectId, sprintObjectId)
+        if (cancelled) return false
+
+        if (remote) {
+          setActiveSprintId(remote.id || null)
+          const remoteStatus = String(remote.status || '').toLowerCase()
+          const isActive = remoteStatus === 'active'
+          setIsSprintStarted(isActive)
+          setSprintStartedAt(remote.started_at ? new Date(remote.started_at) : (isActive ? new Date() : null))
+          if (typeof remote.weeks === 'number' && remote.weeks > 0) {
+            setSprintWeeks(remote.weeks)
+          }
+          if (remote.name) {
+            setSprintName(remote.name)
+            setActiveSprintNames(prev => ({
+              ...prev,
+              [sprintObjectId]: remote.name
+            }))
+          }
+
+          const plannedIds = Array.isArray(remote.planned_ticket_ids)
+            ? remote.planned_ticket_ids.filter((id: any) => typeof id === 'string')
+            : []
+          const doneIds = Array.isArray(remote.done_ticket_ids)
+            ? remote.done_ticket_ids.filter((id: any) => typeof id === 'string')
+            : []
+
+          const remoteCopies: RocketTicketCopy[] = []
+          plannedIds.forEach((id) => { remoteCopies.push(buildRocketCopy(id, 'planned', null)) })
+          doneIds.forEach((id) => { remoteCopies.push(buildRocketCopy(id, 'done', null)) })
+
+          setRocketTicketCopies(remoteCopies)
+          setPlannedTickets(new Set(plannedIds))
+          setPlannedCountAtStart(plannedIds.length)
+          setSprintProgressByObject(prev => ({
+            ...prev,
+            [sprintObjectId]: {
+              total: plannedIds.length + doneIds.length,
+              done: doneIds.length
+            }
+          }))
+          setIsSprintStateLoaded(true)
+          return true
+        }
+      } catch (error) {
+        console.error('Failed to load sprint state from Supabase', error)
+      }
+      return false
+    }
+
+    const loadFromLocalStorage = () => {
+      try {
+        const plannedKey = `planned_tickets_${projectId}_${sprintObjectId}`
+        const copiesKey = `rocket_copies_${projectId}_${sprintObjectId}`
+        const nameKey = `sprint_name_${projectId}_${sprintObjectId}`
+
+        const storedCopiesRaw = localStorage.getItem(copiesKey)
+        if (storedCopiesRaw) {
+          try {
+            const parsed = JSON.parse(storedCopiesRaw)
+            if (Array.isArray(parsed)) {
+              const normalized = parsed
+                .map((item: any): RocketTicketCopy | null => {
+                  if (!item) return null
+                  const ticketId = item.ticketId || item.id
+                  const status = item.status === 'done' ? 'done' : 'planned'
+                  if (!ticketId) return null
+                  return {
+                    ticketId,
+                    status,
+                    title: item.title || 'Ticket',
+                    ticketType: item.ticketType || item.type || 'task',
+                    priority: item.priority ?? null,
+                    assigneeId: item.assigneeId ?? item.assignee_id ?? null,
+                    originZoneObjectId: item.originZoneObjectId ?? item.locationObjectId ?? null
+                  }
+                })
+                .filter((x): x is RocketTicketCopy => Boolean(x))
+              setRocketTicketCopies(normalized)
+              setPlannedTickets(new Set(normalized.filter(copy => copy.status === 'planned').map(copy => copy.ticketId)))
+              setSprintProgressByObject(prev => ({
+                ...prev,
+                [sprintObjectId]: {
+                  total: normalized.length,
+                  done: normalized.filter(copy => copy.status === 'done').length
+                }
+              }))
+            } else {
+              resetSprintState()
+            }
+          } catch {
+            resetSprintState()
+          }
+        } else {
+          const saved = localStorage.getItem(plannedKey)
+          if (saved) {
+            try {
+              const ids = JSON.parse(saved)
+              if (Array.isArray(ids)) {
+                const fallbackCopies: RocketTicketCopy[] = ids
+                  .filter((id): id is string => typeof id === 'string')
+                  .map((ticketId) => buildRocketCopy(ticketId, 'planned', null))
+                setRocketTicketCopies(fallbackCopies)
+                setPlannedTickets(new Set(ids.filter((id): id is string => typeof id === 'string')))
+                setSprintProgressByObject(prev => ({
+                  ...prev,
+                  [sprintObjectId]: {
+                    total: fallbackCopies.length,
+                    done: fallbackCopies.filter(copy => copy.status === 'done').length
+                  }
+                }))
+              } else {
+                resetSprintState()
+              }
+            } catch {
+              resetSprintState()
+            }
+          } else {
+            resetSprintState()
+          }
+        }
+
+        const savedName = localStorage.getItem(nameKey)
+        if (savedName) {
+          setSprintName(savedName)
+          setActiveSprintNames(prev => ({
+            ...prev,
+            [sprintObjectId]: savedName
+          }))
+        } else {
+          setSprintName('Sprint')
+        }
+      } catch (error) {
+        console.error('Failed to load sprint state from localStorage', error)
+        resetSprintState()
+      }
+
+      setIsSprintStateLoaded(true)
+    }
+
+    (async () => {
+      const loaded = await loadFromSupabase()
+      if (!loaded && !cancelled) {
+        loadFromLocalStorage()
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [projectId, sprintObjectId, buildRocketCopy, setActiveSprintNames])
+
+  
+
+  // Handle planning and sprint ticket movement
+  useEffect(() => {
+    const onMoved = (e: any) => {
+      const { from, to, ticketId } = e.detail || {}
+      if (!ticketId || !sprintObjectId) return
+
+      if (!isSprintStarted) {
+        if (to === sprintObjectId) {
+          upsertRocketCopy(ticketId, 'planned', from || null)
+          return
+        }
+        if (from === sprintObjectId) {
+          removeRocketCopy(ticketId)
+        }
+        return
+      }
+
+      if (from === sprintObjectId && to && to !== sprintObjectId) {
+        upsertRocketCopy(ticketId, 'planned', to || null)
+        void (async () => {
+          try {
+            const { ticketService } = await import('../lib/supabase')
+            await ticketService.removeTicketsFromSprint([ticketId])
+          } catch (err) {
+            console.error('Failed to detach ticket from sprint after move', err)
+          }
+        })()
+      }
+
+      if (to === sprintObjectId) {
+        const existing = rocketCopiesRef.current.find((copy) => copy.ticketId === ticketId)
+        if (existing) {
+          upsertRocketCopy(ticketId, 'done', from || existing.originZoneObjectId || null)
+          if (activeSprintId) {
+            void (async () => {
+              try {
+                const { ticketService } = await import('../lib/supabase')
+                await ticketService.assignTicketsToSprint([ticketId], activeSprintId, { boardColumn: 'in_sprint' })
+              } catch (err) {
+                console.error('Failed to flag ticket as in sprint after move', err)
+              }
+            })()
+          }
+        }
+      }
+    }
+
+    window.addEventListener('ticket-moved' as any, onMoved as any, true)
+    return () => window.removeEventListener('ticket-moved' as any, onMoved as any, true)
+  }, [isSprintStarted, sprintObjectId, upsertRocketCopy, removeRocketCopy, activeSprintId])
+
+  useEffect(() => {
+    if (rocketTicketCopies.length === 0) return
+    setRocketTicketCopies((prev) => {
+      let hasChanges = false
+      const next = prev.map((copy) => {
+        const details = findTicketDetails(copy.ticketId)
+        if (!details) return copy
+
+        let modified = false
+        const updated: RocketTicketCopy = { ...copy }
+
+        if (details.title && details.title !== copy.title) {
+          updated.title = details.title
+          modified = true
+        }
+        if (details.type && details.type !== copy.ticketType) {
+          updated.ticketType = details.type
+          modified = true
+        }
+        if (details.priority && details.priority !== copy.priority) {
+          updated.priority = details.priority
+          modified = true
+        }
+        if (details.assignee_id !== undefined && details.assignee_id !== copy.assigneeId) {
+          updated.assigneeId = details.assignee_id
+          modified = true
+        }
+        const detailsAssigneeName = (details as any)?.assignee ?? (details as any)?.assignee_name ?? null
+        if (detailsAssigneeName !== undefined && detailsAssigneeName !== copy.assigneeName) {
+          updated.assigneeName = detailsAssigneeName
+          modified = true
+        }
+        if (details.zone_object_id && details.zone_object_id !== copy.originZoneObjectId) {
+          updated.originZoneObjectId = details.zone_object_id
+          modified = true
+        }
+
+        if (modified) {
+          hasChanges = true
+          return updated
+        }
+        return copy
+      })
+      return hasChanges ? next : prev
+    })
+  }, [rocketTicketCopies.length, findTicketDetails])
+
+  const activeSprintProgress = useMemo(() => {
+    const total = rocketTicketCopies.length
+    const done = rocketTicketCopies.filter((copy) => copy.status === 'done').length
+    return { total, done }
+  }, [rocketTicketCopies])
+
+  const sprintSidebarTickets = useMemo<SprintSidebarTicket[]>(() => {
+    const sprintZoneObject = sprintObjectId ? getZoneObjectById(sprintObjectId) : null
+
+    return rocketTicketCopies.map((copy) => {
+      const origin = getZoneObjectById(copy.originZoneObjectId)
+      const details = findTicketDetails(copy.ticketId)
+      const detailZoneObject = details?.zone_object_id ? getZoneObjectById(details.zone_object_id) : null
+      const effectiveOrigin = origin ?? detailZoneObject
+      const focusTarget = effectiveOrigin ?? sprintZoneObject
+      const focusPosition = focusTarget ? hexToWorldPosition(focusTarget.q, focusTarget.r) : null
+      const originTitle = effectiveOrigin?.title || null
+      const subtitle = copy.status === 'done'
+        ? `Completed in ${originTitle ?? 'Sprint'}`
+        : `Ticket in ${originTitle ?? 'Pipeline'}`
+
+      return {
+        id: copy.ticketId,
+        title: copy.title,
+        ticketType: copy.ticketType,
+        priority: copy.priority ?? null,
+        status: copy.status,
+        subtitle,
+        originName: originTitle,
+        assigneeId: copy.assigneeId ?? null,
+        assigneeName: copy.assigneeName ?? null,
+        onClick: focusPosition ? () => {
+          const [focusX, focusY, focusZ] = focusPosition
+          try {
+            window.dispatchEvent(new CustomEvent('camera-focus', {
+              detail: {
+                position: [focusX, focusY, focusZ],
+                ticketId: copy.ticketId,
+                zoneObjectId: focusTarget?.id ?? null
+              }
+            }))
+          } catch (err) {
+            console.error('Failed to dispatch camera focus for sprint ticket', err)
+          }
+        } : undefined,
+        onDragStart: (event) => {
+          try {
+            event.dataTransfer?.setData('application/x-remove-from-sprint', JSON.stringify({ ticketId: copy.ticketId }))
+            event.dataTransfer?.setData('application/x-ticket-type', copy.ticketType)
+            event.dataTransfer?.setData('text/plain', copy.ticketType)
+            if (event.dataTransfer) {
+              event.dataTransfer.effectAllowed = 'move'
+            }
+            const ghostData: DragGhostData = {
+              title: copy.title,
+              type: copy.ticketType,
+              priority: copy.priority || undefined,
+              isNewTicket: false
+            }
+            setDragImage(event, ghostData)
+          } catch (err) {
+            console.error('Failed to initialise sprint ghost drag', err)
+          }
+          try {
+            window.dispatchEvent(new CustomEvent('ticket-dragstart', {
+              detail: {
+                type: copy.ticketType,
+                ticketId: copy.ticketId,
+                fromZoneObjectId: copy.originZoneObjectId ?? sprintObjectId
+              }
+            }))
+          } catch {}
+        },
+        onDragEnd: () => {
+          try { window.dispatchEvent(new CustomEvent('ticket-dragend')) } catch {}
+        }
+      }
+    })
+  }, [rocketTicketCopies, getZoneObjectById, sprintObjectId, findTicketDetails])
+
+  const plannedSprintTickets = useMemo(() => sprintSidebarTickets.filter((ticket) => ticket.status === 'planned'), [sprintSidebarTickets])
+  const doneSprintTickets = useMemo(() => sprintSidebarTickets.filter((ticket) => ticket.status === 'done'), [sprintSidebarTickets])
+
+  const handleSprintNameDraftChange = useCallback((value: string) => {
+    setSprintName(value)
+  }, [])
+
+  const handleSprintNameCommit = useCallback(async (value: string) => {
+    const name = value.trim() || 'Sprint'
+    setSprintName(name)
+    if (!sprintObjectId) return
+    try {
+      const { sprintService } = await import('../lib/supabase')
+      const result = await sprintService.saveSprintState({
+        sprintId: activeSprintId,
+        projectId,
+        zoneObjectId: sprintObjectId,
+        name,
+        status: isSprintStarted ? 'active' : 'draft',
+        startedAt: isSprintStarted ? (sprintStartedAt ? sprintStartedAt.toISOString() : null) : undefined
+      })
+      if (result && result.id && result.id !== activeSprintId) {
+        setActiveSprintId(result.id)
+      }
+      setActiveSprintNames(prev => ({
+        ...prev,
+        [sprintObjectId]: name
+      }))
+    } catch (error) {
+      console.error('Failed to update sprint name', error)
+    }
+  }, [activeSprintId, projectId, sprintObjectId, isSprintStarted, sprintStartedAt])
+
+  const handleSprintDurationChange = useCallback((weeks: number) => {
+    setSprintWeeks(weeks)
+  }, [])
+
+  const handleSprintStart = useCallback(async () => {
+    if (isSprintActionLoading || isSprintStarted || !sprintObjectId) return
+    if (plannedTickets.size === 0) {
+      setNotification({ message: 'Plan tickets for Sprint before starting', type: 'warning' })
+      setTimeout(() => setNotification(null), 2000)
+      return
+    }
+
+    const plannedIds = plannedSprintTickets.map((ticket) => ticket.id)
+    const doneIds = doneSprintTickets.map((ticket) => ticket.id)
+    const nameToPersist = (sprintName || 'Sprint').trim() || 'Sprint'
+
+    setIsSprintActionLoading(true)
+    try {
+      const { sprintService } = await import('../lib/supabase')
+      const activated = await sprintService.activateSprint({
+        sprintId: activeSprintId,
+        projectId,
+        zoneObjectId: sprintObjectId,
+        name: nameToPersist,
+        weeks: sprintWeeks,
+        plannedTicketIds: plannedIds,
+        doneTicketIds: doneIds
+      })
+
+      if (activated) {
+        setIsSprintStarted(true)
+        setActiveSprintId(activated.id || activeSprintId)
+        const started = activated.started_at ? new Date(activated.started_at) : new Date()
+        setSprintStartedAt(started)
+        if (typeof activated.weeks === 'number' && activated.weeks > 0) {
+          setSprintWeeks(activated.weeks)
+        }
+        setPlannedCountAtStart(plannedIds.length)
+        setActiveSprintNames(prev => ({
+          ...prev,
+          [sprintObjectId]: activated.name || nameToPersist
+        }))
+
+        if (sprintObjectId) {
+          try {
+            await sprintService.attachTicketsInObjectToSprint(sprintObjectId, activated.id)
+          } catch (err) {
+            console.error('Failed to attach tickets to sprint', err)
+          }
+        }
+        if (activated.id) {
+          try { localStorage.setItem(`sprint_planned_${activated.id}`, String(plannedIds.length)) } catch {}
+        }
+      }
+    } catch (error) {
+      console.error('Sprint start error', error)
+      setNotification({ message: 'Failed to start sprint', type: 'error' })
+      setTimeout(() => setNotification(null), 2000)
+    } finally {
+      setIsSprintActionLoading(false)
+    }
+  }, [
+    isSprintActionLoading,
+    isSprintStarted,
+    sprintObjectId,
+    plannedTickets,
+    plannedSprintTickets,
+    doneSprintTickets,
+    activeSprintId,
+    projectId,
+    sprintName,
+    sprintWeeks
+  ])
+
+  const handleSprintStop = useCallback(async () => {
+    if (isSprintActionLoading || !isSprintStarted || !activeSprintId) return
+
+    setIsSprintActionLoading(true)
+    try {
+      const { sprintService, ticketService } = await import('../lib/supabase')
+      const plannedIds = plannedSprintTickets.map((ticket) => ticket.id)
+      const doneIds = doneSprintTickets.map((ticket) => ticket.id)
+
+      await sprintService.finishSprint(activeSprintId, {
+        plannedTicketIds: plannedIds,
+        doneTicketIds: doneIds,
+        zoneObjectId: sprintObjectId
+      })
+
+      if (doneIds.length > 0) {
+        try {
+          await ticketService.markTicketsDone(doneIds, activeSprintId)
+        } catch (err) {
+          console.error('Failed to mark sprint tickets as done', err)
+        }
+        try {
+          await sprintService.incrementProjectCrystals(projectId, doneIds.length)
+        } catch (err) {
+          console.error('Failed to increment project crystals', err)
+        }
+      }
+
+      const archivedCount = await sprintService.archiveSprintTickets(projectId, activeSprintId, null)
+      setIsSprintStarted(false)
+      setActiveSprintId(null)
+      setSprintStartedAt(null)
+      setSprintTickets([])
+      setRocketTicketCopies([])
+      setPlannedTickets(new Set())
+      setPlannedCountAtStart(null)
+      try { localStorage.removeItem(`sprint_planned_${activeSprintId}`) } catch {}
+      if (sprintObjectId) {
+        try { localStorage.removeItem(`planned_tickets_${projectId}_${sprintObjectId}`) } catch {}
+        try { localStorage.removeItem(`rocket_copies_${projectId}_${sprintObjectId}`) } catch {}
+      }
+      try { await reloadData() } catch (err) { console.error('Failed to reload data after sprint stop', err) }
+      try { window.dispatchEvent(new Event('sprint-completed')) } catch {}
+      setNotification({ message: `Sprint finished, archived ${archivedCount} tickets`, type: 'info' })
+      setTimeout(() => setNotification(null), 2000)
+    } catch (error) {
+      console.error('Sprint stop error', error)
+      setNotification({ message: 'Failed to stop sprint', type: 'error' })
+      setTimeout(() => setNotification(null), 2000)
+    } finally {
+      setIsSprintActionLoading(false)
+    }
+  }, [
+    isSprintActionLoading,
+    isSprintStarted,
+    activeSprintId,
+    projectId,
+    sprintObjectId,
+    reloadData,
+    plannedSprintTickets,
+    doneSprintTickets
+  ])
+
+  const sprintStartDisabled = isSprintActionLoading || isSprintStarted || plannedSprintTickets.length === 0 || !sprintObjectId || !isSprintStateLoaded
+  const sprintStopDisabled = isSprintActionLoading || !isSprintStarted
+
   // Гибридные обработчики drag & drop
   useEffect(() => {
     console.log('🔧 HexGridSystem: Setting up hybrid drag & drop event listeners')
@@ -2522,22 +3199,109 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     
     const handleHybridDrop = (e: any) => {
       console.log('🎯 Hybrid drop received:', e.detail)
-      
+
       const { dragData, clientX, clientY } = e.detail
       if (!dragData) {
         console.log('❌ No dragData found, returning')
         return
       }
-      
+
       console.log('🎯 DragData:', dragData)
-      
-      // Используем единую функцию для вычисления места дропа
+
       const dropTarget = calculateDropTarget(clientX, clientY)
+      const targetZoneObject = dropTarget?.zoneObject || null
+      const isSprintTarget = isSprintZoneObject(targetZoneObject)
+      const sprintTargetId = isSprintTarget
+        ? ensureSprintContext(targetZoneObject)
+        : sprintObjectId
+
       if (!dropTarget) {
-        console.log('❌ Invalid drop target')
+        if (dragData.isSprintGhostRemoval && dragData.ticketId) {
+          console.log('🧹 Removing rocket copy after drop outside sprint')
+          removeRocketCopy(dragData.ticketId)
+        } else {
+          console.log('❌ Invalid drop target')
+        }
         return
       }
-      
+
+      if (dragData.isSprintGhostRemoval && dragData.ticketId) {
+        if (!isSprintTarget) {
+          console.log('🧹 Removing rocket copy via ghost removal drop')
+          removeRocketCopy(dragData.ticketId)
+        }
+        return
+      }
+
+      if (isSprintTarget && dragData.isExistingTicket && dragData.ticketId) {
+        const ticketId = dragData.ticketId
+        const sprintZoneId = (targetZoneObject as any)?.id || sprintTargetId || sprintObjectId || null
+        let existing = rocketCopiesRef.current.find((copy) => copy.ticketId === ticketId)
+
+        if (!existing && sprintZoneId) {
+          const cached = getCachedRocketCopy(sprintZoneId, ticketId)
+          if (cached) {
+            existing = cached
+            setRocketTicketCopies((prev) => {
+              const index = prev.findIndex((copy) => copy.ticketId === ticketId)
+              if (index === -1) {
+                return [...prev, cached]
+              }
+              const next = [...prev]
+              next[index] = { ...next[index], ...cached }
+              return next
+            })
+          }
+        }
+        const origin = dragData.fromZoneObjectId || existing?.originZoneObjectId || null
+
+        let nextStatus: RocketTicketGhostStatus = 'planned'
+        if (existing) {
+          if (existing.status === 'planned') {
+            nextStatus = isSprintStarted ? 'done' : 'planned'
+          } else {
+            nextStatus = existing.status
+          }
+        } else {
+          nextStatus = 'planned'
+        }
+
+        if (existing && existing.status === nextStatus && existing.originZoneObjectId === origin) {
+          return
+        }
+
+        if (nextStatus === 'planned' && existing && existing.status === 'planned' && !isSprintStarted) {
+          return
+        }
+
+        console.log('🚀 Updating rocket copy for ticket:', ticketId, 'status:', nextStatus)
+        upsertRocketCopy(ticketId, nextStatus, origin)
+
+        if (nextStatus === 'done' && isSprintStarted && sprintZoneId) {
+          const currentFrom = dragData.fromZoneObjectId
+            || findTicketDetails(ticketId)?.zone_object_id
+            || existing?.originZoneObjectId
+            || null
+
+          if (currentFrom && currentFrom !== sprintZoneId) {
+            moveTicket(ticketId, currentFrom, sprintZoneId)
+          }
+
+          if (activeSprintId) {
+            void (async () => {
+              try {
+                const { ticketService } = await import('../lib/supabase')
+                await ticketService.assignTicketsToSprint([ticketId], activeSprintId, { boardColumn: 'in_sprint' })
+              } catch (err) {
+                console.error('Failed to assign ticket to sprint after completion', err)
+              }
+            })()
+          }
+        }
+        return
+      }
+
+      // Используем единую функцию для вычисления места дропа
       if (dragData.isNewTicket) {
         console.log('🆕 Opening modal for new ticket:', dragData.type, 'on zone center:', dropTarget.cell)
         setModalConfig({
@@ -2547,13 +3311,12 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         })
       } else if (dragData.isExistingTicket) {
         console.log('🔄 Moving existing ticket:', dragData.ticketId, 'to zone center:', dropTarget.cell)
-        // Логика перемещения существующего тикета
         if (dragData.fromZoneObjectId !== dropTarget.zoneObject.id) {
           moveTicket(dragData.ticketId, dragData.fromZoneObjectId, dropTarget.zoneObject.id)
         }
       }
     }
-    
+
     // Добавляем слушатели для гибридных событий
     addHybridEventListener('hybrid-dragstart', handleHybridDragStart)
     addHybridEventListener('hybrid-dragend', handleHybridDragEnd)
@@ -2566,7 +3329,19 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       removeHybridEventListener('hybrid-dragend', handleHybridDragEnd)
       removeHybridEventListener('hybrid-drop', handleHybridDrop)
     }
-  }, [calculateDropTarget, moveTicket])
+  }, [
+    calculateDropTarget,
+    isSprintZoneObject,
+    moveTicket,
+    removeRocketCopy,
+    upsertRocketCopy,
+    ensureSprintContext,
+    findTicketDetails,
+    isSprintStarted,
+    sprintObjectId,
+    activeSprintId,
+    getCachedRocketCopy
+  ])
 
   // Упрощение: статус зоны не влияет на визуальное состояние центра — объект строится сразу
   const calculateZoneProgress = (_zoneId: string): number => 100
@@ -3054,52 +3829,23 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     ;(async () => {
       try {
         const { sprintService } = await import('../lib/supabase')
-        if (sprintObjectId) {
-          const active = await sprintService.getActiveSprintForObject(projectId, sprintObjectId)
-          setIsSprintStarted(Boolean(active))
-          setActiveSprintId(active?.id || null)
-        } else {
-          const active = await sprintService.getActiveSprint(projectId)
-          setIsSprintStarted(Boolean(active))
-          setActiveSprintId(active?.id || null)
+        const active = sprintObjectId
+          ? await sprintService.getActiveSprintForObject(projectId, sprintObjectId)
+          : await sprintService.getActiveSprint(projectId)
+        setIsSprintStarted(Boolean(active))
+        setActiveSprintId(active?.id || null)
+        setSprintStartedAt(active?.started_at ? new Date(active.started_at) : null)
+        if (active && typeof active.weeks === 'number' && active.weeks > 0) {
+          setSprintWeeks(active.weeks)
         }
-        
-        // Create placeholders for planned tickets when opening Sprint sidebar
-        if (!isSprintStarted) {
-          if (plannedTickets.size > 0) {
-            const newGhosts: any[] = []
-            let index = 0
-            for (const ticketId of plannedTickets) {
-              // Find ticket in any building
-              let foundTicket: any = null
-              let foundLocation: string | null = null
-              for (const [locationId, tickets] of Object.entries(ticketsByZoneObject)) {
-                const ticket = (tickets as any[]).find(t => t.id === ticketId)
-                if (ticket) {
-                  foundTicket = ticket
-                  foundLocation = locationId
-                  break
-                }
-              }
-              if (foundTicket && foundLocation) {
-                newGhosts.push({
-                  id: foundTicket.id,
-                  index: index++,
-                  title: foundTicket.title,
-                  priority: foundTicket.priority,
-                  assignee_id: foundTicket.assignee_id,
-                  locationObjectId: foundLocation
-                })
-              }
-            }
-            setSprintGhosts(newGhosts)
-          } else {
-            setSprintGhosts([])
-          }
-        }
-      } catch {}
+      } catch (error) {
+        console.error('Failed to load active sprint', error)
+        setIsSprintStarted(false)
+        setActiveSprintId(null)
+        setSprintStartedAt(null)
+      }
     })()
-  }, [isSprintOpen, projectId, sprintObjectId, isSprintStarted, plannedTickets, ticketsByZoneObject])
+  }, [isSprintOpen, projectId, sprintObjectId])
 
   // Load sprint tickets for active sprint (used to render placeholders persistently)
   useEffect(() => {
@@ -3296,10 +4042,65 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           console.log('🎯 SIMPLE DROP on canvas container!')
           e.preventDefault()
           e.stopPropagation()
-          
+
+          const existingTicketPayload = e.dataTransfer?.getData('application/x-existing-ticket')
+          if (existingTicketPayload) {
+            console.log('🎯 Existing ticket drop detected:', existingTicketPayload)
+            try {
+              const parsed = JSON.parse(existingTicketPayload)
+              const ticketId = parsed?.ticketId as string | undefined
+              const fromZoneObjectIdRaw = parsed?.fromZoneObjectId
+              const fromZoneObjectId = typeof fromZoneObjectIdRaw === 'string'
+                ? fromZoneObjectIdRaw
+                : typeof fromZoneObjectIdRaw === 'number'
+                  ? String(fromZoneObjectIdRaw)
+                  : undefined
+
+              if (!ticketId || !fromZoneObjectId) {
+                console.warn('❌ Existing ticket payload incomplete, skipping modal open')
+                return
+              }
+
+              const dropTarget = calculateDropTarget(e.clientX, e.clientY)
+              if (!dropTarget) {
+                console.log('❌ Existing ticket drop target invalid, skipping modal')
+                return
+              }
+
+              const targetZoneObject = dropTarget.zoneObject
+              if (isSprintZoneObject(targetZoneObject)) {
+                ensureSprintContext(targetZoneObject)
+                const existing = rocketCopiesRef.current.find((copy) => copy.ticketId === ticketId)
+                const nextStatus: RocketTicketGhostStatus = existing
+                  ? (existing.status === 'planned' ? 'done' : existing.status)
+                  : 'planned'
+                console.log('🚀 Updating rocket copy via fallback drop handler', { ticketId, nextStatus })
+                upsertRocketCopy(ticketId, nextStatus, fromZoneObjectId)
+                return
+              }
+
+              if (dropTarget.zoneObject.id === fromZoneObjectId) {
+                console.log('⚠️ Existing ticket dropped onto the same zone object, no move needed')
+                return
+              }
+
+              console.log('🔄 Moving existing ticket via fallback drop handler', {
+                ticketId,
+                fromZoneObjectId,
+                toZoneObjectId: dropTarget.zoneObject.id
+              })
+              moveTicket(ticketId, fromZoneObjectId, dropTarget.zoneObject.id)?.catch((err) => {
+                console.error('❌ Failed to move ticket via fallback drop handler:', err)
+              })
+            } catch (error) {
+              console.error('❌ Failed to parse existing ticket payload, skipping modal:', error)
+            }
+            return
+          }
+
           const ticketType = e.dataTransfer?.getData('text/plain') || e.dataTransfer?.getData('application/x-ticket-type')
           console.log('🎯 Simple drop ticketType:', ticketType)
-          
+
           if (ticketType && ['story', 'task', 'bug', 'test'].includes(ticketType)) {
             console.log('🎯 SIMPLE: Opening modal for ticket type:', ticketType)
             
@@ -3547,6 +4348,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             hoveredCellDuringDrag={hoveredCellDuringDrag}
             registerHoverTarget={registerHoverTarget}
             unregisterHoverTarget={unregisterHoverTarget}
+            activeSprintObjectId={sprintObjectId}
+            activeSprintProgress={sprintObjectId ? activeSprintProgress : null}
+            sprintProgressMap={sprintProgressByObject}
           />
         )}
           
@@ -3568,6 +4372,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             
             // Находим здание для центральной ячейки зоны (для building mode)
             const building = isZoneCenterCell && zone ? zoneObjects.find(obj => obj.zone_id === zone.id) : null
+            const isSprintBuilding = Boolean(building && typeof building.object_type === 'string' && ['sprint', 'mountain'].includes(building.object_type.toLowerCase()))
+            const progressEntry = isSprintBuilding && building ? (sprintProgressByObject[building.id] ?? { total: 0, done: 0 }) : null
+            const sprintProgressForCell = isSprintBuilding
+              ? (building?.id === sprintObjectId && activeSprintProgress ? activeSprintProgress : progressEntry)
+              : null
             
             // Вычисляем количество тикетов в зоне
             // Тикеты хранятся по ID здания (zoneObject), а не по ID зоны
@@ -3730,6 +4539,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 })()}
                 registerHoverTarget={registerHoverTarget}
                 unregisterHoverTarget={unregisterHoverTarget}
+                sprintProgress={sprintProgressForCell || undefined}
               />
               {isDraggingTicket && dragTicketId && isZoneCenterCell && candidateCenterCell && candidateCenterCell[0] === q && candidateCenterCell[1] === r && (() => {
                 const foundObject = getZoneObjectForCellLocal(q, r)
@@ -3987,6 +4797,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
       {/* Панель деталей объекта зоны */}
       <ZoneObjectDetailsPanel
+        side="right"
         isOpen={isZoneObjectDetailsOpen}
         onClose={() => {
           setIsZoneObjectDetailsOpen(false)
@@ -4072,6 +4883,40 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }}
       />
 
+      {isSprintOpen && (
+        <Sidebar
+          isOpen={isSprintOpen}
+          onClose={() => {
+            setIsSprintOpen(false)
+            setSprintObjectId(null)
+            setSelectedZoneObject(null)
+          }}
+          side="left"
+        >
+          <SprintSidebar
+            sprintName={sprintName}
+            onSprintNameChange={handleSprintNameDraftChange}
+            onSprintNameCommit={handleSprintNameCommit}
+            durationWeeks={sprintWeeks}
+            onDurationChange={handleSprintDurationChange}
+            sprintStartedAt={sprintStartedAt}
+            isSprintStarted={isSprintStarted}
+            plannedTickets={plannedSprintTickets}
+            doneTickets={doneSprintTickets}
+            onClose={() => {
+              setIsSprintOpen(false)
+              setSprintObjectId(null)
+              setSelectedZoneObject(null)
+            }}
+            onStart={handleSprintStart}
+            onStop={handleSprintStop}
+            startDisabled={sprintStartDisabled}
+            stopDisabled={sprintStopDisabled}
+            isActionLoading={isSprintActionLoading}
+          />
+        </Sidebar>
+      )}
+
       {/* Радиальное меню для выбора объекта в центре зоны */}
       <RadialMenu
         isOpen={showRadialMenu}
@@ -4088,8 +4933,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       <BottomTapbar 
         onSelect={(id) => console.log('create type:', id)} 
       />
-
-
 
       {/* Bottom-panel ghost overlay removed: we now use unified HTML5 drag image like Sidebar */}
 
@@ -4118,463 +4961,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           }
         }}
       />
-
-      {/* Sprint modal (top-most) */}
-      <Sidebar
-        isOpen={isSprintOpen}
-        onClose={() => setIsSprintOpen(false)}
-        side="left"
-        width={386}
-        header={<div style={{ padding: '16px 16px 2px', borderBottom: '1px solid #E5E7EB', position: 'relative' }}>
-          {/* Sprint Name - Editable */}
-          <input
-            value={sprintName}
-            onBlur={async (e) => {
-              const name = e.currentTarget.value.trim() || 'Sprint'
-              setSprintName(name)
-              if (activeSprintId) {
-                try { 
-                  const { sprintService } = await import('../lib/supabase')
-                  const success = await sprintService.updateSprintName(activeSprintId, name)
-                  if (success) {
-                    setActiveSprintNames(prev => ({
-                      ...prev,
-                      [activeSprintId]: name
-                    }))
-                  }
-                } catch {}
-              }
-            }}
-            onKeyDown={async (e) => {
-              if (e.key === 'Enter') {
-                const input = e.currentTarget as HTMLInputElement
-                const name = input.value.trim() || 'Sprint'
-                setSprintName(name)
-                if (activeSprintId) {
-                  try { 
-                    const { sprintService } = await import('../lib/supabase')
-                    const success = await sprintService.updateSprintName(activeSprintId, name)
-                    if (success) {
-                      setActiveSprintNames(prev => ({
-                        ...prev,
-                        [activeSprintId]: name
-                      }))
-                    }
-                  } catch {}
-                }
-                input.blur()
-              }
-            }}
-            onChange={(e) => setSprintName(e.currentTarget.value)}
-            placeholder="Sprint name"
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              border: 'none',
-              background: 'transparent',
-              color: '#111827',
-              outline: 'none',
-              padding: 0,
-              width: '100%',
-              marginBottom: '16px'
-            }}
-          />
-          
-          {/* Week Scale */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <div style={{ fontSize: 14, color: '#6B7280' }}>
-              {sprintWeeks} {sprintWeeks === 1 ? 'week' : 'weeks'}
-            </div>
-            <button 
-              onClick={() => setSprintWeeks(w => (w === 1 ? 2 : w === 2 ? 3 : 1))}
-              disabled={isSprintStarted}
-              style={{ 
-                background: 'none', 
-                border: 'none', 
-                fontSize: 14, 
-                cursor: isSprintStarted ? 'not-allowed' : 'pointer', 
-                color: isSprintStarted ? '#9CA3AF' : '#6B7280',
-                padding: '4px 8px',
-                borderRadius: 4
-              }}
-            >
-              ▾
-            </button>
-          </div>
-          
-          {/* Week Scale Visual */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            {/* Start Date */}
-            <div style={{ 
-              fontSize: '12px', 
-              color: '#6B7280', 
-              minWidth: '60px',
-              textAlign: 'left'
-            }}>
-              {(() => {
-                const today = new Date();
-                return today.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-              })()}
-            </div>
-            
-            <div style={{ 
-              height: '4px', 
-              backgroundColor: '#E5E7EB', 
-              borderRadius: '2px',
-              flex: 1,
-              position: 'relative'
-            } as any}>
-              {/* All day markers distributed evenly across total duration */}
-              {Array.from({ length: sprintWeeks * 7 }, (_, dayIndex) => {
-                const isFirstDayOfWeek = dayIndex % 7 === 0;
-                return (
-                  <div key={dayIndex} style={{
-                    position: 'absolute',
-                    left: `${(dayIndex / (sprintWeeks * 7 - 1)) * 100}%`,
-                    top: '-3px', // Все штрихи выровнены по верхнему краю
-                    width: '2px',
-                    height: isFirstDayOfWeek ? '10px' : '5px', // Первый день недели длиннее, остальные короче
-                    backgroundColor: '#9CA3AF',
-                    borderRadius: '1px'
-                  } as any} />
-                );
-              })}
-            </div>
-            
-            {/* End Date */}
-            <div style={{ 
-              fontSize: '12px', 
-              color: '#6B7280', 
-              minWidth: '60px',
-              textAlign: 'right'
-            }}>
-              {(() => {
-                const today = new Date();
-                const endDate = new Date(today);
-                endDate.setDate(today.getDate() + (sprintWeeks * 7) - 1);
-                return endDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-              })()}
-            </div>
-          </div>
-          
-          {/* Close Button */}
-          <button 
-            onClick={() => setIsSprintOpen(false)} 
-            title="Close" 
-            style={{ 
-              position: 'absolute',
-              top: '16px',
-              right: '16px',
-              background: 'none', 
-              border: 'none', 
-              fontSize: 18, 
-              cursor: 'pointer', 
-              color: '#6B7280', 
-              padding: 8,
-              borderRadius: 4
-            }}
-          >
-            ✕
-          </button>
-        </div>}
-        footer={<div style={{ 
-          position: 'sticky',
-          bottom: 0,
-          padding: '16px 24px', 
-          background: 'transparent',
-          display: 'flex',
-          justifyContent: 'center'
-        }}>
-          <div style={{
-            background: 'rgb(0 0 0 / 64%)',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '4px 4px',
-            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px',
-            backdropFilter: 'blur(10px)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0px',
-            transition: 'transform 0.1s ease-out, box-shadow 0.2s ease-out',
-            transformStyle: 'preserve-3d',
-            willChange: 'transform'
-          }}>
-            <button
-            onClick={async () => {
-              try {
-                const { sprintService } = await import('../lib/supabase')
-                if (isSprintStarted && activeSprintId) {
-                  // Allow finishing only when all sprint tickets returned to Sprint building
-                  const tickets = (sprintTickets || []) as any[]
-                  const allReturned = tickets.length === 0 || tickets.every((t) => t.zone_object_id === sprintObjectId)
-                  if (!allReturned) {
-                    setNotification({ message: 'Return all sprint tickets to Sprint before finishing', type: 'warning' })
-                    setTimeout(() => setNotification(null), 2000)
-                    return
-                  }
-                  // Finish sprint and archive all sprint tickets from this sidebar
-                  // Archive only tickets for this sprint id (not other sprint buildings)
-                  const archivedCount = await sprintService.archiveSprintTickets(projectId, activeSprintId, null)
-                  await sprintService.completeSprint(activeSprintId)
-                  setIsSprintStarted(false)
-                  setActiveSprintId(null)
-                  setSprintTickets([])
-                  setSprintGhosts([])
-                  setPlannedTickets(new Set())
-                  setPlannedCountAtStart(null)
-                  try { localStorage.removeItem(`sprint_planned_${activeSprintId}`) } catch {}
-                  try { localStorage.removeItem(`planned_tickets_${projectId}_${sprintObjectId}`) } catch {}
-                  try { await reloadData() } catch {}
-                  try { window.dispatchEvent(new Event('sprint-completed')) } catch {}
-                  setNotification({ message: `Sprint finished, archived ${archivedCount} tickets`, type: 'info' })
-                  setTimeout(() => setNotification(null), 2000)
-                } else {
-                  // Start sprint - check planned tickets instead of physical tickets in building
-                  if (plannedTickets.size === 0) {
-                    setNotification({ message: 'Plan tickets for Sprint before starting', type: 'warning' })
-                    setTimeout(() => setNotification(null), 2000)
-                    return
-                  }
-                  const active = sprintObjectId
-                    ? await sprintService.getActiveSprintForObject(projectId, sprintObjectId)
-                    : await sprintService.getActiveSprint(projectId)
-                  if (active) {
-                    // Resume only this building's sprint
-                    setIsSprintStarted(true)
-                    setActiveSprintId(active.id)
-                    return
-                  }
-                  const created = await sprintService.createSprint(projectId, sprintObjectId || null, sprintName || 'Sprint', sprintWeeks)
-                  if (created) {
-                    // Attach all existing tickets in this sprint object to the sprint to avoid instant placeholders
-                    try { await sprintService.attachTicketsInObjectToSprint(sprintObjectId!, created.id) } catch {}
-                    setIsSprintStarted(true)
-                    setActiveSprintId(created.id)
-                    // Keep existing ghosts so planned placeholders remain visible after start
-                    // Minimal no-op to avoid redeclaration issues; we'll restore snapshot later
-                    /* placeholder */
-                    // Keep existing ghosts so planned placeholders remain visible after start
-                    const initialTotal = plannedTickets.size
-                    setPlannedCountAtStart(initialTotal)
-                    try { localStorage.setItem(`sprint_planned_${created.id}`, String(initialTotal)) } catch {}
-                    // Preserve planned placeholders (ghosts) during the sprint
-                  }
-                }
-              } catch (e) { console.error('Sprint start/finish error', e) }
-            }}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '8px 12px',
-              borderRadius: '0px',
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 600,
-              opacity: (() => {
-                if (isSprintStarted) {
-                  const tickets = (sprintTickets || []) as any[]
-                  const allReturned = tickets.length === 0 || tickets.every((t) => t.zone_object_id === sprintObjectId)
-                  return allReturned ? 1 : 0.6
-                } else {
-                  return plannedTickets.size > 0 ? 1 : 0.6
-                }
-              })()
-            }}
-            disabled={(() => {
-              if (isSprintStarted) {
-                const tickets = (sprintTickets || []) as any[]
-                return !(tickets.length === 0 || tickets.every((t) => t.zone_object_id === sprintObjectId))
-              }
-              return plannedTickets.size === 0
-            })()}
-          >
-            {isSprintStarted ? (
-              <>
-                <div style={{ fontSize: '20px' }}>⏹</div>
-                <div>STOP</div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: '20px' }}>▶</div>
-                <div>START</div>
-              </>
-            )}
-          </button>
-          </div>
-        </div>}
-      >
-        <div style={{ padding: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            {(() => {
-              const list = sprintObjectId ? (ticketsByZoneObject[sprintObjectId] || []) : []
-              if (!isSprintStarted) {
-                // While sprint is NOT started: render grey placeholders (ghosts) for planned tickets
-                const ghosts = (sprintGhosts || []) as any[]
-                if (ghosts.length === 0) return null
-                return ghosts.map((ghost: any) => {
-                  const locObj = (zoneObjects || []).find((o: any) => o && o.id === ghost.locationObjectId)
-                  return (
-                    <div key={`ghost-${ghost.id}`} style={{ breakInside: 'avoid' as any }}>
-                      <div 
-                        draggable
-                        onDragStart={(e) => {
-                          try {
-                            e.dataTransfer?.setData('application/x-remove-from-sprint', JSON.stringify({ ticketId: ghost.id }))
-                            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
-                            // Создаем единый drag ghost для ghost placeholder
-                            const ghostData: DragGhostData = {
-                              title: ghost.title,
-                              type: 'task', // Default type for ghost placeholders
-                              isNewTicket: false
-                            }
-                            setDragImage(e, ghostData)
-                          } catch {}
-                        }}
-                        style={{ display: 'flex', flexDirection: 'column', border: '1px dashed rgba(0,0,0,0.2)', borderRadius: 16, background: '#FAFBFC', padding: 14, minHeight: 165, opacity: 0.65, cursor: 'grab' }}
-                      >
-                        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>Planned in Sprint</div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: '#111', lineHeight: 1.35, flex: 1, overflow: 'hidden' }}>{ghost.title}</div>
-                        <div style={{ fontSize: 11, color: '#94A3B8' }}>Ticket in {locObj?.title || 'another building'}</div>
-                      </div>
-                    </div>
-                  )
-                })
-              }
-              const baseList = list as any[]
-              // Deduplicate base tickets by id to avoid duplicate keys and repeated renders
-              const baseMap = new Map<string, any>()
-              for (const item of baseList) { if (item && item.id && !baseMap.has(item.id)) baseMap.set(item.id, item) }
-              const baseUnique = Array.from(baseMap.values())
-              const ghostByIndex = new Map<number, any>()
-              // Ensure each ghost placeholder occupies a unique slot index.
-              // Previously, multiple moved tickets could share the same index (e.g., end-of-list),
-              // and later entries were dropped, resulting in fewer placeholders displayed.
-              for (const g of sprintGhosts as any[]) {
-                let idx: number = Number.isFinite((g as any).index) ? (g as any).index : 0
-                while (ghostByIndex.has(idx)) idx += 1
-                ghostByIndex.set(idx, { ...g, index: idx })
-              }
-              const ghostIds = new Set((sprintGhosts || []).map((g) => g.id))
-              // Persistent placeholders (tickets still in this sprint but located in another building)
-              const persistentCandidates = (isSprintStarted && activeSprintId)
-                ? (sprintTickets || []).filter((t: any) => t.zone_object_id && t.zone_object_id !== sprintObjectId && !baseUnique.some((b) => b.id === t.id) && !ghostIds.has(t.id))
-                : []
-              // Deduplicate persistent placeholders by id
-              const persistentMap = new Map<string, any>()
-              for (const p of persistentCandidates) { if (p && p.id && !persistentMap.has(p.id)) persistentMap.set(p.id, p) }
-              const persistent = Array.from(persistentMap.values())
-              const persistentIds = new Set(persistent.map((p: any) => p.id))
-              // Remove any base items that are already represented by a ghost or persistent placeholder
-              const filteredBase = baseUnique.filter((b: any) => !ghostIds.has(b.id) && !persistentIds.has(b.id))
-              const maxLen = Math.max(filteredBase.length + ghostByIndex.size + persistent.length, ...Array.from(ghostByIndex.keys()).map((i) => i + 1))
-              const items: any[] = []
-              for (let i = 0, bi = 0, pi = 0; i < maxLen; i++) {
-                const ghost = ghostByIndex.get(i)
-                if (ghost) {
-                  const locObj = (zoneObjects || []).find((o: any) => o && o.id === ghost.locationObjectId)
-                  items.push(
-                    <div key={`ghost-${ghost.id}`} style={{ breakInside: 'avoid' as any }}>
-                      <div 
-                        draggable
-                        onDragStart={(e) => {
-                          try {
-                            // Dragging placeholder means removing from planning
-                            e.dataTransfer?.setData('application/x-remove-from-sprint', JSON.stringify({ ticketId: ghost.id }))
-                            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
-                            // Создаем единый drag ghost для ghost placeholder
-                            const ghostData: DragGhostData = {
-                              title: ghost.title,
-                              type: 'task', // Default type for ghost placeholders
-                              isNewTicket: false
-                            }
-                            setDragImage(e, ghostData)
-                          } catch {}
-                        }}
-                        style={{ 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          border: '1px dashed rgba(0,0,0,0.2)', 
-                          borderRadius: 16, 
-                          background: '#FAFBFC', 
-                          padding: 14, 
-                          minHeight: 165, 
-                          opacity: 0.65,
-                          cursor: 'grab'
-                        } as any}
-                      >
-                        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>Planned in Sprint</div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: '#111', lineHeight: 1.35, flex: 1, overflow: 'hidden' }}>{ghost.title}</div>
-                        <div style={{ fontSize: 11, color: '#94A3B8' }}>Ticket in {locObj?.title || 'another building'}</div>
-                      </div>
-                    </div>
-                  )
-                }
-                if (!ghost && pi < persistent.length) {
-                  const p = persistent[pi++]
-                  const locObj = (zoneObjects || []).find((o: any) => o && o.id === p.zone_object_id)
-                  items.push(
-                    <div key={`persist-${p.id}`} style={{ breakInside: 'avoid' as any }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', border: '1px dashed rgba(0,0,0,0.2)', borderRadius: 16, background: '#FAFBFC', padding: 14, minHeight: 165, opacity: 0.65 }}>
-                        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>Planned in Sprint</div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: '#111', lineHeight: 1.35, flex: 1, overflow: 'hidden' }}>{p.title}</div>
-                        <div style={{ fontSize: 11, color: '#94A3B8' }}>Ticket in {locObj?.title || 'another building'}</div>
-                      </div>
-                    </div>
-                  )
-                  continue
-                }
-                if (filteredBase[bi]) {
-                  const t = filteredBase[bi++]
-                  items.push(
-                    <div key={t.id} style={{ breakInside: 'avoid' as any }}>
-                      <TicketCard
-                        id={t.id}
-                        title={t.title}
-                        priority={t.priority as any}
-                        assigneeId={t.assignee_id || null}
-                        draggable
-                        onClick={() => { setSelectedTicket(t); setIsTicketModalOpen(true) }}
-                        isPlannedInSprint={plannedTickets.has(t.id) && t.zone_object_id !== sprintObjectId}
-                        isDone={Boolean(t.zone_object_id === sprintObjectId)}
-                        sprintName={sprintName}
-                        onDragStart={(e) => {
-                          try {
-                            // Remember index for stable ghost slot when moved out
-                            ;(window as any)._sprintDragIndex = i
-                            e.dataTransfer?.setData('application/x-existing-ticket', JSON.stringify({ ticketId: t.id, fromZoneObjectId: sprintObjectId, type: t.type }))
-                            e.dataTransfer?.setData('application/x-ticket-type', t.type)
-                            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
-                            // Создаем единый drag ghost
-                            const ghostData: DragGhostData = {
-                              title: t.title,
-                              type: t.type,
-                              priority: t.priority as any,
-                              assigneeName: t.assignee_id ? String(t.assignee_id).charAt(0).toUpperCase() : null,
-                              status: t.status as any,
-                              isNewTicket: false
-                            }
-                            setDragImage(e, ghostData)
-                          } catch {}
-                          try { window.dispatchEvent(new CustomEvent('ticket-dragstart', { detail: { type: t.type, ticketId: t.id, fromZoneObjectId: sprintObjectId } })) } catch {}
-                        }}
-                        onDragEnd={() => { try { window.dispatchEvent(new CustomEvent('ticket-dragend')) } catch {} finally { try { (window as any)._sprintDragIndex = -1 } catch {} } }}
-                      />
-                    </div>
-                  )
-                }
-              }
-              return items
-            })()}
-          </div>
-        </div>
-      </Sidebar>
-
-      {/* Removed: Create Test Buildings button */}
 
       {/* Уведомления */}
       {notification && (

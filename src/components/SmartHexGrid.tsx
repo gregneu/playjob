@@ -46,6 +46,9 @@ interface HexGridProps {
   isDraggingTicket?: boolean
   candidateCenterCell?: [number, number] | null
   hoveredCellDuringDrag?: [number, number] | null
+  activeSprintObjectId?: string | null
+  activeSprintProgress?: { total: number; done: number } | null
+  sprintProgressMap?: Record<string, { total: number; done: number }>
 }
 
 export const SmartHexGrid: React.FC<HexGridProps> = ({ 
@@ -65,7 +68,10 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
   candidateCenterCell = null,
   hoveredCellDuringDrag = null,
   registerHoverTarget,
-  unregisterHoverTarget
+  unregisterHoverTarget,
+  activeSprintObjectId = null,
+  activeSprintProgress = null,
+  sprintProgressMap = {}
 }) => {
   const hexSize = 2.0
 
@@ -266,6 +272,14 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
         // Вычисляем количество тикетов в зоне
         // Тикеты хранятся по ID здания (zoneObject), а не по ID зоны
         const zoneTicketCount = building ? (ticketsByZoneObject[building.id] || []).length : 0
+
+        const isSprintBuilding = Boolean(building && typeof building.object_type === 'string' && ['sprint', 'mountain'].includes(building.object_type.toLowerCase()))
+        const progressEntry = isSprintBuilding && building ? (sprintProgressMap[building.id] ?? { total: 0, done: 0 }) : null
+        const sprintProgressForCell = isSprintBuilding
+          ? (building?.id && building.id === activeSprintObjectId && activeSprintProgress
+              ? activeSprintProgress
+              : progressEntry)
+          : null
         
         // Отладка: проверяем данные тикетов
         if (isCenter && zone) {
@@ -352,6 +366,7 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
                 }
                 return result
               })()}
+              sprintProgress={sprintProgressForCell || undefined}
             />
             
             {/* Отладочный бейдж для центральных ячеек убран */}

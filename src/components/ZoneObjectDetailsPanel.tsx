@@ -53,6 +53,7 @@ interface ZoneObjectDetailsPanelProps {
   sprintNames?: Record<string, string>
   sprintLabelByTicketId?: Record<string, string>
   onSprintBadgeClick?: (sprintId: string) => void
+  side?: 'left' | 'right'
 }
 
 export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
@@ -68,7 +69,8 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
   sprintName,
   sprintNames,
   sprintLabelByTicketId,
-  onSprintBadgeClick
+  onSprintBadgeClick,
+  side = 'right'
 }) => {
   // const { user } = useAuth()
   
@@ -412,13 +414,18 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
       <div style={{
         position: 'absolute',
         top: 16,
-        right: 16,
+        right: side === 'right' ? 16 : 'auto',
+        left: side === 'left' ? 16 : 'auto',
         bottom: 16,
         width: 386,
         borderRadius: '20px',
         overflow: 'hidden',
         transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-        transform: isVisible ? 'translateX(0)' : 'translateX(100%)',
+        transform: isVisible
+          ? 'translateX(0)'
+          : side === 'right'
+            ? 'translateX(100%)'
+            : 'translateX(-100%)',
         pointerEvents: 'auto', // Sidebar всегда кликабелен для drag & drop
         opacity: isVisible ? 1 : 0
       }}>
