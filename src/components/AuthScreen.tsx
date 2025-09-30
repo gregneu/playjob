@@ -234,19 +234,6 @@ export const AuthScreen = () => {
             </svg>
             {googleLoading ? 'Connecting…' : 'Sign in with Google'}
           </button>
-
-          <div style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '12px',
-            fontSize: '12px',
-            color: '#475569',
-            lineHeight: 1.5
-          }}>
-            <div><span style={{ color: '#94a3b8' }}>origin:</span> {debugInfo.origin || 'N/A'}</div>
-            <div><span style={{ color: '#94a3b8' }}>redirectTo:</span> {debugInfo.redirectTo || 'undefined'}</div>
-          </div>
         </div>
       </div>
     </div>
