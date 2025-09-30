@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { signInWithGoogle } from '../../lib/supabase-browser'
 
-const googleIconPath =
-  'M19.6 10.23H12v3.54h4.28c-.18 1-.74 1.84-1.58 2.4v2.01h2.56c1.5-1.38 2.36-3.42 2.36-5.85 0-.56-.05-1.1-.12-1.61z M12 20.4c2.14 0 3.93-.71 5.24-1.93l-2.56-2.01c-.71.48-1.61.76-2.68.76-2.06 0-3.81-1.39-4.43-3.29H5.88v2.07c1.31 2.58 3.99 4.4 6.92 4.4z M7.57 11.93c-.16-.48-.25-.99-.25-1.52s.09-1.04.25-1.52V6.82H5.88A8.4 8.4 0 0 0 4.8 10.4c0 1.31.31 2.55.88 3.58l2.33-1.81z M12 5.6c1.16 0 2.21.4 3.04 1.16l2.28-2.28C15.92 3.04 14.14 2.4 12 2.4 9.07 2.4 6.4 4.22 5.08 6.8l2.49 1.87C8.19 7 9.94 5.6 12 5.6z'
+const GoogleIcon = () => (
+  <svg className="h-5 w-5" viewBox="0 0 20 20" aria-hidden="true">
+    <path d="M19.6 8.4h-1.02V8.35H10v3.3h5.49c-.8 2.06-2.7 3.48-4.99 3.48a5.44 5.44 0 0 1-5.51-5.37A5.44 5.44 0 0 1 10.5 4.4c1.38 0 2.63.5 3.6 1.32l2.32-2.25C14.89 1.86 12.85 1 10.5 1A7.99 7.99 0 0 0 1.53 5.86l2.77 2.01C5.03 5.81 7.55 4.4 10.5 4.4z" fill="#4285F4" />
+    <path d="M1.53 5.862A7.976 7.976 0 0 0 2.5 12.3l2.8-2.18a4.61 4.61 0 0 1-.18-1.26c0-.44.07-.87.18-1.26L1.53 5.86z" fill="#FBBC05" />
+    <path d="M10.5 4.4c1.38 0 2.63.5 3.6 1.32l2.32-2.25C14.89 1.86 12.85 1 10.5 1A7.99 7.99 0 0 0 1.53 5.86l2.77 2.01C5.03 5.81 7.55 4.4 10.5 4.4z" fill="#EA4335" />
+    <path d="M10.5 16.72c2.3 0 4.19-.74 5.59-2.03l-2.74-2.13c-.73.5-1.66.79-2.85.79-2.29 0-4.2-1.42-4.99-3.48L2.5 12.3C3.9 15.42 7.02 17.72 10.5 17.72z" fill="#34A853" />
+  </svg>
+)
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false)
@@ -21,16 +27,16 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="glass-panel rounded-2xl bg-slate-800/90 shadow-xl p-8 backdrop-blur-xl text-white">
-          <div className="text-center space-y-4">
+        <div className="glass-panel rounded-2xl bg-slate-800/90 shadow-xl p-8 backdrop-blur-xl text-white space-y-6">
+          <div className="text-center space-y-3">
             <h1 className="text-2xl font-semibold">Welcome to PlayJob</h1>
             <p className="text-slate-300">Sign in to continue building your 3D projects.</p>
           </div>
 
           {error && (
-            <div className="mt-6 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-200">
               {error}
             </div>
           )}
@@ -39,12 +45,12 @@ const LoginPage = () => {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="mt-8 w-full inline-flex items-center justify-center gap-3 rounded-xl bg-white text-slate-900 font-medium py-3 shadow-md transition hover:bg-slate-100 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center justify-center gap-3 rounded-full border border-slate-200 bg-white text-slate-900 font-medium py-3 shadow-sm transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-              <path d={googleIconPath} fill="#4285F4" />
-            </svg>
-            {loading ? 'Connecting…' : 'Continue with Google'}
+            <span className="flex items-center gap-3">
+              <GoogleIcon />
+              <span>{loading ? 'Connecting…' : 'Sign in with Google'}</span>
+            </span>
           </button>
         </div>
       </div>
