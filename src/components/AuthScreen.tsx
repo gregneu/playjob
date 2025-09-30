@@ -67,7 +67,7 @@ export const AuthScreen = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #87CEEB 0%, #4A90E2 100%)',
+      background: 'radial-gradient(1000px 700px at 50% 40%, #FFFFFF 0%, #FFFFFF 20%, #EBECF7 70%, #EBECF7 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -87,7 +87,7 @@ export const AuthScreen = () => {
             alt="PlayJob logo"
             style={{ width: '64px', height: '64px', margin: '0 auto 12px' }}
           />
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#17162B', marginBottom: '8px' }}>
             PlayJob
           </h1>
           <p style={{ color: '#666' }}>
