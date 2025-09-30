@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { signInWithGoogle } from '../../lib/supabase-browser'
+import { useEffect, useState } from 'react'
+import { signInWithGoogle, getRedirectForDebug } from '../../lib/supabase-browser'
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 20 20" aria-hidden="true">
@@ -13,6 +13,14 @@ const GoogleIcon = () => (
 const LoginPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<{ origin: string; redirectTo: string | undefined }>({ origin: '', redirectTo: undefined })
+
+  useEffect(() => {
+    setDebugInfo({
+      origin: typeof window !== 'undefined' ? window.location.origin : '',
+      redirectTo: getRedirectForDebug()
+    })
+  }, [])
 
   const handleGoogleSignIn = async () => {
     try {
@@ -40,6 +48,11 @@ const LoginPage = () => {
               {error}
             </div>
           )}
+
+          <div className="rounded-lg bg-slate-900/80 border border-slate-700 px-4 py-3 text-xs text-slate-300">
+            <p><span className="text-slate-400">origin:</span> {debugInfo.origin || 'N/A'}</p>
+            <p><span className="text-slate-400">redirectTo:</span> {debugInfo.redirectTo || 'undefined'}</p>
+          </div>
 
           <button
             type="button"

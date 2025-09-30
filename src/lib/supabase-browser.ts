@@ -26,21 +26,16 @@ const getRedirectTo = () => {
     return undefined
   }
 
-  if (import.meta.env.DEV) {
-    return 'http://localhost:5173/auth/callback'
-  }
-
-  const origin = window.location.origin.replace(/\/$/, '')
-  if (origin === 'https://playjob.vercel.app') {
-    return 'https://playjob.vercel.app/auth/callback'
-  }
-
-  return `${origin}/auth/callback`
+  return `${window.location.origin}/auth/callback`
 }
+
+export const getRedirectForDebug = () => getRedirectTo()
 
 export const signInWithGoogle = async () => {
   const supabase = getBrowserClient()
   const redirectTo = getRedirectTo()
+
+  console.log('[Auth] Google sign-in redirectTo:', redirectTo)
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',

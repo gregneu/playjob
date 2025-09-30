@@ -219,7 +219,16 @@ CREATE TRIGGER update_buildings_updated_at BEFORE UPDATE ON buildings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
 
-### ✅ **Шаг 3: Проверьте создание таблиц**
+### ✅ **Шаг 3: Проверьте настройки аутентификации
+
+1. Откройте вкладку `Authentication → URL Configuration`.
+2. В поле **Site URL** укажите `https://playjob.vercel.app`.
+3. В разделе **Redirect URLs** добавьте (каждую строку отдельно):
+   - `https://playjob.vercel.app/auth/callback`
+   - `http://localhost:5173/auth/callback`
+4. Сохраните изменения и перезапустите любое запущенное приложение, чтобы подтянуть новые настройки.
+
+### ✅ **Шаг 4: Проверьте создание таблиц**
 
 1. **Перейдите** в раздел "Table Editor"
 2. **Проверьте** наличие таблиц:
