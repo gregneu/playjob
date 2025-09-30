@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { signInWithGoogle, getRedirectForDebug } from '../lib/supabase-browser'
 
+const logoPath = '/assets/128.svg'
+
 export const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
@@ -80,8 +82,13 @@ export const AuthScreen = () => {
         maxWidth: '400px'
       }}>
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <img
+            src={logoPath}
+            alt="PlayJob logo"
+            style={{ width: '64px', height: '64px', margin: '0 auto 12px' }}
+          />
           <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', marginBottom: '10px' }}>
-            🎮 PlayJob
+            PlayJob
           </h1>
           <p style={{ color: '#666' }}>
             {isLogin ? 'Sign in to account' : 'Create account'}
