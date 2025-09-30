@@ -1,6 +1,9 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { AuthScreen } from './components/AuthScreen'
 import PlayjobBuilder from './components/playjob_Builder'
+import LoginPage from './pages/auth/LoginPage'
+import AuthDebugPage from './pages/auth/AuthDebugPage'
 
 function App() {
   const { user, loading } = useAuth()
@@ -22,10 +25,26 @@ function App() {
   }
 
   if (!user) {
-    return <AuthScreen />
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/auth/debug" element={<AuthDebugPage />} />
+          <Route path="*" element={<AuthScreen />} />
+        </Routes>
+      </BrowserRouter>
+    )
   }
 
-  return <PlayjobBuilder />
+  return (
+    <BrowserRouter>
+        <Routes>
+          <Route path="/auth/debug" element={<AuthDebugPage />} />
+          <Route path="/auth/login" element={<Navigate to="/" replace />} />
+          <Route path="/*" element={<PlayjobBuilder />} />
+        </Routes>
+    </BrowserRouter>
+  )
 }
 
 export default App

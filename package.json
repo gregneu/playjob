@@ -25,6 +25,7 @@
     "motion": "^12.23.12",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-router-dom": "^7.1.1",
     "react-hot-toast": "^2.5.2",
     "three": "^0.178.0",
     "three-custom-shader-material": "^6.3.7",
