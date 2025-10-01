@@ -280,6 +280,26 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
             <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '6px' }}>Share “{projectName}”</h2>
             <p style={mutedTextStyle}>Invite teammates and manage access levels</p>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={copyInviteLink}
+              style={{
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.24)',
+                color: '#fff',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+              title={copyState === 'copied' ? 'Copied!' : 'Copy invite link'}
+            >
+              <span style={{ fontSize: '18px', lineHeight: 1 }}>🔗</span>
+            </button>
           <button
             onClick={onClose}
             aria-label="Close share modal"
@@ -294,6 +314,7 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
           >
             ×
           </button>
+          </div>
         </header>
 
         <section>
@@ -320,16 +341,6 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
               Invite
             </button>
           </form>
-        </section>
-
-        <section>
-          <button type="button" onClick={copyInviteLink} style={pillButtonStyle}>
-            <div>
-              <p style={{ fontWeight: 600 }}>Copy link</p>
-              <p style={mutedTextStyle}>Share a direct link with your team</p>
-            </div>
-            <span style={{ fontWeight: 500 }}>{copyState === 'copied' ? 'Copied!' : 'Copy'}</span>
-          </button>
         </section>
 
         <section>

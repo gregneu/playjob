@@ -14,7 +14,8 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
 serve(async (req) => {
@@ -40,6 +41,21 @@ serve(async (req) => {
     const { projectId } = await req.json()
     if (!projectId) return new Response('Missing projectId', { status: 400, headers: corsHeaders })
 
+    const { data: projectRow, error: projectError } = await supabase
+      .from('projects')
+      .select('id, created_by, created_at')
+      .eq('id', projectId)
+      .maybeSingle()
+
+    if (projectError) {
+      console.error('[list-project-members] projectError', projectError)
+      return new Response('Failed to load project', { status: 500, headers: corsHeaders })
+    }
+
+    if (!projectRow) {
+      return new Response('Project not found', { status: 404, headers: corsHeaders })
+    }
+
     const { data: membership, error: membershipError } = await supabase
       .from('project_memberships')
       .select('role')
@@ -54,21 +70,6 @@ serve(async (req) => {
 
     if (!membership) {
       return new Response('Forbidden', { status: 403, headers: corsHeaders })
-    }
-
-    const { data: projectRow, error: projectError } = await supabase
-      .from('projects')
-      .select('id, created_by, created_at')
-      .eq('id', projectId)
-      .maybeSingle()
-
-    if (projectError) {
-      console.error('[list-project-members] projectError', projectError)
-      return new Response('Failed to load project', { status: 500, headers: corsHeaders })
-    }
-
-    if (!projectRow) {
-      return new Response('Project not found', { status: 404, headers: corsHeaders })
     }
 
     const [{ data: memberRows, error: membersError }, { data: inviteRows, error: invitesError }] = await Promise.all([
@@ -133,14 +134,30 @@ serve(async (req) => {
       let fallbackName: string | null = null
 
       if (projectRow.created_by) {
-        const { data: ownerProfile } = await supabase
+        const { data: ownerProfile, error: ownerProfileError } = await supabase
           .from('profiles')
           .select('email, display_name')
           .eq('id', projectRow.created_by)
           .maybeSingle()
 
+        if (ownerProfileError) {
+          console.error('[list-project-members] ownerProfileError', ownerProfileError)
+        }
+
         fallbackEmail = ownerProfile?.email ?? ''
         fallbackName = ownerProfile?.display_name ?? null
+      }
+
+      const { data: membershipOwner } = await supabase
+        .from('project_memberships')
+        .select('id, user_id, created_at, profiles:profiles(display_name, email)')
+        .eq('project_id', projectId)
+        .eq('role', 'owner')
+        .maybeSingle()
+
+      if (membershipOwner) {
+        fallbackEmail = membershipOwner.profiles?.email ?? fallbackEmail
+        fallbackName = membershipOwner.profiles?.display_name ?? fallbackName
       }
 
       const fallbackEmailLower = fallbackEmail.trim().toLowerCase()
@@ -149,15 +166,15 @@ serve(async (req) => {
       }
 
       result.push({
-        id: `owner_${projectRow.created_by ?? 'unknown'}`,
-        membership_id: null,
+        id: `owner_${projectRow.created_by ?? membershipOwner?.user_id ?? 'unknown'}`,
+        membership_id: membershipOwner?.id ?? null,
         invite_id: null,
-        user_id: projectRow.created_by ?? null,
+        user_id: membershipOwner?.user_id ?? projectRow.created_by ?? null,
         display_name: fallbackName ?? 'Owner',
         email: fallbackEmail || 'owner@unknown.local',
         role: 'owner',
         status: 'member',
-        created_at: projectRow.created_at ?? new Date().toISOString(),
+        created_at: membershipOwner?.created_at ?? projectRow.created_at ?? new Date().toISOString(),
         source: 'synthetic_owner'
       })
       ownerPresent = true
