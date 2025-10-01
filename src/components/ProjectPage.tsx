@@ -3,7 +3,7 @@ import { HexGridSystem } from './HexGridSystem'
 import { GlassPanel } from './GlassPanel'
 import { UserAvatar } from './UserAvatar'
 import { UserStats } from './UserStats'
-import { ShareProjectModal } from './ShareProjectModal'
+import { ShareModal } from './share/ShareModal'
 // import { Code2, Boxes, Hexagon, FlaskConical } from 'lucide-react'
 import { sprintService } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -260,14 +260,12 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
         <UserAvatar userId={user?.id} userName={user?.user_metadata?.full_name || user?.email} size={56} showName={false} />
       </div>
 
-      {/* Share Project Modal */}
-      <ShareProjectModal
+      {/* Share Modal */}
+      <ShareModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         projectName={project.name}
         projectId={project.id}
-        currentUserId={user?.id || ''}
-        onUserAdded={handleUserAdded}
       />
       {/* AvatarCreatorModal removed */}
     </div>

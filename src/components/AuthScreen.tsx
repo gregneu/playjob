@@ -84,11 +84,11 @@ export const AuthScreen = () => {
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <img
             src={logoPath}
-            alt="PlayJob logo"
+            alt="PlayJoob logo"
             style={{ width: '64px', height: '64px', margin: '0 auto 12px' }}
           />
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#17162B', marginBottom: '8px' }}>
-            PlayJob
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#17162B', marginBottom: '4px' }}>
+            PlayJoob
           </h1>
           <p style={{ color: '#666' }}>
             {isLogin ? 'Sign in to account' : 'Create account'}
@@ -163,7 +163,7 @@ export const AuthScreen = () => {
             disabled={loading}
             style={{
               width: '100%',
-              background: '#3498db',
+              background: '#17162B',
               color: 'white',
               padding: '12px',
               borderRadius: '8px',
@@ -174,7 +174,7 @@ export const AuthScreen = () => {
               opacity: loading ? 0.7 : 1
             }}
           >
-            {loading ? '⏳ Loading...' : isLogin ? '🚀 Sign In' : '✨ Create Account'}
+            {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Create Account'}
           </button>
         </form>
 

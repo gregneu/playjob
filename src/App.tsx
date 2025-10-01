@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth'
 import { AuthScreen } from './components/AuthScreen'
 import PlayjobBuilder from './components/playjob_Builder'
 import LoginPage from './pages/auth/LoginPage'
+import InviteRoute from './pages/invite/InviteRoute'
 import AuthDebugPage from './pages/auth/AuthDebugPage'
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
         <Routes>
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/debug" element={<AuthDebugPage />} />
+          <Route path="/invite/:token" element={<InviteRoute />} />
           <Route path="*" element={<AuthScreen />} />
         </Routes>
       </BrowserRouter>
@@ -41,6 +43,7 @@ function App() {
         <Routes>
           <Route path="/auth/debug" element={<AuthDebugPage />} />
           <Route path="/auth/login" element={<Navigate to="/" replace />} />
+          <Route path="/invite/:token" element={<InviteRoute />} />
           <Route path="/*" element={<PlayjobBuilder />} />
         </Routes>
     </BrowserRouter>

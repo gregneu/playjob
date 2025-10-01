@@ -20,7 +20,7 @@ export const Flag: React.FC<FlagProps> = ({
   poleHeight = 2.6,
   flagWidth = 1.8,
   flagHeight = 1.1,
-  color = '#1D4ED8'
+  color = '#17162B'
 }) => {
   const materialRef = useRef<THREE.ShaderMaterial>(null)
 
@@ -80,14 +80,86 @@ export const Flag: React.FC<FlagProps> = ({
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     const maxWidth = Math.round(w * 0.86)
-    let display = text || ''
-    // Trim if too long
-    while (ctx.measureText(display).width > maxWidth && display.length > 3) {
-      display = display.slice(0, -1)
+    const baseText = (text || '').trim()
+
+    const wrapWords = (input: string) => {
+      if (!input) return ['']
+      const words = input.split(/\s+/)
+      const lines: string[] = []
+      let current = ''
+
+      const pushCurrent = () => {
+        if (current.length) {
+          lines.push(current)
+          current = ''
+        }
+      }
+
+      const pushWithHyphenation = (word: string) => {
+        let segment = ''
+        for (const char of word) {
+          const test = segment + char
+          if (ctx.measureText(test).width > maxWidth && segment.length) {
+            lines.push(segment)
+            segment = char
+          } else {
+            segment = test
+          }
+        }
+        if (segment.length) {
+          if (ctx.measureText(segment).width > maxWidth && segment.length > 1) {
+            let trimmed = segment
+            while (ctx.measureText(trimmed).width > maxWidth && trimmed.length > 1) {
+              trimmed = trimmed.slice(0, -1)
+            }
+            lines.push(trimmed)
+          } else {
+            lines.push(segment)
+          }
+        }
+      }
+
+      for (const word of words) {
+        if (!word) continue
+        const tentative = current ? `${current} ${word}` : word
+        if (ctx.measureText(tentative).width <= maxWidth) {
+          current = tentative
+        } else {
+          pushCurrent()
+          if (ctx.measureText(word).width > maxWidth) {
+            pushWithHyphenation(word)
+          } else {
+            current = word
+          }
+        }
+      }
+
+      pushCurrent()
+      return lines.length ? lines : ['']
     }
+
+    let lines = wrapWords(baseText)
+
+    if (lines.length > 2) {
+      const ellipsis = '...'
+      const rest = lines.slice(1).join(' ')
+      let second = rest.trim()
+      while (ctx.measureText(`${second}${ellipsis}`).width > maxWidth && second.length > 0) {
+        second = second.slice(0, -1)
+      }
+      lines = [lines[0], `${second}${ellipsis}`]
+    }
+
+    const lineHeight = Math.round(h * 0.34)
+    const totalHeight = lineHeight * lines.length
+    let y = h / 2 - (totalHeight - lineHeight) / 2
+
     ctx.shadowColor = 'rgba(0,0,0,0.3)'
     ctx.shadowBlur = 8
-    ctx.fillText(display, w / 2, h / 2)
+    for (const line of lines) {
+      ctx.fillText(line, w / 2, y)
+      y += lineHeight
+    }
 
     const tex = new THREE.CanvasTexture(canvas)
     tex.colorSpace = THREE.SRGBColorSpace
