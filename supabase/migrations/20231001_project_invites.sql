@@ -4,7 +4,7 @@ create table if not exists public.project_invites (
   project_id uuid not null references public.projects(id) on delete cascade,
   inviter_id uuid references public.profiles(id) on delete set null,
   invitee_email citext,
-  role text not null check (role in ('viewer','editor','admin')),
+  role text not null check (role in ('viewer','editor','admin','owner')),
   status text not null default 'pending' check (status in ('pending','accepted','expired')),
   invite_token uuid not null default gen_random_uuid(),
   expires_at timestamptz not null default now() + interval '7 days',
@@ -23,7 +23,7 @@ create table if not exists public.project_memberships (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
-  role text not null check (role in ('viewer','editor','admin')),
+  role text not null check (role in ('viewer','editor','admin','owner')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (project_id, user_id)
@@ -93,12 +93,59 @@ begin
     raise exception 'Unable to resolve invitee profile for %', p_email;
   end if;
 
+  -- Prevent demoting existing owners through invites or role updates
+  if p_role <> 'owner' then
+    perform 1
+    from public.project_memberships
+    where project_id = p_project_id
+      and user_id = v_user_id
+      and role = 'owner';
+
+    if found then
+      update public.project_memberships
+      set updated_at = now()
+      where project_id = p_project_id
+        and user_id = v_user_id;
+      return;
+    end if;
+  end if;
+
   insert into public.project_memberships (project_id, user_id, role)
   values (p_project_id, v_user_id, p_role)
   on conflict (project_id, user_id)
   do update set role = excluded.role, updated_at = now();
 end;
 $$;
+
+-- Ensure project creator becomes owner automatically
+create or replace function public.handle_project_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exists boolean;
+begin
+  select exists (
+    select 1 from public.project_memberships
+    where project_id = new.id
+      and user_id = new.created_by
+  ) into v_exists;
+
+  if not v_exists then
+    insert into public.project_memberships (project_id, user_id, role)
+    values (new.id, new.created_by, 'owner');
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists project_owner_default on public.projects;
+create trigger project_owner_default
+after insert on public.projects
+for each row execute function public.handle_project_owner();
 
 -- Create invite RPC, generates new or refreshes existing invite
 create or replace function public.create_project_invite(
@@ -233,11 +280,19 @@ for select using (
 drop policy if exists "project_memberships_insert" on public.project_memberships;
 create policy "project_memberships_insert" on public.project_memberships
 for insert with check (
-  exists (
-    select 1 from public.project_memberships pm
-    where pm.project_id = project_memberships.project_id
-      and pm.user_id = auth.uid()
-      and pm.role = 'admin'
+  (
+    exists (
+      select 1 from public.project_memberships pm
+      where pm.project_id = project_memberships.project_id
+        and pm.user_id = auth.uid()
+        and pm.role in ('admin','owner')
+    )
+  )
+  or (
+    project_memberships.role = 'owner'
+    and (
+      select p.created_by from public.projects p where p.id = project_memberships.project_id
+    ) = auth.uid()
   )
 );
 
@@ -248,7 +303,7 @@ for update using (
     select 1 from public.project_memberships pm
     where pm.project_id = project_memberships.project_id
       and pm.user_id = auth.uid()
-      and pm.role = 'admin'
+      and pm.role in ('admin','owner')
   )
 );
 
@@ -260,7 +315,7 @@ for select using (
     from public.project_memberships pm
     where pm.project_id = project_invites.project_id
       and pm.user_id = auth.uid()
-      and pm.role in ('admin','editor')
+      and pm.role in ('admin','owner','editor')
   )
 );
 
@@ -272,7 +327,7 @@ for insert with check (
     from public.project_memberships pm
     where pm.project_id = project_invites.project_id
       and pm.user_id = auth.uid()
-      and pm.role = 'admin'
+      and pm.role in ('admin','owner')
   )
 );
 
@@ -284,7 +339,7 @@ for update using (
     from public.project_memberships pm
     where pm.project_id = project_invites.project_id
       and pm.user_id = auth.uid()
-      and pm.role = 'admin'
+      and pm.role in ('admin','owner')
   )
 );
 
@@ -296,7 +351,7 @@ for delete using (
     from public.project_memberships pm
     where pm.project_id = project_invites.project_id
       and pm.user_id = auth.uid()
-      and pm.role = 'admin'
+      and pm.role in ('admin','owner')
   )
 );
 

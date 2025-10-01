@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getBrowserClient } from '@/lib/supabase-browser'
 
-type Role = 'viewer' | 'editor' | 'admin'
+type Role = 'viewer' | 'editor' | 'admin' | 'owner'
 type MemberStatus = 'pending' | 'accepted' | 'expired' | 'active'
 
 interface MemberRow {
@@ -23,10 +23,19 @@ interface ShareModalProps {
   onClose: () => void
 }
 
-const ROLE_LABEL: Record<Role, string> = {
+const ROLE_LABEL: Record<Exclude<Role, 'owner'>, string> = {
   viewer: 'Can view',
   editor: 'Can edit',
   admin: 'Admin'
+}
+
+const OWNER_BADGE_STYLE: React.CSSProperties = {
+  padding: '2px 8px',
+  borderRadius: '9999px',
+  background: 'rgba(255,255,255,0.18)',
+  fontSize: '12px',
+  fontWeight: 600,
+  color: '#fff'
 }
 
 export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareModalProps) {
@@ -295,6 +304,7 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
             {members.map((member) => {
               const initials = member.display_name?.slice(0, 2).toUpperCase() ?? member.email.slice(0, 2).toUpperCase()
               const statusLabel = member.status === 'pending' ? 'Pending' : undefined
+              const isOwner = member.role === 'owner'
 
               return (
                 <div key={`${member.member_id ?? member.invite_id}`} style={memberEntryStyle}>
@@ -314,7 +324,14 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
                       {initials}
                     </div>
                     <div>
-                      <p style={{ fontWeight: 600 }}>{member.display_name ?? member.email}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <p style={{ fontWeight: 600 }}>{member.display_name ?? member.email}</p>
+                        {isOwner ? (
+                          <span style={OWNER_BADGE_STYLE}>
+                            Owner
+                          </span>
+                        ) : null}
+                      </div>
                       <p style={mutedTextStyle}>
                         {member.email}
                         {statusLabel ? (
@@ -334,17 +351,34 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
                     </div>
                   </div>
 
-                  <select
-                    value={member.role}
-                    onChange={(event) => changeRole(member, event.target.value as Role)}
-                    style={{ ...selectStyle, minWidth: '140px', opacity: member.status === 'pending' ? 0.8 : 1 }}
-                  >
-                    {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABEL[r]}
-                      </option>
-                    ))}
-                  </select>
+                  {isOwner ? (
+                    <span
+                      style={{
+                        ...selectStyle,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: OWNER_BADGE_STYLE.background,
+                        borderColor: 'rgba(255,255,255,0.3)',
+                        fontWeight: OWNER_BADGE_STYLE.fontWeight,
+                        color: OWNER_BADGE_STYLE.color,
+                      }}
+                    >
+                      Owner
+                    </span>
+                  ) : (
+                    <select
+                      value={member.role as Exclude<Role, 'owner'>}
+                      onChange={(event) => changeRole(member, event.target.value as Role)}
+                      style={{ ...selectStyle, minWidth: '140px', opacity: member.status === 'pending' ? 0.8 : 1 }}
+                    >
+                      {(Object.keys(ROLE_LABEL) as Array<Exclude<Role, 'owner'>>).map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABEL[r]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )
             })}
