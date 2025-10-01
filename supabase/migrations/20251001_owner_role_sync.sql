@@ -1,20 +1,4 @@
 -- Ensure project_members table supports owner role
-alter table if exists public.project_members
-  alter column role set default 'member';
-
-alter table if exists public.project_members
-  alter column role set not null;
-
-alter table if exists public.project_members
-  drop constraint if exists project_members_role_check;
-
-alter table if exists public.project_members
-  drop constraint if exists project_members_role_check1;
-
-alter table if exists public.project_members
-  add constraint project_members_role_check
-  check (role in ('owner','admin','member'));
-
 -- Ensure project_memberships table supports owner role
 alter table if exists public.project_memberships
   alter column role set not null;

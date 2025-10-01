@@ -43,7 +43,7 @@ serve(async (req) => {
 
     const { data: projectRow, error: projectError } = await supabase
       .from('projects')
-      .select('id, created_by, created_at')
+      .select('id, owner_id, created_at')
       .eq('id', projectId)
       .maybeSingle()
 
@@ -68,7 +68,9 @@ serve(async (req) => {
       return new Response('Failed to verify membership', { status: 500, headers: corsHeaders })
     }
 
-    if (!membership) {
+    const isOwner = projectRow.owner_id && projectRow.owner_id === user.id
+
+    if (!membership && !isOwner) {
       return new Response('Forbidden', { status: 403, headers: corsHeaders })
     }
 
@@ -133,11 +135,11 @@ serve(async (req) => {
       let fallbackEmail = ''
       let fallbackName: string | null = null
 
-      if (projectRow.created_by) {
+      if (projectRow.owner_id) {
         const { data: ownerProfile, error: ownerProfileError } = await supabase
           .from('profiles')
           .select('email, display_name')
-          .eq('id', projectRow.created_by)
+          .eq('id', projectRow.owner_id)
           .maybeSingle()
 
         if (ownerProfileError) {
@@ -166,10 +168,10 @@ serve(async (req) => {
       }
 
       result.push({
-        id: `owner_${projectRow.created_by ?? membershipOwner?.user_id ?? 'unknown'}`,
+        id: `owner_${projectRow.owner_id ?? membershipOwner?.user_id ?? 'unknown'}`,
         membership_id: membershipOwner?.id ?? null,
         invite_id: null,
-        user_id: membershipOwner?.user_id ?? projectRow.created_by ?? null,
+        user_id: membershipOwner?.user_id ?? projectRow.owner_id ?? null,
         display_name: fallbackName ?? 'Owner',
         email: fallbackEmail || 'owner@unknown.local',
         role: 'owner',

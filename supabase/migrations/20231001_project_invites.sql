@@ -291,7 +291,7 @@ for insert with check (
   or (
     project_memberships.role = 'owner'
     and (
-      select p.created_by from public.projects p where p.id = project_memberships.project_id
+      select p.owner_id from public.projects p where p.id = project_memberships.project_id
     ) = auth.uid()
   )
 );
