@@ -56,19 +56,30 @@ serve(async (req) => {
       return new Response('Forbidden', { status: 403, headers: corsHeaders })
     }
 
-    const membersPromise = supabase
-      .from('project_memberships')
-      .select('user_id, role, profiles:profiles(display_name, email)')
-      .eq('project_id', projectId)
+    const { data: projectRow, error: projectError } = await supabase
+      .from('projects')
+      .select('id, created_by, created_at')
+      .eq('id', projectId)
+      .maybeSingle()
 
-    const invitesPromise = supabase
-      .from('project_invites')
-      .select('id, invite_token, invitee_email, role, status, expires_at')
-      .eq('project_id', projectId)
+    if (projectError) {
+      console.error('[list-project-members] projectError', projectError)
+      return new Response('Failed to load project', { status: 500, headers: corsHeaders })
+    }
+
+    if (!projectRow) {
+      return new Response('Project not found', { status: 404, headers: corsHeaders })
+    }
 
     const [{ data: memberRows, error: membersError }, { data: inviteRows, error: invitesError }] = await Promise.all([
-      membersPromise,
-      invitesPromise
+      supabase
+        .from('project_memberships')
+        .select('id, user_id, role, created_at, profiles:profiles(display_name, email)')
+        .eq('project_id', projectId),
+      supabase
+        .from('project_invites')
+        .select('id, invitee_email, role, status, created_at')
+        .eq('project_id', projectId)
     ])
 
     if (membersError || invitesError) {
@@ -76,32 +87,139 @@ serve(async (req) => {
       return new Response('Failed to load team members', { status: 500, headers: corsHeaders })
     }
 
-    const combined = [
-      ...((memberRows ?? []).map((row: any) => ({
-        invite_id: null,
-        invite_token: null,
-        member_id: row.user_id,
-        display_name: row.profiles?.display_name ?? null,
-        email: row.profiles?.email ?? '',
-        role: row.role as any,
-        status: 'active',
-        expires_at: null
-      }))),
-      ...((inviteRows ?? []).map((row) => ({
-        invite_id: row.id,
-        invite_token: row.invite_token,
-        member_id: null,
-        display_name: null,
-        email: row.invitee_email,
-        role: row.role as any,
-        status: row.status as any,
-        expires_at: row.expires_at
-      })))
-    ]
+    const membershipEmails = new Set<string>()
+    const result: Array<{
+      id: string
+      membership_id: string | null
+      invite_id: string | null
+      user_id: string | null
+      display_name: string | null
+      email: string
+      role: string
+      status: 'member' | 'invited'
+      created_at: string
+      source: 'membership' | 'invite' | 'synthetic_owner'
+    }> = []
 
-    return new Response(JSON.stringify(combined), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    let ownerPresent = false
+
+    for (const row of memberRows ?? []) {
+      const email = (row as any).profiles?.email ?? ''
+      const emailLower = email.trim().toLowerCase()
+      if (emailLower) {
+        membershipEmails.add(emailLower)
+      }
+      if ((row as any).role === 'owner') {
+        ownerPresent = true
+      }
+
+      result.push({
+        id: `member_${(row as any).id}`,
+        membership_id: (row as any).id ?? null,
+        invite_id: null,
+        user_id: (row as any).user_id ?? null,
+        display_name: (row as any).profiles?.display_name ?? null,
+        email,
+        role: (row as any).role,
+        status: 'member',
+        created_at: (row as any).created_at ?? new Date().toISOString(),
+        source: 'membership'
+      })
+    }
+
+    if (!ownerPresent) {
+      console.warn(`[list-project-members] Owner membership missing for project ${projectId}, synthesizing fallback row`)
+      let fallbackEmail = ''
+      let fallbackName: string | null = null
+
+      if (projectRow.created_by) {
+        const { data: ownerProfile } = await supabase
+          .from('profiles')
+          .select('email, display_name')
+          .eq('id', projectRow.created_by)
+          .maybeSingle()
+
+        fallbackEmail = ownerProfile?.email ?? ''
+        fallbackName = ownerProfile?.display_name ?? null
+      }
+
+      const fallbackEmailLower = fallbackEmail.trim().toLowerCase()
+      if (fallbackEmailLower) {
+        membershipEmails.add(fallbackEmailLower)
+      }
+
+      result.push({
+        id: `owner_${projectRow.created_by ?? 'unknown'}`,
+        membership_id: null,
+        invite_id: null,
+        user_id: projectRow.created_by ?? null,
+        display_name: fallbackName ?? 'Owner',
+        email: fallbackEmail || 'owner@unknown.local',
+        role: 'owner',
+        status: 'member',
+        created_at: projectRow.created_at ?? new Date().toISOString(),
+        source: 'synthetic_owner'
+      })
+      ownerPresent = true
+    }
+
+    for (const row of inviteRows ?? []) {
+      if ((row as any).status !== 'pending') {
+        continue
+      }
+
+      const email = ((row as any).invitee_email ?? '').trim()
+      const emailLower = email.toLowerCase()
+
+      if (emailLower && membershipEmails.has(emailLower)) {
+        continue
+      }
+
+      result.push({
+        id: `invite_${(row as any).id}`,
+        membership_id: null,
+        invite_id: (row as any).id,
+        user_id: null,
+        display_name: null,
+        email,
+        role: (row as any).role,
+        status: 'invited',
+        created_at: (row as any).created_at ?? new Date().toISOString(),
+        source: 'invite'
+      })
+    }
+
+    const rolePriority: Record<string, number> = {
+      owner: 0,
+      admin: 1,
+      editor: 2,
+      viewer: 3
+    }
+
+    const statusPriority: Record<'member' | 'invited', number> = {
+      member: 0,
+      invited: 1
+    }
+
+    result.sort((a, b) => {
+      const statusDelta = statusPriority[a.status] - statusPriority[b.status]
+      if (statusDelta !== 0) return statusDelta
+
+      const roleDelta = (rolePriority[a.role] ?? 99) - (rolePriority[b.role] ?? 99)
+      if (roleDelta !== 0) return roleDelta
+
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
+
+    return new Response(
+      JSON.stringify({
+        members: result,
+        missing_owner: !ownerPresent
+      }),
+      {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      }
+    )
   } catch (error) {
     console.error('[list-project-members] unexpected error', error)
     return new Response('Internal Server Error', { status: 500, headers: corsHeaders })

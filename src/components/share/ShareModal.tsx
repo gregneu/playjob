@@ -3,17 +3,19 @@ import { createPortal } from 'react-dom'
 import { getBrowserClient } from '@/lib/supabase-browser'
 
 type Role = 'viewer' | 'editor' | 'admin' | 'owner'
-type MemberStatus = 'pending' | 'accepted' | 'expired' | 'active'
+type MemberStatus = 'member' | 'invited'
 
 interface MemberRow {
+  id: string
+  membership_id: string | null
   invite_id: string | null
-  invite_token: string | null
-  member_id: string | null
+  user_id: string | null
   display_name: string | null
   email: string
   role: Role
   status: MemberStatus
-  expires_at: string | null
+  created_at: string
+  source?: 'membership' | 'invite' | 'synthetic_owner'
 }
 
 interface ShareModalProps {
@@ -27,6 +29,18 @@ const ROLE_LABEL: Record<Exclude<Role, 'owner'>, string> = {
   viewer: 'Can view',
   editor: 'Can edit',
   admin: 'Admin'
+}
+
+const ROLE_PRIORITY: Record<Role, number> = {
+  owner: 0,
+  admin: 1,
+  editor: 2,
+  viewer: 3
+}
+
+const STATUS_PRIORITY: Record<MemberStatus, number> = {
+  member: 0,
+  invited: 1
 }
 
 const OWNER_BADGE_STYLE: React.CSSProperties = {
@@ -56,7 +70,23 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
       return
     }
 
-    setMembers((data as MemberRow[]) ?? [])
+    const payload = (data ?? {}) as { members?: MemberRow[]; missing_owner?: boolean }
+
+    if (payload?.missing_owner) {
+      console.warn('[ShareModal] Owner membership missing, synthetic fallback rendered')
+    }
+
+    const sortedMembers = [...(payload?.members ?? [])].sort((a, b) => {
+      const statusDelta = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]
+      if (statusDelta !== 0) return statusDelta
+
+      const roleDelta = ROLE_PRIORITY[a.role] - ROLE_PRIORITY[b.role]
+      if (roleDelta !== 0) return roleDelta
+
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
+
+    setMembers(sortedMembers)
   }, [projectId, supabase])
 
   useEffect(() => {
@@ -113,17 +143,21 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
   }
 
   const changeRole = async (member: MemberRow, nextRole: Role) => {
-    if (member.member_id) {
+    if (member.role === 'owner') {
+      return
+    }
+
+    if (member.status === 'member' && member.membership_id && member.user_id) {
       const { error } = await supabase
         .from('project_memberships')
         .update({ role: nextRole })
         .eq('project_id', projectId)
-        .eq('user_id', member.member_id)
+        .eq('user_id', member.user_id)
 
       if (error) {
         console.error('[ShareModal] Failed to update role', error)
       }
-    } else if (member.invite_id) {
+    } else if (member.status === 'invited' && member.invite_id) {
       const { error } = await supabase
         .from('project_invites')
         .update({ role: nextRole })
@@ -302,12 +336,12 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
           <p style={sectionTitleStyle}>Members</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '320px', overflowY: 'auto' }}>
             {members.map((member) => {
-              const initials = member.display_name?.slice(0, 2).toUpperCase() ?? member.email.slice(0, 2).toUpperCase()
-              const statusLabel = member.status === 'pending' ? 'Pending' : undefined
+              const initials = (member.display_name ?? member.email ?? '?').slice(0, 2).toUpperCase()
+              const statusLabel = member.status === 'invited' ? 'Pending' : undefined
               const isOwner = member.role === 'owner'
 
               return (
-                <div key={`${member.member_id ?? member.invite_id}`} style={memberEntryStyle}>
+                <div key={member.id} style={memberEntryStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div
                       style={{
@@ -341,8 +375,9 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
                               padding: '2px 8px',
                               borderRadius: '9999px',
                               background: 'rgba(255,255,255,0.12)',
-                              fontSize: '12px'
+                              fontSize: '12px',
                             }}
+                            title={member.status === 'invited' ? 'Awaiting acceptance' : undefined}
                           >
                             {statusLabel}
                           </span>
@@ -370,7 +405,7 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
                     <select
                       value={member.role as Exclude<Role, 'owner'>}
                       onChange={(event) => changeRole(member, event.target.value as Role)}
-                      style={{ ...selectStyle, minWidth: '140px', opacity: member.status === 'pending' ? 0.8 : 1 }}
+                      style={{ ...selectStyle, minWidth: '140px', opacity: member.status === 'invited' ? 0.8 : 1 }}
                     >
                       {(Object.keys(ROLE_LABEL) as Array<Exclude<Role, 'owner'>>).map((r) => (
                         <option key={r} value={r}>
