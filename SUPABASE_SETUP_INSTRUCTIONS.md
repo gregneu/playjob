@@ -222,9 +222,9 @@ CREATE TRIGGER update_buildings_updated_at BEFORE UPDATE ON buildings
 ### ✅ **Шаг 3: Проверьте настройки аутентификации
 
 1. Откройте вкладку `Authentication → URL Configuration`.
-2. В поле **Site URL** укажите `https://playjob.vercel.app`.
+2. В поле **Site URL** укажите `https://playjoob.com`.
 3. В разделе **Redirect URLs** добавьте (каждую строку отдельно):
-   - `https://playjob.vercel.app/auth/callback`
+   - `https://playjoob.com/auth/callback`
    - `http://localhost:5173/auth/callback`
 4. Сохраните изменения и перезапустите любое запущенное приложение, чтобы подтянуть новые настройки.
 
