@@ -300,5 +300,3 @@ for delete using (
   )
 );
 
--- View to expose combined members + pending invites
-

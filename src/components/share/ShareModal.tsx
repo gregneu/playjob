@@ -128,97 +128,230 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
 
   if (!isOpen) return null
 
+  const overlayStyle: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 200,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '40px 24px',
+    background: 'rgba(0, 0, 0, 0.35)'
+  }
+
+  const modalStyle: React.CSSProperties = {
+    width: '100%',
+    maxWidth: '640px',
+    borderRadius: '20px',
+    padding: '24px',
+    background: 'rgba(55, 65, 81, 0.95)',
+    backdropFilter: 'blur(10px)',
+    color: '#fff',
+    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.35)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px'
+  }
+
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '16px'
+  }
+
+  const sectionTitleStyle: React.CSSProperties = {
+    fontSize: '16px',
+    fontWeight: 600,
+    marginBottom: '8px'
+  }
+
+  const mutedTextStyle: React.CSSProperties = {
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.7)'
+  }
+
+  const pillButtonStyle: React.CSSProperties = {
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.05)',
+    padding: '12px 16px',
+    color: '#fff',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    cursor: 'pointer'
+  }
+
+  const formRowStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'center'
+  }
+
+  const inputStyle: React.CSSProperties = {
+    flex: 1,
+    padding: '12px 16px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.2)',
+    background: 'rgba(255,255,255,0.08)',
+    color: '#fff',
+    fontSize: '15px'
+  }
+
+  const selectStyle: React.CSSProperties = {
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.2)',
+    background: 'rgba(255,255,255,0.08)',
+    color: '#fff',
+    padding: '12px 16px',
+    fontSize: '15px'
+  }
+
+  const primaryButtonStyle: React.CSSProperties = {
+    borderRadius: '12px',
+    border: 'none',
+    background: '#FFFFFF',
+    color: '#111827',
+    fontWeight: 600,
+    padding: '12px 20px',
+    cursor: loading ? 'not-allowed' : 'pointer',
+    opacity: loading ? 0.7 : 1
+  }
+
+  const memberEntryStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: '16px',
+    padding: '16px',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.14)'
+  }
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-6 py-10">
-      <div className="glass-panel w-full max-w-2xl rounded-2xl p-6 shadow-2xl">
-        <header className="flex items-start justify-between">
+    <div style={overlayStyle}>
+      <div style={modalStyle}>
+        <header style={headerStyle}>
           <div>
-            <h2 className="text-xl font-semibold text-white">Share “{projectName}”</h2>
-            <p className="text-sm text-white/70">Invite teammates and manage access levels</p>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '6px' }}>Share “{projectName}”</h2>
+            <p style={mutedTextStyle}>Invite teammates and manage access levels</p>
           </div>
-          <button className="text-white/70 transition hover:text-white" onClick={onClose} aria-label="Close share modal">
+          <button
+            onClick={onClose}
+            aria-label="Close share modal"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '24px',
+              lineHeight: 1,
+              cursor: 'pointer'
+            }}
+          >
             ×
           </button>
         </header>
 
-        <form onSubmit={inviteByEmail} className="mt-6 flex gap-3">
-          <input
-            type="email"
-            required
-            value={email}
-            placeholder="Add email"
-            onChange={(event) => setEmail(event.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-          />
-          <select
-            value={role}
-            onChange={(event) => setRole(event.target.value as Role)}
-            className="rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-white focus:border-white/40 focus:outline-none"
-          >
-            <option value="viewer">Can view</option>
-            <option value="editor">Can edit</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-xl bg-white px-4 py-3 font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-50"
-          >
-            Invite
+        <section>
+          <p style={sectionTitleStyle}>Invite by email</p>
+          <form onSubmit={inviteByEmail} style={formRowStyle}>
+            <input
+              type="email"
+              required
+              value={email}
+              placeholder="Add email"
+              onChange={(event) => setEmail(event.target.value)}
+              style={inputStyle}
+            />
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value as Role)}
+              style={selectStyle}
+            >
+              <option value="viewer">Can view</option>
+              <option value="editor">Can edit</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button type="submit" disabled={loading} style={primaryButtonStyle}>
+              Invite
+            </button>
+          </form>
+        </section>
+
+        <section>
+          <button type="button" onClick={copyInviteLink} style={pillButtonStyle}>
+            <div>
+              <p style={{ fontWeight: 600 }}>Copy link</p>
+              <p style={mutedTextStyle}>Share a direct link with your team</p>
+            </div>
+            <span style={{ fontWeight: 500 }}>{copyState === 'copied' ? 'Copied!' : 'Copy'}</span>
           </button>
-        </form>
+        </section>
 
-        <button
-          type="button"
-          onClick={copyInviteLink}
-          className="mt-6 flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-white transition hover:bg-white/10"
-        >
-          <div>
-            <p className="font-medium text-white">Copy link</p>
-            <p className="text-sm text-white/60">Share a direct link with your team</p>
-          </div>
-          <span className="text-sm font-medium">{copyState === 'copied' ? 'Copied!' : 'Copy'}</span>
-        </button>
+        <section>
+          <p style={sectionTitleStyle}>Members</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '320px', overflowY: 'auto' }}>
+            {members.map((member) => {
+              const initials = member.display_name?.slice(0, 2).toUpperCase() ?? member.email.slice(0, 2).toUpperCase()
+              const statusLabel = member.status === 'pending' ? 'Pending' : undefined
 
-        <div className="mt-6 space-y-3">
-          {members.map((member) => {
-            const initials = member.display_name?.slice(0, 2).toUpperCase() ?? member.email.slice(0, 2).toUpperCase()
-            const statusLabel = member.status === 'pending' ? 'Pending' : undefined
-
-            return (
-              <div
-                key={`${member.member_id ?? member.invite_id}`}
-                className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white">
-                    {initials}
+              return (
+                <div key={`${member.member_id ?? member.invite_id}`} style={memberEntryStyle}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 600
+                      }}
+                    >
+                      {initials}
+                    </div>
+                    <div>
+                      <p style={{ fontWeight: 600 }}>{member.display_name ?? member.email}</p>
+                      <p style={mutedTextStyle}>
+                        {member.email}
+                        {statusLabel ? (
+                          <span
+                            style={{
+                              marginLeft: '8px',
+                              padding: '2px 8px',
+                              borderRadius: '9999px',
+                              background: 'rgba(255,255,255,0.12)',
+                              fontSize: '12px'
+                            }}
+                          >
+                            {statusLabel}
+                          </span>
+                        ) : null}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-white">{member.display_name ?? member.email}</p>
-                    <p className="text-sm text-white/60">
-                      {member.email}
-                      {statusLabel ? <span className="ml-2 rounded-full bg-white/15 px-2 py-0.5 text-xs text-white/80">{statusLabel}</span> : null}
-                    </p>
-                  </div>
+
+                  <select
+                    value={member.role}
+                    onChange={(event) => changeRole(member, event.target.value as Role)}
+                    style={{ ...selectStyle, minWidth: '140px', opacity: member.status === 'pending' ? 0.8 : 1 }}
+                  >
+                    {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABEL[r]}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              )
+            })}
 
-                <select
-                  value={member.role}
-                  onChange={(event) => changeRole(member, event.target.value as Role)}
-                  className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white focus:border-white/40 focus:outline-none"
-                  style={{ opacity: member.status === 'pending' ? 0.8 : 1 }}
-                >
-                  {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABEL[r]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )
-          })}
-        </div>
+            {members.length === 0 && <p style={mutedTextStyle}>No members yet.</p>}
+          </div>
+        </section>
       </div>
     </div>,
     document.body

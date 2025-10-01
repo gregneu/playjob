@@ -185,12 +185,14 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
         justifyContent: 'space-between',
         alignItems: 'flex-start'
       }}>
-        <GlassPanel style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          padding: '8px 16px'
-        }}>
+        <GlassPanel
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            padding: '8px 16px'
+          }}
+        >
           <button
             onClick={onBack}
             style={{
@@ -212,7 +214,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
 
           {/* Share Button */}
           <button
-            onClick={() => setShowShareModal(true)}
+            onClick={() => setShowShareModal((prev) => !prev)}
             style={{
               background: 'rgba(255,255,255,0.1)',
               border: '1px solid rgba(255,255,255,0.2)',

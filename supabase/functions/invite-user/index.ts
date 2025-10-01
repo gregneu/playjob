@@ -6,6 +6,11 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 const INVITE_BASE_URL = Deno.env.get('INVITE_BASE_URL') ?? 'https://playjoob.com'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+}
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing Supabase configuration in Edge Function environment')
 }
@@ -37,14 +42,18 @@ const buildInviteEmail = (projectName: string, token: string) => `
   </table>`
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 })
+    return new Response('Method Not Allowed', { status: 405, headers: corsHeaders })
   }
 
   try {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response('Missing bearer token', { status: 401 })
+      return new Response('Missing bearer token', { status: 401, headers: corsHeaders })
     }
 
     const jwt = authHeader.replace('Bearer ', '')
@@ -53,17 +62,17 @@ serve(async (req) => {
     } = await supabase.auth.getUser(jwt)
 
     if (!user) {
-      return new Response('Unauthorized', { status: 401 })
+      return new Response('Unauthorized', { status: 401, headers: corsHeaders })
     }
 
     const { projectId, email, role } = await req.json()
 
     if (!projectId || !email || !role) {
-      return new Response('Missing required fields', { status: 400 })
+      return new Response('Missing required fields', { status: 400, headers: corsHeaders })
     }
 
     if (!['viewer', 'editor', 'admin'].includes(role)) {
-      return new Response('Invalid role', { status: 400 })
+      return new Response('Invalid role', { status: 400, headers: corsHeaders })
     }
 
     const { data: membership, error: membershipError } = await supabase
@@ -75,11 +84,11 @@ serve(async (req) => {
 
     if (membershipError) {
       console.error('[invite-user] membershipError', membershipError)
-      return new Response('Failed to verify permissions', { status: 500 })
+      return new Response('Failed to verify permissions', { status: 500, headers: corsHeaders })
     }
 
     if (!membership || membership.role !== 'admin') {
-      return new Response('Forbidden', { status: 403 })
+      return new Response('Forbidden', { status: 403, headers: corsHeaders })
     }
 
     const { data: inviteData, error: inviteError } = await supabase.rpc('create_project_invite', {
@@ -91,7 +100,7 @@ serve(async (req) => {
 
     if (inviteError) {
       console.error('[invite-user] inviteError', inviteError)
-      return new Response(inviteError.message, { status: 400 })
+      return new Response(inviteError.message, { status: 400, headers: corsHeaders })
     }
 
     if (RESEND_API_KEY) {
@@ -111,12 +120,12 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify(inviteData), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
       status: 201
     })
   } catch (error) {
     console.error('[invite-user] unexpected error', error)
-    return new Response('Internal Server Error', { status: 500 })
+    return new Response('Internal Server Error', { status: 500, headers: corsHeaders })
   }
 })
 
