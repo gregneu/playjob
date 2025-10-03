@@ -68,7 +68,8 @@ serve(async (req) => {
       return new Response('Failed to verify membership', { status: 500, headers: corsHeaders })
     }
 
-    const isOwner = projectRow.owner_id && projectRow.owner_id === user.id
+    const ownerId = projectRow.owner_id ?? (projectRow as any).created_by ?? null
+    const isOwner = ownerId !== null && ownerId === user.id
 
     if (!membership && !isOwner) {
       return new Response('Forbidden', { status: 403, headers: corsHeaders })
@@ -77,12 +78,13 @@ serve(async (req) => {
     const [{ data: memberRows, error: membersError }, { data: inviteRows, error: invitesError }] = await Promise.all([
       supabase
         .from('project_memberships')
-        .select('id, user_id, role, created_at, profiles:profiles(display_name, email)')
+        .select('id, user_id, role, created_at, profiles:profiles(full_name, email)')
         .eq('project_id', projectId),
       supabase
         .from('project_invites')
         .select('id, invitee_email, role, status, created_at')
         .eq('project_id', projectId)
+        .eq('status', 'pending')
     ])
 
     if (membersError || invitesError) {
@@ -121,7 +123,7 @@ serve(async (req) => {
         membership_id: (row as any).id ?? null,
         invite_id: null,
         user_id: (row as any).user_id ?? null,
-        display_name: (row as any).profiles?.display_name ?? null,
+        display_name: (row as any).profiles?.full_name ?? null,
         email,
         role: (row as any).role,
         status: 'member',
@@ -135,11 +137,11 @@ serve(async (req) => {
       let fallbackEmail = ''
       let fallbackName: string | null = null
 
-      if (projectRow.owner_id) {
+      if (ownerId) {
         const { data: ownerProfile, error: ownerProfileError } = await supabase
           .from('profiles')
-          .select('email, display_name')
-          .eq('id', projectRow.owner_id)
+          .select('email, full_name')
+          .eq('id', ownerId)
           .maybeSingle()
 
         if (ownerProfileError) {
@@ -147,19 +149,19 @@ serve(async (req) => {
         }
 
         fallbackEmail = ownerProfile?.email ?? ''
-        fallbackName = ownerProfile?.display_name ?? null
+        fallbackName = ownerProfile?.full_name ?? null
       }
 
       const { data: membershipOwner } = await supabase
         .from('project_memberships')
-        .select('id, user_id, created_at, profiles:profiles(display_name, email)')
+        .select('id, user_id, created_at, profiles:profiles(full_name, email)')
         .eq('project_id', projectId)
         .eq('role', 'owner')
         .maybeSingle()
 
       if (membershipOwner) {
         fallbackEmail = membershipOwner.profiles?.email ?? fallbackEmail
-        fallbackName = membershipOwner.profiles?.display_name ?? fallbackName
+        fallbackName = membershipOwner.profiles?.full_name ?? fallbackName
       }
 
       const fallbackEmailLower = fallbackEmail.trim().toLowerCase()
@@ -168,10 +170,10 @@ serve(async (req) => {
       }
 
       result.push({
-        id: `owner_${projectRow.owner_id ?? membershipOwner?.user_id ?? 'unknown'}`,
+        id: `owner_${ownerId ?? membershipOwner?.user_id ?? 'unknown'}`,
         membership_id: membershipOwner?.id ?? null,
         invite_id: null,
-        user_id: membershipOwner?.user_id ?? projectRow.owner_id ?? null,
+        user_id: membershipOwner?.user_id ?? ownerId ?? null,
         display_name: fallbackName ?? 'Owner',
         email: fallbackEmail || 'owner@unknown.local',
         role: 'owner',
@@ -183,10 +185,6 @@ serve(async (req) => {
     }
 
     for (const row of inviteRows ?? []) {
-      if ((row as any).status !== 'pending') {
-        continue
-      }
-
       const email = ((row as any).invitee_email ?? '').trim()
       const emailLower = email.toLowerCase()
 
@@ -244,4 +242,3 @@ serve(async (req) => {
     return new Response('Internal Server Error', { status: 500, headers: corsHeaders })
   }
 })
-

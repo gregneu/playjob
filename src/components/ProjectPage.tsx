@@ -109,42 +109,24 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
       
       // Используем простой запрос без JOIN
       const { data: membersData, error: membersError } = await supabase
-        .from('project_members')
-        .select('user_id, role')
-        .eq('project_id', project.id)
-
-      // Also read pending invitations for local preview
-      const { data: _pendingInvites } = await supabase
-        .from('project_invitations')
-        .select('email, role, status')
+        .from('project_memberships')
+        .select('user_id, role, profiles:profiles(full_name, email)')
         .eq('project_id', project.id)
 
       if (!membersError && membersData && membersData.length > 0) {
         console.log('📊 Raw members data:', membersData)
         
         // Получаем профили отдельно
-        const userIds = membersData.map(m => m.user_id).filter(Boolean)
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, email')
-          .in('id', userIds)
-        
-        if (!profilesError && profilesData) {
-          const formattedMembers = membersData.map((member: any) => {
-            const profile = profilesData.find(p => p.id === member.user_id)
-            return {
-              id: member.user_id,
-              full_name: profile?.full_name ?? null,
-              email: profile?.email ?? null,
-              role: member.role ?? 'member'
-            }
-          })
-          console.log('✅ Formatted members:', formattedMembers)
-          setProjectMembers(formattedMembers)
-        } else {
-          console.error('❌ Failed to load profiles:', profilesError)
-          setProjectMembers([])
-        }
+        const formattedMembers = membersData.map((member: any) => {
+          return {
+            id: member.user_id,
+            full_name: member.profiles?.full_name ?? null,
+            email: member.profiles?.email ?? null,
+            role: member.role ?? 'viewer'
+          }
+        })
+        console.log('✅ Formatted members:', formattedMembers)
+        setProjectMembers(formattedMembers)
       } else {
         console.error('❌ Failed to load project members:', membersError)
         setProjectMembers([])
