@@ -3,11 +3,13 @@
 import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-let cachedClient: SupabaseClient | null = null
+const globalForSupabaseBrowser = globalThis as typeof globalThis & {
+  supabaseBrowserClient?: SupabaseClient
+}
 
 export const getBrowserClient = () => {
-  if (cachedClient) {
-    return cachedClient
+  if (globalForSupabaseBrowser.supabaseBrowserClient) {
+    return globalForSupabaseBrowser.supabaseBrowserClient
   }
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -17,8 +19,9 @@ export const getBrowserClient = () => {
     throw new Error('Supabase environment variables are missing')
   }
 
-  cachedClient = createClient(supabaseUrl, supabaseAnonKey)
-  return cachedClient
+  const client = createClient(supabaseUrl, supabaseAnonKey)
+  globalForSupabaseBrowser.supabaseBrowserClient = client
+  return client
 }
 
 const getRedirectTo = () => {
@@ -51,4 +54,3 @@ export const signInWithGoogle = async () => {
     throw error
   }
 }
-

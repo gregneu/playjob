@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Zone, ZoneCell, HexCell, Building } from '../types/enhanced'
 import { calculateHexZoneCenter } from './hex-utils'
 
@@ -6,17 +7,37 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY
 
+const globalForSupabase = globalThis as typeof globalThis & {
+  supabaseClient?: SupabaseClient
+  supabaseServiceClient?: SupabaseClient | null
+}
+
+const getOrInitSupabaseClient = () => {
+  if (!globalForSupabase.supabaseClient) {
+    globalForSupabase.supabaseClient = createClient(supabaseUrl || '', supabaseAnonKey || '')
+  }
+  return globalForSupabase.supabaseClient
+}
+
+const getOrInitSupabaseServiceClient = () => {
+  if (!supabaseServiceKey) {
+    return null
+  }
+  if (globalForSupabase.supabaseServiceClient === undefined) {
+    globalForSupabase.supabaseServiceClient = createClient(supabaseUrl || '', supabaseServiceKey)
+  }
+  return globalForSupabase.supabaseServiceClient
+}
+
 // Проверяем наличие переменных окружения
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase environment variables are not configured. Using mock data.')
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
+export const supabase = getOrInitSupabaseClient()
 
 // Создаем отдельный клиент с service_role для загрузки zone_objects
-export const supabaseService = supabaseServiceKey 
-  ? createClient(supabaseUrl || '', supabaseServiceKey)
-  : null
+export const supabaseService = getOrInitSupabaseServiceClient()
 
 // Функция для проверки доступности Supabase
 export const isSupabaseConfigured = () => {
@@ -1503,67 +1524,145 @@ export const linkService = {
   }
 }
 
-// Функция для проверки существования поля color в таблице zone_objects
-let colorFieldCheckWarningLogged = false
+// Функция для проверки, что актуальное поле цвета доступно (сейчас хранится в таблице zones)
+let colorFieldCheckLogged = false
+let colorFieldCheckResult: boolean | null = null
 
 export const checkColorFieldExists = async (): Promise<boolean> => {
+  if (colorFieldCheckResult !== null) {
+    return colorFieldCheckResult
+  }
+
   if (!isSupabaseConfigured()) {
-    console.warn('Supabase not configured, returning false')
+    if (!colorFieldCheckLogged) {
+      console.warn('Supabase not configured, returning false')
+      colorFieldCheckLogged = true
+    }
+    colorFieldCheckResult = false
     return false
   }
 
   try {
-    console.log('🎨 Checking if color field exists in zone_objects table...')
-    
-    // Temporarily disable color field check due to 400 error
-    if (!colorFieldCheckWarningLogged) {
-      console.warn('🎨 Color field check disabled due to 400 error')
-      colorFieldCheckWarningLogged = true
-    }
-    return false
-    
-    // Пытаемся выбрать поле color
-    const { data, error } = await supabase
-      .from('zone_objects')
-      .select('id, color')
+    const client = supabaseService ?? supabase
+    const { error } = await client
+      .from('zones')
+      .select('color')
       .limit(1)
-    
-    if (error && error.code === '42703') {
-      // Поле color не существует
-      console.log('🎨 Color field does not exist in database')
+
+    if (error) {
+      if (!colorFieldCheckLogged) {
+        console.warn('🎨 zones.color column is unavailable, fallback colors will be used', error)
+        colorFieldCheckLogged = true
+      }
+      colorFieldCheckResult = false
       return false
-    } else if (error) {
-      console.error('🎨 Error checking color field:', error)
-      return false
-    } else {
-      console.log('🎨 Color field exists in database')
-      return true
     }
+
+    if (!colorFieldCheckLogged) {
+      console.log('🎨 Zone colors are managed through zones.color (column detected)')
+      colorFieldCheckLogged = true
+    }
+
+    colorFieldCheckResult = true
+    return true
   } catch (err) {
-    console.error('🎨 Exception checking color field:', err)
+    if (!colorFieldCheckLogged) {
+      console.error('🎨 Exception verifying zones.color column', err)
+      colorFieldCheckLogged = true
+    }
+    colorFieldCheckResult = false
     return false
   }
 }
 
 // Функция для получения количества назначенных тикетов пользователю в проекте
 let assignedTicketsRpcWarningLogged = false
+let assignedTicketsFallbackWarningLogged = false
+
+const isRpcMissingError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as { code?: string; message?: string; details?: string }
+  const message = candidate.message?.toLowerCase() || ''
+  const details = candidate.details?.toLowerCase() || ''
+  return candidate.code === 'PGRST100'
+    || candidate.code === 'PGRST201'
+    || message.includes('not found')
+    || message.includes('does not exist')
+    || message.includes('no function')
+    || details.includes('function')
+}
+
+const getAssignedTicketsFallback = async (projectId: string, userId: string): Promise<number> => {
+  try {
+    const client = supabaseService ?? supabase
+    const zonesResponse = await client
+      .from('zones')
+      .select('id')
+      .eq('project_id', projectId)
+
+    if (zonesResponse.error) {
+      console.error('❌ Fallback: failed to load zones for assigned ticket count', zonesResponse.error)
+      return 0
+    }
+
+    const zoneIds = (zonesResponse.data ?? [])
+      .map((zone) => zone.id)
+      .filter((id): id is string => Boolean(id))
+
+    if (zoneIds.length === 0) {
+      return 0
+    }
+
+    const uniqueZoneIds = Array.from(new Set(zoneIds))
+
+    const zoneObjectsResponse = await client
+      .from('zone_objects')
+      .select('id')
+      .in('zone_id', uniqueZoneIds)
+
+    if (zoneObjectsResponse.error) {
+      console.error('❌ Fallback: failed to load zone objects for assigned ticket count', zoneObjectsResponse.error)
+      return 0
+    }
+
+    const zoneObjectIds = (zoneObjectsResponse.data ?? [])
+      .map((zo) => zo.id)
+      .filter((id): id is string => Boolean(id))
+
+    if (zoneObjectIds.length === 0) {
+      return 0
+    }
+
+    const uniqueZoneObjectIds = Array.from(new Set(zoneObjectIds))
+
+    const ticketsResponse = await client
+      .from('object_tickets')
+      .select('id', { count: 'exact', head: true })
+      .in('zone_object_id', uniqueZoneObjectIds)
+      .eq('assignee_id', userId)
+      .neq('status', 'done')
+
+    if (ticketsResponse.error) {
+      console.error('❌ Fallback: failed to count tickets for assigned ticket count', ticketsResponse.error)
+      return 0
+    }
+
+    return ticketsResponse.count ?? 0
+  } catch (error) {
+    console.error('❌ Fallback: exception while counting assigned tickets', error)
+    return 0
+  }
+}
 
 export const getUserAssignedTicketsCount = async (projectId: string, userId: string): Promise<number> => {
   console.log('🔍 getUserAssignedTicketsCount called with:', { projectId, userId })
-  
+
   if (!isSupabaseConfigured()) {
     console.warn('❌ Supabase not configured, returning 0')
     return 0
   }
 
   try {
-    // Temporarily disable RPC call due to 404 error
-    if (!assignedTicketsRpcWarningLogged) {
-      console.warn('📡 RPC function get_user_assigned_tickets_count disabled due to 404 error')
-      assignedTicketsRpcWarningLogged = true
-    }
-    return 0
-
     console.log('📡 Calling RPC function get_user_assigned_tickets_count...')
     const { data, error } = await supabase.rpc('get_user_assigned_tickets_count', {
       project_uuid: projectId,
@@ -1572,15 +1671,36 @@ export const getUserAssignedTicketsCount = async (projectId: string, userId: str
 
     console.log('📡 RPC response:', { data, error })
 
-    if (error) {
-      console.error('❌ Error getting user assigned tickets count:', error)
-      return 0
+    if (!error && typeof data === 'number') {
+      console.log('✅ Successfully got assigned tickets count via RPC:', data)
+      return data ?? 0
     }
 
-    console.log('✅ Successfully got assigned tickets count:', data)
-    return data || 0
+    if (error && isRpcMissingError(error)) {
+      if (!assignedTicketsRpcWarningLogged) {
+        console.warn('📡 RPC function get_user_assigned_tickets_count unavailable, using SQL fallback')
+        assignedTicketsRpcWarningLogged = true
+      }
+      return await getAssignedTicketsFallback(projectId, userId)
+    }
+
+    if (error) {
+      console.error('❌ Error getting user assigned tickets count via RPC:', error)
+      if (!assignedTicketsFallbackWarningLogged) {
+        console.warn('📡 Falling back to client-side count for assigned tickets')
+        assignedTicketsFallbackWarningLogged = true
+      }
+      return await getAssignedTicketsFallback(projectId, userId)
+    }
+
+    // Unexpected RPC payload, fallback to client-side computation
+    return await getAssignedTicketsFallback(projectId, userId)
   } catch (err) {
     console.error('❌ Exception getting user assigned tickets count:', err)
-    return 0
+    if (!assignedTicketsFallbackWarningLogged) {
+      console.warn('📡 Falling back to client-side count for assigned tickets after exception')
+      assignedTicketsFallbackWarningLogged = true
+    }
+    return await getAssignedTicketsFallback(projectId, userId)
   }
 }
