@@ -8,7 +8,8 @@ const INVITE_BASE_URL = Deno.env.get('INVITE_BASE_URL') ?? 'https://playjoob.com
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -87,7 +88,7 @@ serve(async (req) => {
       return new Response('Failed to verify permissions', { status: 500, headers: corsHeaders })
     }
 
-    if (!membership || membership.role !== 'admin') {
+    if (!membership || (membership.role !== 'admin' && membership.role !== 'owner')) {
       return new Response('Forbidden', { status: 403, headers: corsHeaders })
     }
 
@@ -128,4 +129,3 @@ serve(async (req) => {
     return new Response('Internal Server Error', { status: 500, headers: corsHeaders })
   }
 })
-
