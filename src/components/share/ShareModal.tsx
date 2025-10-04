@@ -125,6 +125,9 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
 
     if (error) {
       console.error('[ShareModal] Invite failure', error)
+      if ((error as any)?.context) {
+        console.error('[ShareModal] Invite failure context', (error as any).context)
+      }
       return
     }
 
@@ -439,4 +442,3 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
 }
 
 export default ShareModal
-
