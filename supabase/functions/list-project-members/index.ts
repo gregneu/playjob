@@ -217,7 +217,7 @@ serve(async (req) => {
 
     const { data: projectRow, error: projectError } = await supabase
       .from('projects')
-      .select('id, owner_id, created_at')
+      .select('id, owner_id, user_id, created_by, created_at')
       .eq('id', projectId)
       .maybeSingle()
 
@@ -328,11 +328,48 @@ serve(async (req) => {
       return new Response('Failed to verify membership', { status: 500, headers: corsHeaders })
     }
 
-    const ownerId = projectRow.owner_id ?? (projectRow as any).created_by ?? null
+    const ownerId = projectRow.owner_id
+      ?? (projectRow as any).user_id
+      ?? (projectRow as any).created_by
+      ?? null
     const isOwner = ownerId !== null && candidateUserIds.includes(ownerId)
 
     if (!membership && !isOwner) {
-      return new Response('Forbidden', { status: 403, headers: corsHeaders })
+      try {
+        const legacyQuery = supabase
+          .from('project_members')
+          .select('user_id, role, status')
+          .eq('project_id', projectId)
+
+        const finalLegacyQuery = candidateUserIds.length === 1
+          ? legacyQuery.eq('user_id', candidateUserIds[0])
+          : legacyQuery.in('user_id', candidateUserIds)
+
+        const { data: legacyMembershipRows, error: legacyMembershipError } = await finalLegacyQuery
+
+        if (legacyMembershipError && !isMissingRelationError(legacyMembershipError, 'project_members')) {
+          console.error('[list-project-members] legacy membership fetch error', legacyMembershipError)
+        }
+
+        const acceptedLegacyMembership = (legacyMembershipRows ?? []).find((row: any) => {
+          const normalizedRole = normalizeRole(row.role)
+          const status = (row.status ?? '').toLowerCase()
+          return normalizedRole === 'owner' || status === 'accepted'
+        })
+
+        if (acceptedLegacyMembership) {
+          membership = {
+            user_id: acceptedLegacyMembership.user_id,
+            role: normalizeRole(acceptedLegacyMembership.role)
+          }
+        }
+      } catch (legacyMembershipFallbackError) {
+        console.error('[list-project-members] legacy membership fallback exception', legacyMembershipFallbackError)
+      }
+
+      if (!membership && !isOwner) {
+        return new Response('Forbidden', { status: 403, headers: corsHeaders })
+      }
     }
 
     let memberRows: NormalizedMemberRow[] = []
