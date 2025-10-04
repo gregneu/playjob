@@ -109,6 +109,7 @@ export interface Project {
   tasks_count?: number
   progress?: number
   type?: string
+  membership_role?: 'viewer' | 'editor' | 'admin' | 'owner'
 }
 
 export interface ProjectCard {

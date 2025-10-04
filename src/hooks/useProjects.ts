@@ -15,17 +15,37 @@ export const useProjects = (userId: string | null) => {
       return
     }
 
+    setLoading(true)
+
+    if (!isSupabaseConfigured()) {
+      setProjects([])
+      setLoading(false)
+      return
+    }
+
     try {
-      // Check if Supabase is configured
-      if (!isSupabaseConfigured()) {
-        setProjects([])
-        setLoading(false)
-        return
+      console.log('Loading projects for user:', userId)
+
+      const membershipProjects: Project[] = []
+
+      const { data: membershipRows, error: membershipError } = await supabase
+        .from('project_memberships')
+        .select('project_id, role, projects(*)')
+        .eq('user_id', userId)
+
+      if (membershipError) {
+        console.error('Error loading membership projects:', membershipError)
+      } else if (membershipRows) {
+        for (const row of membershipRows) {
+          const project = (row as any)?.projects as Project | null
+          if (!project) continue
+          membershipProjects.push({
+            ...project,
+            membership_role: (row as any)?.role ?? project.membership_role
+          })
+        }
       }
 
-      console.log('Loading projects for user:', userId)
-      
-      // Упрощенная загрузка проектов (только владельцы)
       const { data: ownedProjects, error: ownedError } = await supabase
         .from('projects')
         .select('*')
@@ -35,61 +55,39 @@ export const useProjects = (userId: string | null) => {
 
       if (ownedError) {
         console.error('Error loading owned projects:', ownedError)
-        // Не выбрасываем ошибку, просто используем пустой массив
-        console.warn('Using empty array for projects due to error')
-        setProjects([])
-        setLoading(false)
-        return
       }
 
-      // Пропускаем загрузку project_members из-за проблем с RLS
-      const memberProjects: any[] = []
-      console.log('Skipping project_members loading due to RLS issues')
+      const ownedList = (ownedProjects ?? []).map((project: any) => ({
+        ...project,
+        membership_role: project.owner_id === userId ? 'owner' : project.membership_role
+      }))
 
-      // Загружаем проекты, куда пользователя пригласили по email (включая pending)
-      let invitedProjects: any[] = []
-      try {
-        const { data: userRes } = await supabase.auth.getUser()
-        const userEmail = userRes?.user?.email || null
-        if (userEmail) {
-          // Temporarily disabled due to 403 error
-          // const { data: invites, error: invitesError } = await supabase
-          //   .from('project_invitations')
-          //   .select(`
-          //     project_id,
-          //     status,
-          //     projects (*)
-          //   `)
-          //   .eq('email', userEmail)
-          // if (invitesError) {
-          //   console.warn('Error loading invited projects:', invitesError)
-          // } else {
-          //   invitedProjects = (invites || []).map((ip: any) => ip.projects).filter(Boolean)
-          // }
-          console.log('Invited projects loading temporarily disabled')
+      const projectMap = new Map<string, Project>()
+
+      for (const project of membershipProjects) {
+        projectMap.set(project.id, project)
+      }
+
+      for (const project of ownedList) {
+        if (projectMap.has(project.id)) {
+          const existing = projectMap.get(project.id)!
+          projectMap.set(project.id, {
+            ...project,
+            membership_role: existing.membership_role ?? project.membership_role
+          })
+        } else {
+          projectMap.set(project.id, project)
         }
-      } catch (e) {
-        console.warn('Failed to fetch invited projects:', e)
       }
 
-      // Объединяем проекты (только ownedProjects пока)
-      const allProjects = [
-        ...(ownedProjects || []),
-        ...invitedProjects
-      ]
+      const uniqueProjects = Array.from(projectMap.values())
 
-      // Убираем дубликаты (если пользователь и владелец, и участник)
-      const uniqueProjects = allProjects.filter((project, index, self) => 
-        index === self.findIndex(p => p.id === project.id)
-      )
-
-      // Сортируем по дате обновления
-      const sortedProjects = uniqueProjects.sort((a, b) => 
+      uniqueProjects.sort((a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       )
 
-      console.log('All projects loaded:', sortedProjects)
-      setProjects(sortedProjects)
+      console.log('All projects loaded:', uniqueProjects)
+      setProjects(uniqueProjects)
     } catch (error) {
       console.warn('Failed to load projects from database:', error)
       setProjects([])
@@ -138,20 +136,23 @@ export const useProjects = (userId: string | null) => {
       const insertData = {
         ...projectData,
         user_id: currentUserId,
+        owner_id: currentUserId,
+        created_by: currentUserId,
         status: 'active',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
-      
+
       console.log('Inserting project data:', insertData)
-      
+
       const res = await supabase
         .from('projects')
         .insert(insertData)
         .select()
-      
+        .single()
+
       console.log('Supabase response:', res)
-      
+
       if (res.error) {
         console.error('Direct project creation failed:', res.error)
         console.error('Error details:', {
@@ -162,20 +163,12 @@ export const useProjects = (userId: string | null) => {
         })
         throw res.error
       }
-      
-      if (!res.data || res.data.length === 0) {
-        console.error('No data returned from insert')
-        throw new Error('No data returned from insert')
-      }
-      
-      data = res.data[0]
-      
-      // Skip project_members creation for now due to auth.uid() issues
-      console.log('Skipping project_members creation due to auth.uid() issues')
-      console.log('Project created successfully without project_members:', data)
-      
+
+      data = res.data
+
       console.log('Project created successfully:', data)
-      setProjects(prev => [data, ...prev])
+
+      await loadProjects()
       return data
     } catch (error) {
       console.warn('Failed to create project in database:', error)
