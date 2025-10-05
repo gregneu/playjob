@@ -39,14 +39,16 @@ as $$
 declare
   v_target_role text;
 begin
+  perform set_config('row_security', 'off', true);
+
   if not public.is_project_manager(p_project_id, p_requested_by) then
     raise exception 'insufficient permissions';
   end if;
 
-  select role into v_target_role
-  from public.project_memberships
-  where project_id = p_project_id
-    and user_id = p_target_user_id;
+  select pm.role into v_target_role
+  from public.project_memberships pm
+  where pm.project_id = p_project_id
+    and pm.user_id = p_target_user_id;
 
   if v_target_role is null then
     raise exception 'member not found';
@@ -56,9 +58,9 @@ begin
     raise exception 'cannot remove project owner';
   end if;
 
-  delete from public.project_memberships
-  where project_id = p_project_id
-    and user_id = p_target_user_id;
+  delete from public.project_memberships pm
+  where pm.project_id = p_project_id
+    and pm.user_id = p_target_user_id;
 
   return true;
 end;
@@ -76,14 +78,16 @@ security definer
 set search_path = public
 as $$
 begin
+  perform set_config('row_security', 'off', true);
+
   if not public.is_project_manager(p_project_id, p_requested_by) then
     raise exception 'insufficient permissions';
   end if;
 
-  delete from public.project_invites
-  where project_id = p_project_id
-    and lower(invitee_email) = lower(p_invitee_email)
-    and status = 'pending';
+  delete from public.project_invites pi
+  where pi.project_id = p_project_id
+    and lower(pi.invitee_email) = lower(p_invitee_email)
+    and pi.status = 'pending';
 
   return true;
 end;
