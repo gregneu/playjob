@@ -9,6 +9,8 @@ security definer
 set search_path = public
 as $$
 begin
+  perform set_config('row_security', 'off', true);
+
   if public.is_service_role() then
     return true;
   end if;

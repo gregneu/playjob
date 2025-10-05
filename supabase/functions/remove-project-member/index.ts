@@ -52,7 +52,7 @@ serve(async (req) => {
       return new Response('Missing target identifier', { status: 400, headers: corsHeaders })
     }
 
-    if (targetUserId) {
+   if (targetUserId) {
       const { error } = await supabase.rpc('remove_project_member', {
         p_project_id: projectId,
         p_target_user_id: targetUserId,
@@ -61,7 +61,7 @@ serve(async (req) => {
 
       if (error) {
         console.error('[remove-project-member] remove_project_member error', error)
-        return new Response(JSON.stringify({ error }), {
+        return new Response(JSON.stringify({ error, payload: { projectId, targetUserId } }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders }
         })
@@ -75,7 +75,7 @@ serve(async (req) => {
 
       if (error) {
         console.error('[remove-project-member] remove_project_invite error', error)
-        return new Response(JSON.stringify({ error }), {
+        return new Response(JSON.stringify({ error, payload: { projectId, inviteEmail } }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders }
         })
