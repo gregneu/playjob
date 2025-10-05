@@ -101,7 +101,10 @@ serve(async (req) => {
 
     if (inviteError) {
       console.error('[invite-user] inviteError', inviteError)
-      return new Response(inviteError.message, { status: 400, headers: corsHeaders })
+      return new Response(JSON.stringify({ error: inviteError }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      })
     }
 
     if (RESEND_API_KEY) {

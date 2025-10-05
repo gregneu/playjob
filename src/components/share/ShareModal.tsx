@@ -59,6 +59,19 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
   const [role, setRole] = useState<Role>('viewer')
   const [loading, setLoading] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<Role | null>(null)
+
+  useEffect(() => {
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        setCurrentUserId(data.user?.id ?? null)
+      })
+      .catch((error) => {
+        console.error('[ShareModal] Failed to resolve current user', error)
+      })
+  }, [supabase])
 
   const fetchMembers = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke('list-project-members', {
@@ -87,7 +100,14 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
     })
 
     setMembers(sortedMembers)
-  }, [projectId, supabase])
+
+    if (currentUserId) {
+      const self = sortedMembers.find((member) => member.user_id === currentUserId)
+      setCurrentUserRole(self?.role ?? null)
+    } else {
+      setCurrentUserRole(null)
+    }
+  }, [projectId, supabase, currentUserId])
 
   useEffect(() => {
     if (!isOpen) return
@@ -125,8 +145,24 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
 
     if (error) {
       console.error('[ShareModal] Invite failure', error)
-      if ((error as any)?.context) {
-        console.error('[ShareModal] Invite failure context', (error as any).context)
+      const context = (error as any)?.context
+      if (context) {
+        console.error('[ShareModal] Invite failure context', context)
+        try {
+          const clone = typeof context?.clone === 'function' ? context.clone() : context
+          if (typeof clone?.json === 'function') {
+            const json = await clone.json()
+            console.error('[ShareModal] Invite failure parsed context', json)
+            try {
+              console.error('[ShareModal] Invite failure parsed context (stringified)', JSON.stringify(json))
+            } catch {}
+          } else if (typeof clone?.text === 'function') {
+            const text = await clone.text()
+            console.error('[ShareModal] Invite failure raw text', text)
+          }
+        } catch (parseError) {
+          console.error('[ShareModal] Invite failure context parse error', parseError)
+        }
       }
       return
     }
@@ -169,6 +205,60 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
       if (error) {
         console.error('[ShareModal] Failed to update invite role', error)
       }
+    }
+  }
+
+  const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'admin'
+
+  const removeMember = async (member: MemberRow) => {
+    if (!canManageMembers) return
+    if (member.role === 'owner') return
+    if (member.status === 'member' && member.user_id && member.user_id === currentUserId) {
+      console.warn('[ShareModal] Managers cannot remove themselves via modal')
+      return
+    }
+
+    const payload: { projectId: string; targetUserId?: string; inviteEmail?: string } = { projectId }
+
+    if (member.status === 'member' && member.user_id) {
+      payload.targetUserId = member.user_id
+    } else if (member.status === 'invited') {
+      payload.inviteEmail = member.email
+    }
+
+    if (!payload.targetUserId && !payload.inviteEmail) {
+      console.error('[ShareModal] Unable to resolve removal payload for member', member)
+      return
+    }
+
+    try {
+      setLoading(true)
+      const { error } = await supabase.functions.invoke('remove-project-member', {
+        body: payload
+      })
+
+      if (error) {
+        console.error('[ShareModal] Failed to remove member', error)
+        const context = (error as any)?.context
+        if (context) {
+          try {
+            const clone = typeof context?.clone === 'function' ? context.clone() : context
+            if (typeof clone?.json === 'function') {
+              const json = await clone.json()
+              console.error('[ShareModal] Removal error context', json)
+            } else if (typeof clone?.text === 'function') {
+              const text = await clone.text()
+              console.error('[ShareModal] Removal error context (text)', text)
+            }
+          } catch (parseError) {
+            console.error('[ShareModal] Removal error context parse failure', parseError)
+          }
+        }
+      } else {
+        fetchMembers()
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -417,15 +507,33 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
                     </span>
                   ) : (
                     <select
-                      value={member.role as Exclude<Role, 'owner'>}
-                      onChange={(event) => changeRole(member, event.target.value as Role)}
-                      style={{ ...selectStyle, minWidth: '140px', opacity: member.status === 'invited' ? 0.8 : 1 }}
+                      value={member.role}
+                      onChange={(event) => {
+                        const nextValue = event.target.value
+                        if (nextValue === '__remove') {
+                          removeMember(member)
+                          return
+                        }
+                        if (nextValue !== member.role) {
+                          changeRole(member, nextValue as Role)
+                        }
+                      }}
+                      style={{
+                        ...selectStyle,
+                        minWidth: '140px',
+                        opacity: member.status === 'invited' ? 0.8 : 1,
+                        cursor: canManageMembers ? 'pointer' : 'not-allowed'
+                      }}
+                      disabled={!canManageMembers}
                     >
                       {(Object.keys(ROLE_LABEL) as Array<Exclude<Role, 'owner'>>).map((r) => (
                         <option key={r} value={r}>
                           {ROLE_LABEL[r]}
                         </option>
                       ))}
+                      {canManageMembers && (member.user_id !== currentUserId || member.status === 'invited') ? (
+                        <option value="__remove">Remove</option>
+                      ) : null}
                     </select>
                   )}
                 </div>
