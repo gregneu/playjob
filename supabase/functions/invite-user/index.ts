@@ -110,6 +110,13 @@ serve(async (req) => {
 
     if (RESEND_API_KEY) {
       const acceptUrl = `${INVITE_BASE_URL}/invite/${inviteData.invite_token}`
+      console.log('[invite-user] Ready to send via Resend', {
+        hasApiKey: !!RESEND_API_KEY,
+        from: RESEND_FROM_EMAIL,
+        to: email,
+        acceptUrl
+      })
+
       const resendResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -120,9 +127,11 @@ serve(async (req) => {
           from: RESEND_FROM_EMAIL,
           to: email,
           subject: `You’ve been invited to ${inviteData.project_name}`,
-          html: buildInviteEmail(inviteData.project_name, acceptUrl)
+          html: `<p>You have been invited to join ${inviteData.project_name}</p><a href="${acceptUrl}">Accept invitation</a>`
         })
       })
+
+      console.log('[invite-user] Resend response', resendResponse.status, await resendResponse.clone().text())
 
       if (!resendResponse.ok) {
         const body = await resendResponse.text()

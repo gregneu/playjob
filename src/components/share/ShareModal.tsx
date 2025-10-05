@@ -137,38 +137,52 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
     if (!email) return
     setLoading(true)
 
-    const { error } = await supabase.functions.invoke('invite-user', {
-      body: { projectId, email, role }
-    })
+    try {
+      const [{ data: sessionData }, { error: fetchError }] = await Promise.all([
+        supabase.auth.getSession(),
+        (async () => ({ error: null as null | Error }))()
+      ])
 
-    setLoading(false)
+      const accessToken = sessionData.session?.access_token
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-    if (error) {
-      console.error('[ShareModal] Invite failure', error)
-      const context = (error as any)?.context
-      if (context) {
-        console.error('[ShareModal] Invite failure context', context)
-        try {
-          const clone = typeof context?.clone === 'function' ? context.clone() : context
-          if (typeof clone?.json === 'function') {
-            const json = await clone.json()
-            console.error('[ShareModal] Invite failure parsed context', json)
-            try {
-              console.error('[ShareModal] Invite failure parsed context (stringified)', JSON.stringify(json))
-            } catch {}
-          } else if (typeof clone?.text === 'function') {
-            const text = await clone.text()
-            console.error('[ShareModal] Invite failure raw text', text)
-          }
-        } catch (parseError) {
-          console.error('[ShareModal] Invite failure context parse error', parseError)
-        }
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Supabase env variables are missing')
       }
-      return
-    }
 
-    setEmail('')
-    fetchMembers()
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        apikey: supabaseAnonKey
+      }
+
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`
+      }
+
+      console.log('[ShareModal] Calling invite-user', { projectId, email, role })
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/invite-user`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ projectId, email, role })
+      })
+
+      if (!response.ok) {
+        const body = await response.text()
+        console.error('[ShareModal] Invite failed', response.status, body)
+        return
+      }
+
+      const payload = await response.json().catch(() => null)
+      console.log('[ShareModal] Invite success', payload)
+      setEmail('')
+      fetchMembers()
+    } catch (err) {
+      console.error('[ShareModal] Invite exception', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const copyInviteLink = async () => {
