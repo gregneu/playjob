@@ -61,7 +61,14 @@ serve(async (req) => {
 
       if (error) {
         console.error('[remove-project-member] remove_project_member error', error)
-        return new Response(JSON.stringify({ error, payload: { projectId, targetUserId } }), {
+        return new Response(JSON.stringify({
+          error,
+          message: error?.message ?? null,
+          details: error?.details ?? null,
+          hint: error?.hint ?? null,
+          code: error?.code ?? null,
+          payload: { projectId, targetUserId }
+        }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders }
         })
@@ -75,7 +82,14 @@ serve(async (req) => {
 
       if (error) {
         console.error('[remove-project-member] remove_project_invite error', error)
-        return new Response(JSON.stringify({ error, payload: { projectId, inviteEmail } }), {
+        return new Response(JSON.stringify({
+          error,
+          message: error?.message ?? null,
+          details: error?.details ?? null,
+          hint: error?.hint ?? null,
+          code: error?.code ?? null,
+          payload: { projectId, inviteEmail }
+        }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders }
         })

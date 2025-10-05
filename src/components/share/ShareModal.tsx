@@ -243,15 +243,20 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
         if (context) {
           try {
             const clone = typeof context?.clone === 'function' ? context.clone() : context
-            if (typeof clone?.json === 'function') {
-              const json = await clone.json()
-              console.error('[ShareModal] Removal error context', json)
-            } else if (typeof clone?.text === 'function') {
-              const text = await clone.text()
-              console.error('[ShareModal] Removal error context (text)', text)
+            if (typeof clone?.text === 'function') {
+              const raw = await clone.text()
+              console.error('[ShareModal] Removal error full body:', raw)
+              try {
+                const parsed = JSON.parse(raw)
+                console.error('[ShareModal] Removal error context', parsed)
+              } catch (parseErr) {
+                console.error('[ShareModal] Removal error context parse failure', parseErr)
+              }
+            } else {
+              console.error('[ShareModal] Removal error context', context)
             }
           } catch (parseError) {
-            console.error('[ShareModal] Removal error context parse failure', parseError)
+            console.error('[ShareModal] Removal error context handling failure', parseError)
           }
         }
       } else {

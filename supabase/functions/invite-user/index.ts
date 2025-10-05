@@ -4,7 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.42.0'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-const INVITE_BASE_URL = Deno.env.get('INVITE_BASE_URL') ?? 'https://playjoob.com'
+const INVITE_BASE_URL = (Deno.env.get('INVITE_BASE_URL') ?? 'https://playjoob.com').replace(/\/$/, '')
+const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'PlayJoob <invitations@playjoob.com>'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,7 +21,7 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false }
 })
 
-const buildInviteEmail = (projectName: string, token: string) => `
+const buildInviteEmail = (projectName: string, acceptUrl: string) => `
   <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Inter, Arial, sans-serif; background: #f3f4f6; padding: 32px;">
     <tr>
       <td align="center">
@@ -31,7 +32,7 @@ const buildInviteEmail = (projectName: string, token: string) => `
               <h1 style="font-size:24px;margin:0 0 16px;color:#17162B;">You’ve been invited to ${projectName}</h1>
               <p style="font-size:16px;line-height:1.5;color:#4b5563;">Collaborate with your team in PlayJoob. Use the button below to accept the invitation.</p>
               <p style="margin:32px 0;">
-                <a href="${INVITE_BASE_URL}/invite/${token}" style="display:inline-block;background:#17162B;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:9999px;font-weight:600;">Accept invitation</a>
+                <a href="${acceptUrl}" style="display:inline-block;background:#17162B;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:9999px;font-weight:600;">Accept invitation</a>
               </p>
               <p style="font-size:14px;color:#6b7280;">This invitation expires in 7 days.</p>
               <p style="font-size:14px;color:#9ca3af;margin-top:32px;">If you did not expect this invitation, you can safely ignore this email.</p>
@@ -108,19 +109,36 @@ serve(async (req) => {
     }
 
     if (RESEND_API_KEY) {
-    await fetch('https://api.resend.com/emails', {
+      const acceptUrl = `${INVITE_BASE_URL}/invite/${inviteData.invite_token}`
+      const resendResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${RESEND_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: 'PlayJoob <invitations@playjoob.com>',
+          from: RESEND_FROM_EMAIL,
           to: email,
           subject: `You’ve been invited to ${inviteData.project_name}`,
-          html: buildInviteEmail(inviteData.project_name, inviteData.invite_token)
+          html: buildInviteEmail(inviteData.project_name, acceptUrl)
         })
       })
+
+      if (!resendResponse.ok) {
+        const body = await resendResponse.text()
+        console.error('[invite-user] Resend error', resendResponse.status, body)
+        return new Response(
+          JSON.stringify({
+            error: 'ResendError',
+            status: resendResponse.status,
+            body
+          }),
+          {
+            status: 502,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          }
+        )
+      }
     }
 
     return new Response(JSON.stringify(inviteData), {

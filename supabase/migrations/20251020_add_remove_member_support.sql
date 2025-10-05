@@ -11,9 +11,15 @@ as $$
 begin
   perform set_config('row_security', 'off', true);
 
-  if public.is_service_role() then
-    return true;
-  end if;
+  begin
+    if public.is_service_role() then
+      return true;
+    end if;
+  exception
+    when undefined_function then
+      -- fall through to membership check
+      null;
+  end;
 
   return exists (
     select 1
