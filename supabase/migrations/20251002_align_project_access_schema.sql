@@ -190,6 +190,13 @@ create index if not exists project_invites_token_idx on public.project_invites(i
 create index if not exists project_invites_pending_idx on public.project_invites(status) where status = 'pending';
 
 -- Rebuild access helper functions
+-- First drop dependent policies
+drop policy if exists "sprints_select" on public.sprints;
+drop policy if exists "sprints_insert" on public.sprints;
+drop policy if exists "sprints_update" on public.sprints;
+drop policy if exists "sprints_delete" on public.sprints;
+
+-- Now drop functions
 drop function if exists public.is_project_member(uuid, uuid, text[]);
 drop function if exists public.is_project_member(uuid, uuid);
 drop function if exists public.is_project_member(uuid, text[]);
@@ -302,5 +309,18 @@ create policy "project_invites_update" on public.project_invites
 drop policy if exists "project_invites_delete" on public.project_invites;
 create policy "project_invites_delete" on public.project_invites
   for delete using (public.can_manage_project(project_invites.project_id));
+
+-- Recreate sprints policies with the new function signature
+create policy "sprints_select" on public.sprints
+  for select using (public.is_project_member(project_id, auth.uid(), array['viewer','editor','admin','owner']));
+
+create policy "sprints_insert" on public.sprints
+  for insert with check (public.is_project_member(project_id, auth.uid(), array['editor','admin','owner']));
+
+create policy "sprints_update" on public.sprints
+  for update using (public.is_project_member(project_id, auth.uid(), array['editor','admin','owner']));
+
+create policy "sprints_delete" on public.sprints
+  for delete using (public.is_project_member(project_id, auth.uid(), array['admin','owner']));
 
 
