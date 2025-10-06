@@ -53,6 +53,13 @@ serve(async (req) => {
   }
 
   try {
+    console.log('[invite-user] env snapshot', {
+      hasApiKey: !!RESEND_API_KEY,
+      from: RESEND_FROM_EMAIL,
+      baseUrl: INVITE_BASE_URL,
+      hasServiceRole: !!SUPABASE_SERVICE_ROLE_KEY
+    })
+
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response('Missing bearer token', { status: 401, headers: corsHeaders })
@@ -93,7 +100,7 @@ serve(async (req) => {
       return new Response('Forbidden', { status: 403, headers: corsHeaders })
     }
 
-    const { data: inviteData, error: inviteError } = await supabase.rpc('create_project_invite', {
+    const { data: inviteDataRaw, error: inviteError } = await supabase.rpc('create_project_invite', {
       p_project_id: projectId,
       p_inviter_id: user.id,
       p_invitee_email: email,
@@ -108,8 +115,18 @@ serve(async (req) => {
       })
     }
 
+    const inviteRecord = Array.isArray(inviteDataRaw) ? inviteDataRaw[0] : inviteDataRaw
+
+    if (!inviteRecord) {
+      console.error('[invite-user] inviteData missing after RPC', inviteDataRaw)
+      return new Response(JSON.stringify({ error: 'Invite data missing from RPC response' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      })
+    }
+
     if (RESEND_API_KEY) {
-      const acceptUrl = `${INVITE_BASE_URL}/invite/${inviteData.invite_token}`
+      const acceptUrl = `${INVITE_BASE_URL}/invite/${inviteRecord.invite_token}`
       console.log('[invite-user] Ready to send via Resend', {
         hasApiKey: !!RESEND_API_KEY,
         from: RESEND_FROM_EMAIL,
@@ -126,8 +143,8 @@ serve(async (req) => {
         body: JSON.stringify({
           from: RESEND_FROM_EMAIL,
           to: email,
-          subject: `You’ve been invited to ${inviteData.project_name}`,
-          html: `<p>You have been invited to join ${inviteData.project_name}</p><a href="${acceptUrl}">Accept invitation</a>`
+          subject: `You’ve been invited to ${inviteRecord.project_name ?? 'PlayJoob'}`,
+          html: `<p>You have been invited to join ${inviteRecord.project_name ?? 'PlayJoob'}</p><a href="${acceptUrl}">Accept invitation</a>`
         })
       })
 
@@ -150,7 +167,7 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify(inviteData), {
+    return new Response(JSON.stringify(inviteRecord), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
       status: 201
     })

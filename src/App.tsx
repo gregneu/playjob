@@ -31,7 +31,7 @@ function App() {
         <Routes>
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/debug" element={<AuthDebugPage />} />
-          <Route path="/invite/:token" element={<InviteRoute />} />
+          <Route path="/invite/:token" element={<InviteRoute currentUser={user} />} />
           <Route path="*" element={<AuthScreen />} />
         </Routes>
       </BrowserRouter>
@@ -43,7 +43,7 @@ function App() {
         <Routes>
           <Route path="/auth/debug" element={<AuthDebugPage />} />
           <Route path="/auth/login" element={<Navigate to="/" replace />} />
-          <Route path="/invite/:token" element={<InviteRoute />} />
+          <Route path="/invite/:token" element={<InviteRoute currentUser={user} />} />
           <Route path="/*" element={<PlayjobBuilder />} />
         </Routes>
     </BrowserRouter>
