@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useProjects } from '../hooks/useProjects'
@@ -14,11 +15,57 @@ import type { Project } from '../types/enhanced'
 
 const PlayjobBuilder = () => {
   const { user } = useAuth()
-  const { projects, loading, createProject } = useProjects(user?.id || null)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { projects, loading, createProject, reloadProjects } = useProjects(user?.id || null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [showBuildingShowcase, setShowBuildingShowcase] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const reloadAttemptRef = useRef<string | null>(null)
+
+  const routeProjectId = useMemo(() => {
+    const match = location.pathname.match(/^\/project\/([0-9a-fA-F-]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/)
+    return match ? match[1] : null
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (!routeProjectId) {
+      reloadAttemptRef.current = null
+      setSelectedProject(null)
+      return
+    }
+
+    const project = projects.find((item) => item.id === routeProjectId)
+
+    if (project) {
+      reloadAttemptRef.current = null
+      setSelectedProject(project)
+      return
+    }
+
+    if (!loading && reloadAttemptRef.current !== routeProjectId) {
+      reloadAttemptRef.current = routeProjectId
+      reloadProjects().catch((error) => {
+        console.warn('Failed to reload projects after route change:', error)
+      })
+    }
+  }, [routeProjectId, projects, loading, reloadProjects])
+
+  useEffect(() => {
+    if (!routeProjectId) {
+      return
+    }
+
+    if (!loading && reloadAttemptRef.current === routeProjectId) {
+      const project = projects.find((item) => item.id === routeProjectId)
+      if (!project) {
+        console.warn('Project for route not found, redirecting to home', routeProjectId)
+        navigate('/', { replace: true })
+        reloadAttemptRef.current = null
+      }
+    }
+  }, [routeProjectId, projects, loading, navigate])
 
   // Reset selection if a mock project (non-UUID id) gets selected before auth loads
   useEffect(() => {
@@ -41,10 +88,12 @@ const PlayjobBuilder = () => {
 
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project)
+    navigate(`/project/${project.id}`)
   }
 
   const handleBackToProjects = () => {
     setSelectedProject(null)
+    navigate('/')
   }
 
   // const handleSignOut = async () => {
