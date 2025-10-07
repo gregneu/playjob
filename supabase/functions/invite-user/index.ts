@@ -21,27 +21,96 @@ const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false }
 })
 
-const buildInviteEmail = (projectName: string, acceptUrl: string) => `
-  <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Inter, Arial, sans-serif; background: #f3f4f6; padding: 32px;">
-    <tr>
-      <td align="center">
-        <table width="560" style="background:#ffffff;border-radius:16px;padding:40px;text-align:left;">
-          <tr>
-            <td>
-              <img src="https://playjoob.com/assets/mail-logo.png" alt="PlayJoob" width="72" height="72" style="display:block;margin-bottom:24px;" />
-              <h1 style="font-size:24px;margin:0 0 16px;color:#17162B;">You’ve been invited to ${projectName}</h1>
-              <p style="font-size:16px;line-height:1.5;color:#4b5563;">Collaborate with your team in PlayJoob. Use the button below to accept the invitation.</p>
-              <p style="margin:32px 0;">
-                <a href="${acceptUrl}" style="display:inline-block;background:#17162B;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:9999px;font-weight:600;">Accept invitation</a>
-              </p>
-              <p style="font-size:14px;color:#6b7280;">This invitation expires in 7 days.</p>
-              <p style="font-size:14px;color:#9ca3af;margin-top:32px;">If you did not expect this invitation, you can safely ignore this email.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>`
+const buildInviteEmail = (projectName: string | null | undefined, acceptUrl: string) => {
+  const displayName = projectName?.trim() || 'PlayJoob'
+
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>You’ve been invited to PlayJoob</title>
+    <style>
+      body {
+        background-color: #f9fafb;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+          Roboto, Helvetica, Arial, sans-serif;
+        color: #111827;
+        margin: 0;
+        padding: 40px 16px;
+      }
+      .container {
+        max-width: 440px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        padding: 40px 32px;
+        text-align: center;
+      }
+      .logo {
+        width: 48px;
+        height: 48px;
+        margin-bottom: 24px;
+      }
+      h2 {
+        font-size: 22px;
+        font-weight: 600;
+        color: #0f172a;
+        margin-bottom: 12px;
+      }
+      p {
+        font-size: 15px;
+        line-height: 1.6;
+        color: #4b5563;
+        margin-bottom: 28px;
+      }
+      .button {
+        display: inline-block;
+        background-color: #111827;
+        color: #ffffff !important;
+        padding: 12px 28px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 15px;
+      }
+      .button:hover {
+        background-color: #1f2937;
+      }
+      .footer {
+        margin-top: 32px;
+        font-size: 13px;
+        color: #9ca3af;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <img
+        src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik02NC4wMDAxIDhDMzAuNTg5MiA4IDggMzAuNTg5MiA4IDY0QzggOTcuNDEwOCAzMC41ODkyIDEyMCA2NCAxMjBDOTcuNDEwOCAxMjAgMTIwIDk3LjQxMDggMTIwIDY0QzEyMCAzMC41ODkyIDk3LjQxMDggOCA2NC4wMDAxIDhaIiBmaWxsPSIjMTExODI3Ii8+CjxwYXRoIGQ9Ik01Ni4zNDA1IDg3LjAzNjZMMTguMzc0MyA1MC4xNDI2TDI5LjYyOTMgMzguOTI3N0w1Ni4zNDA1IDY1LjU5ODlMOTguMzI1MyAyMi45MDE0TDExMC4yOTcgMzQuODczMUw1Ni4zNDA1IDg3LjAzNjZaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4="
+        alt="PlayJoob"
+        class="logo"
+      />
+
+      <h2>You’ve been invited to PlayJoob</h2>
+
+      <p>
+        Someone invited you to join the project <strong>${displayName}</strong> on <strong>PlayJoob</strong>.
+        Click the button below to accept your invitation and get started.
+      </p>
+
+      <a href="${acceptUrl}" class="button">Accept invitation</a>
+
+      <div class="footer">
+        This invitation link will expire in 7 days.<br />
+        If you weren’t expecting this email, you can safely ignore it.
+      </div>
+    </div>
+  </body>
+</html>`
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -127,6 +196,7 @@ serve(async (req) => {
 
     if (RESEND_API_KEY) {
       const acceptUrl = `${INVITE_BASE_URL}/invite/${inviteRecord.invite_token}`
+      const displayProjectName = inviteRecord.project_name ?? 'PlayJoob'
       console.log('[invite-user] Ready to send via Resend', {
         hasApiKey: !!RESEND_API_KEY,
         from: RESEND_FROM_EMAIL,
@@ -143,8 +213,9 @@ serve(async (req) => {
         body: JSON.stringify({
           from: RESEND_FROM_EMAIL,
           to: email,
-          subject: `You’ve been invited to ${inviteRecord.project_name ?? 'PlayJoob'}`,
-          html: `<p>You have been invited to join ${inviteRecord.project_name ?? 'PlayJoob'}</p><a href="${acceptUrl}">Accept invitation</a>`
+          subject: `You’ve been invited to ${displayProjectName}`,
+          html: buildInviteEmail(inviteRecord.project_name, acceptUrl),
+          text: `You have been invited to join the project ${displayProjectName} on PlayJoob. Accept the invitation: ${acceptUrl}`
         })
       })
 
