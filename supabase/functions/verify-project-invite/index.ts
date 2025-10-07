@@ -54,6 +54,8 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const rawToken = (body?.inviteToken ?? body?.token ?? '').toString().trim()
 
+    console.log('[verify-project-invite] incoming request', { hasBody: !!body, rawToken })
+
     if (!rawToken) {
       return new Response(JSON.stringify({ error: 'Missing invite token' }), {
         status: 400,
@@ -62,6 +64,7 @@ serve(async (req) => {
     }
 
     if (!isUuid(rawToken)) {
+      console.warn('[verify-project-invite] token failed uuid validation', { rawToken })
       return new Response(JSON.stringify({ error: INVALID_MESSAGE }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -90,6 +93,7 @@ serve(async (req) => {
     }
 
     if (!inviteData) {
+      console.warn('[verify-project-invite] invite not found', { rawToken })
       return new Response(JSON.stringify({ error: INVALID_MESSAGE }), {
         status: 404,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -97,12 +101,24 @@ serve(async (req) => {
     }
 
     const inviteRow = inviteData as InviteRow
+    console.log('[verify-project-invite] invite loaded', {
+      project_id: inviteRow.project_id,
+      status: inviteRow.status,
+      expires_at: inviteRow.expires_at,
+      project_name: inviteRow.project?.name ?? null
+    })
 
     const expiresAt = inviteRow.expires_at ? new Date(inviteRow.expires_at) : null
     const now = new Date()
     const isExpired = expiresAt !== null && expiresAt.getTime() < now.getTime()
 
     if (inviteRow.status !== 'pending' || isExpired) {
+      console.warn('[verify-project-invite] invite unusable', {
+        status: inviteRow.status,
+        isExpired,
+        expires_at: inviteRow.expires_at,
+        now: now.toISOString()
+      })
       if (inviteRow.status === 'pending' && isExpired) {
         const { error: expireError } = await supabase
           .from('project_invites')

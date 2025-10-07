@@ -114,6 +114,7 @@ const parseJsonSafely = (text: string) => {
 }
 
 const fetchInviteViaApi = async (token: string): Promise<VerifyResponse> => {
+  console.log('[InviteRoute] fetchInviteViaApi start', { token })
   const response = await fetch(`/api/invites/verify?token=${encodeURIComponent(token)}`, {
     headers: { Accept: 'application/json' },
     credentials: 'include'
@@ -128,10 +129,12 @@ const fetchInviteViaApi = async (token: string): Promise<VerifyResponse> => {
   }
 
   const payload = parseJsonSafely(text)
+  console.log('[InviteRoute] fetchInviteViaApi success', { payload })
   return (payload ?? {}) as VerifyResponse
 }
 
 const verifyViaSupabase = async (client: SupabaseClient, token: string): Promise<VerifyResponse> => {
+  console.log('[InviteRoute] verifyViaSupabase start', { token })
   const { data, error } = await client.functions.invoke('verify-project-invite', {
     body: { inviteToken: token }
   })
@@ -145,10 +148,12 @@ const verifyViaSupabase = async (client: SupabaseClient, token: string): Promise
   }
 
   const payload = Array.isArray(data) ? data[0] : data
+  console.log('[InviteRoute] verifyViaSupabase success', { payload })
   return (payload ?? {}) as VerifyResponse
 }
 
 const acceptViaApi = async (accessToken: string, token: string): Promise<AcceptResponse> => {
+  console.log('[InviteRoute] acceptViaApi start', { token })
   const response = await fetch('/api/invites/accept', {
     method: 'POST',
     headers: {
@@ -168,10 +173,12 @@ const acceptViaApi = async (accessToken: string, token: string): Promise<AcceptR
   }
 
   const payload = parseJsonSafely(text)
+  console.log('[InviteRoute] acceptViaApi success', { payload })
   return (payload ?? {}) as AcceptResponse
 }
 
 const acceptViaSupabaseFunction = async (client: SupabaseClient, token: string): Promise<AcceptResponse> => {
+  console.log('[InviteRoute] acceptViaSupabaseFunction start', { token })
   const { data, error } = await client.functions.invoke('accept-invite', {
     body: { inviteToken: token }
   })
@@ -181,10 +188,12 @@ const acceptViaSupabaseFunction = async (client: SupabaseClient, token: string):
   }
 
   const payload = Array.isArray(data) ? data[0] : data
+  console.log('[InviteRoute] acceptViaSupabaseFunction success', { payload })
   return (payload ?? {}) as AcceptResponse
 }
 
 const acceptViaRpc = async (client: SupabaseClient, token: string, userId: string): Promise<AcceptResponse> => {
+  console.log('[InviteRoute] acceptViaRpc start', { token, userId })
   const { data, error } = await client.rpc('accept_project_invite', {
     p_token: token,
     p_user_id: userId
@@ -199,6 +208,7 @@ const acceptViaRpc = async (client: SupabaseClient, token: string, userId: strin
   }
 
   const payload = Array.isArray(data) ? data[0] : data
+  console.log('[InviteRoute] acceptViaRpc success', { payload })
 
   if (!payload) {
     throw new Error(TOAST_INVALID_MESSAGE)
@@ -323,10 +333,22 @@ export default function InviteRoute({ currentUser }: InviteRouteProps) {
         let payload: VerifyResponse | null = null
 
         try {
-          payload = await fetchInviteViaApi(token)
-        } catch (apiError) {
-          console.warn('[InviteRoute] Verify via API failed, falling back to Supabase function', apiError)
+          console.log('[InviteRoute] verify pipeline start (Supabase first)', { token })
           payload = await verifyViaSupabase(supabase, token)
+        } catch (supabaseError) {
+          console.warn('[InviteRoute] Verify via Supabase failed, falling back to API', supabaseError)
+          payload = await fetchInviteViaApi(token)
+        }
+
+        if (!payload) {
+          console.warn('[InviteRoute] verify payload missing, attempting API fallback')
+          payload = await fetchInviteViaApi(token)
+        } else {
+          const projectName = payload.project_name ?? payload.projectName ?? null
+          if (!projectName) {
+            console.warn('[InviteRoute] verify payload missing project name, retrying via API', { payload })
+            payload = await fetchInviteViaApi(token)
+          }
         }
 
         if (cancelled) {
@@ -334,6 +356,7 @@ export default function InviteRoute({ currentUser }: InviteRouteProps) {
         }
 
         const details = parseInviteDetails(token, payload ?? {})
+        console.log('[InviteRoute] verify pipeline parsed details', { details })
         setInviteDetails(details)
         persistInvite(details)
         setStep(authSnapshot.current ? 'ready' : 'needs-auth')

@@ -46,15 +46,19 @@ serve(async (req) => {
       return new Response('Missing invite token', { status: 400, headers: corsHeaders })
     }
 
+    console.log('[accept-invite] attempting accept', { inviteToken, user_id: user.id })
+
     const { data, error } = await supabase.rpc('accept_project_invite', {
       p_token: inviteToken,
       p_user_id: user.id
     })
 
     if (error) {
-      console.error('[accept-invite] failure', error)
+      console.error('[accept-invite] failure', { message: error.message, details: error.details, hint: error.hint })
       return new Response(error.message, { status: 400, headers: corsHeaders })
     }
+
+    console.log('[accept-invite] accept success', { data })
 
     return new Response(JSON.stringify(data), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -64,4 +68,3 @@ serve(async (req) => {
     return new Response('Internal Server Error', { status: 500, headers: corsHeaders })
   }
 })
-
