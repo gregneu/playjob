@@ -174,6 +174,56 @@ begin
       );
   end if;
 
+  -- Ensure a profile exists for the authenticated user so the membership insert
+  -- does not violate the foreign key constraint. Older invites may have created
+  -- a synthetic profile with a random id, so we merge those rows into the real
+  -- profile that matches the Supabase auth user.
+  <<ensure_profile>>
+  declare
+    v_normalized_email text;
+    v_effective_email text;
+  begin
+    select lower(trim(v_invite.invitee_email))
+    into v_normalized_email;
+
+    if v_normalized_email is null then
+      select lower(trim(email))
+      into v_normalized_email
+      from auth.users
+      where id = p_user_id;
+    end if;
+
+    v_effective_email := coalesce(
+      v_normalized_email,
+      'user_' || replace(p_user_id::text, '-', '') || '@playjoob.local'
+    );
+
+    if v_normalized_email is not null then
+      delete from public.profiles pr
+      where pr.id <> p_user_id
+        and lower(pr.email) = v_normalized_email;
+    end if;
+
+    insert into public.profiles as pr (id, email, full_name)
+    values (
+      p_user_id,
+      v_effective_email,
+      split_part(v_effective_email, '@', 1)
+    )
+    on conflict (id) do update
+      set email = excluded.email,
+          full_name = coalesce(pr.full_name, excluded.full_name),
+          updated_at = now();
+  exception
+    when others then
+      raise exception using message = format(
+        'accept_project_invite ensure_profile failure for user %s: %s (SQLSTATE %s)',
+        p_user_id,
+        sqlerrm,
+        SQLSTATE
+      );
+  end ensure_profile;
+
   perform public.upsert_project_member_by_user_id(
     v_invite.project_id,
     p_user_id,
@@ -187,8 +237,60 @@ begin
   where id = v_invite.id;
 
   return query
-  select p.id, p.name, v_invite.role
+  select
+    p.id as project_id,
+    p.name::text as project_name,
+    v_invite.role as role
   from public.projects p
   where p.id = v_invite.project_id;
 end;
 $$;
+
+create or replace function public.accept_invitations_on_profile_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_normalized_email text;
+begin
+  v_normalized_email := lower(trim(new.email));
+
+  if v_normalized_email is null or v_normalized_email = '' then
+    return new;
+  end if;
+
+  insert into public.project_memberships (project_id, user_id, role)
+  select
+    pi.project_id,
+    new.id,
+    case lower(coalesce(pi.role, ''))
+      when 'owner' then 'owner'
+      when 'admin' then 'admin'
+      when 'editor' then 'editor'
+      when 'viewer' then 'viewer'
+      when 'member' then 'editor'
+      else 'viewer'
+    end
+  from public.project_invites pi
+  where lower(pi.invitee_email) = v_normalized_email
+    and pi.status = 'pending'
+  on conflict (project_id, user_id)
+  do update
+    set role = excluded.role,
+        updated_at = now();
+
+  update public.project_invites
+  set status = 'accepted',
+      accepted_at = now(),
+      updated_at = now()
+  where lower(invitee_email) = v_normalized_email
+    and status = 'pending';
+
+  return new;
+end;
+$$;
+
+grant execute on function public.accept_project_invite(uuid, uuid) to authenticated;
+grant execute on function public.accept_project_invite(uuid, uuid) to service_role;

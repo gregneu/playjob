@@ -382,13 +382,17 @@ export default function InviteRoute({ currentUser }: InviteRouteProps) {
   }, [token, supabase])
 
   useEffect(() => {
-    if (!currentUser || step !== 'needs-auth' || !inviteDetails || autoAcceptTriggered.current) {
+    if (!inviteDetails || autoAcceptTriggered.current) {
+      return
+    }
+
+    if (!currentUser) {
       return
     }
 
     autoAcceptTriggered.current = true
     void handleAccept(true)
-  }, [currentUser, step, inviteDetails, handleAccept])
+  }, [currentUser, inviteDetails, handleAccept])
 
   const handleDecline = () => {
     clearStoredInvite()
