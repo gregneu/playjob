@@ -973,7 +973,7 @@ export const useProjectData = (projectId: string) => {
 
     channel.on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'zones', filter: `project_id=eq.'${projectId}'` },
+      { event: '*', schema: 'public', table: 'zones', filter: `project_id=eq.${projectId}` },
       handleZoneChange
     )
 
@@ -996,7 +996,7 @@ export const useProjectData = (projectId: string) => {
     )
 
     if (zoneIds.length > 0) {
-      const zoneFilter = zoneIds.map((id) => `'${id}'`).join(',')
+      const zoneFilter = zoneIds.map((id) => `"${id}"`).join(',')
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'zone_cells', filter: `zone_id=in.(${zoneFilter})` },
@@ -1017,7 +1017,7 @@ export const useProjectData = (projectId: string) => {
     }
 
     if (zoneObjectIds.length > 0) {
-      const ticketFilter = zoneObjectIds.map((id) => `'${id}'`).join(',')
+      const ticketFilter = zoneObjectIds.map((id) => `"${id}"`).join(',')
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'object_tickets', filter: `zone_object_id=in.(${ticketFilter})` },
