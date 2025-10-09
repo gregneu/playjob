@@ -39,78 +39,28 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
       
       setLoading(true)
       try {
-        let nextMembers: ProjectMember[] = []
+        const { data, error } = await supabase.functions.invoke('list-project-members', {
+          body: { projectId }
+        })
 
-        // Temporarily disable database queries due to RLS issues
-        console.warn('AssigneeDropdown: Database queries disabled due to RLS issues')
-        setMembers([])
-        setLoading(false)
-        return
-
-        // Временно отключаем запрос project_members - таблица может не существовать
-        console.log('⚠️ Project members loading temporarily disabled')
-        const membersData = null
-        const error = null
-
-        if (!error && membersData && membersData.length > 0) {
-          // Получаем профили отдельно
-          const userIds = membersData.map((m: any) => m.user_id).filter(Boolean)
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, full_name, email')
-            .in('id', userIds)
-          
-          if (!profilesError && profilesData) {
-            nextMembers = membersData.map((member: any) => {
-              const profile = profilesData.find(p => p.id === member.user_id)
-              return {
-                id: member.user_id,
-                full_name: profile?.full_name ?? null,
-                email: profile?.email ?? null,
-                role: member.role ?? 'member'
-              }
-            })
-            setMembers(nextMembers)
-          } else {
-            console.error('❌ Failed to load profiles:', profilesError)
-            setMembers([])
-          }
-        } else {
-          // Fallback: two-step query if join is unavailable
-          console.warn('AssigneeDropdown: join failed, falling back to separate queries', error)
-          const { data: pmRows, error: pmError } = await supabase
-            .from('project_members')
-            .select('user_id, role')
-            .eq('project_id', projectId)
-          if (pmError || !pmRows) {
-            console.error('AssigneeDropdown: failed to load project_members', pmError)
-            setMembers([])
-          } else {
-            const ids = Array.from(new Set(pmRows.map((r: any) => r.user_id))).filter(Boolean)
-            if (ids.length === 0) {
-              setMembers([])
-            } else {
-              const { data: profiles, error: profError } = await supabase
-                .from('profiles')
-                .select('id, full_name, email')
-                .in('id', ids)
-              if (profError || !profiles) {
-                console.error('AssigneeDropdown: failed to load profiles', profError)
-                nextMembers = pmRows.map((r: any) => ({ id: r.user_id, full_name: null, email: null, role: r.role ?? 'member' }))
-                setMembers(nextMembers)
-              } else {
-                const map = new Map(profiles.map((p: any) => [p.id, p]))
-                nextMembers = pmRows.map((r: any) => {
-                  const p = map.get(r.user_id)
-                  return { id: r.user_id, full_name: p?.full_name ?? null, email: p?.email ?? null, role: r.role ?? 'member' }
-                })
-                setMembers(nextMembers)
-              }
-            }
-          }
+        if (error) {
+          console.error('AssigneeDropdown: failed to load members via edge function', error)
+          setMembers([])
+          return
         }
 
-        // selectedMember будет установлен в отдельном useEffect
+        const payload = (data ?? {}) as { members?: Array<{ user_id?: string | null; role?: string | null; profiles?: { full_name?: string | null; email?: string | null } | null }> }
+
+        const normalizedMembers: ProjectMember[] = (payload.members ?? [])
+          .filter((member) => Boolean(member.user_id))
+          .map((member) => ({
+            id: member.user_id as string,
+            full_name: member.profiles?.full_name ?? null,
+            email: member.profiles?.email ?? null,
+            role: (member.role ?? 'viewer').toLowerCase()
+          }))
+
+        setMembers(normalizedMembers)
       } catch (error) {
         console.error('Error loading project members:', error)
       } finally {
