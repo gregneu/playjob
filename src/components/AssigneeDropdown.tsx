@@ -8,6 +8,7 @@ interface ProjectMember {
   full_name: string | null
   email: string | null
   role: string
+  avatar_url?: string | null
 }
 
 interface AssigneeDropdownProps {
@@ -55,9 +56,10 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
           .filter((member) => Boolean(member.user_id))
           .map((member) => ({
             id: member.user_id as string,
-            full_name: member.profiles?.full_name ?? null,
+            full_name: member.profiles?.full_name ?? member.profiles?.email ?? 'Unnamed User',
             email: member.profiles?.email ?? null,
-            role: (member.role ?? 'viewer').toLowerCase()
+            role: (member.role ?? 'viewer').toLowerCase(),
+            avatar_url: (member as any)?.profiles?.avatar_url ?? null
           }))
 
         setMembers(normalizedMembers)
@@ -168,13 +170,19 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+            <UserAvatar
+              userId={selectedMember?.id}
+              fullName={selectedMember?.full_name ?? undefined}
+              size={40}
+              show3D={false}
+            />
             {selectedMember ? (
-              <div style={{ textAlign: 'left', flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: '500', color: '#0F172A' }}>
-                  {selectedMember.full_name || 'Unnamed User'}
+              <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {selectedMember.full_name || selectedMember.email || 'Без имени'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#64748B' }}>
-                  {selectedMember.email}
+                <div style={{ fontSize: '12px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {selectedMember.email || 'Не назначено'}
                 </div>
               </div>
             ) : (
@@ -205,9 +213,12 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
           <div style={{
             position: 'relative',
             display: 'flex',
-            alignItems: 'center'
+            alignItems: 'center',
+            background: 'rgba(255,255,255,0.85)',
+            borderRadius: '12px',
+            padding: '0 12px'
           }}>
-            <Search size={16} style={{ position: 'absolute', left: '0px', color: '#64748B' }} />
+            <Search size={16} style={{ color: '#64748B' }} />
             <input
               type="text"
               placeholder="Поиск участников..."
@@ -215,7 +226,7 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 0px 8px 24px',
+                padding: '8px 12px',
                 border: 'none',
                 background: 'transparent',
                 fontSize: '14px',
@@ -322,19 +333,21 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
                       e.currentTarget.style.background = 'transparent'
                     }}
                   >
-                    <div style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '999px',
-                      background: '#A3B0C2'
-                    }} />
+                    <UserAvatar
+                      userId={member.id}
+                      fullName={member.full_name ?? undefined}
+                      size={28}
+                      show3D={false}
+                    />
                     <div style={{ textAlign: 'left', flex: 1 }}>
-                      <div style={{ fontWeight: '700', color: 'white' }}>
-                        {member.full_name || 'Unnamed User'}
+                      <div style={{ fontWeight: 600, color: 'white' }}>
+                        {member.full_name || member.email || 'Без имени'}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#D1D5DB' }}>
-                        {member.email}
-                      </div>
+                      {member.email && (
+                        <div style={{ fontSize: '12px', color: '#D1D5DB' }}>
+                          {member.email}
+                        </div>
+                      )}
                     </div>
                   </button>
                 ))}
