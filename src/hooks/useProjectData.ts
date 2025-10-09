@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { zoneService, zoneCellService, hexCellService, buildingService, zoneObjectService, ticketService, linkService, supabase } from '../lib/supabase'
 import type { Zone, ZoneCell, HexCell, Building, ZoneObject, ZoneObjectTicket } from '../types/enhanced'
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 
 export const useProjectData = (projectId: string) => {
   const [zones, setZones] = useState<Zone[]>([])
@@ -18,6 +19,7 @@ export const useProjectData = (projectId: string) => {
   }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null)
 
   // Загрузка всех данных проекта
   const loadProjectData = useCallback(async () => {
@@ -117,24 +119,358 @@ export const useProjectData = (projectId: string) => {
           console.warn('⚠️ Error loading tickets for zone object:', obj.id, err)
         }
       }
-      console.log('🎫 Final ticketsMap:', ticketsMap)
-      console.log('🎫 Final ticketsMap keys:', Object.keys(ticketsMap))
-      console.log('🎫 Final ticketsMap total tickets:', Object.values(ticketsMap).flat().length)
-      setTicketsByZoneObject(ticketsMap)
+  console.log('🎫 Final ticketsMap:', ticketsMap)
+  console.log('🎫 Final ticketsMap keys:', Object.keys(ticketsMap))
+  console.log('🎫 Final ticketsMap total tickets:', Object.values(ticketsMap).flat().length)
+  setTicketsByZoneObject(ticketsMap)
 
-      // Загружаем связи между объектами
-      console.log('🔗 Loading links...')
-      const linksData = await linkService.getLinks(projectId)
-      console.log('🔗 Links loaded:', linksData)
-      console.log('🔗 Links count:', linksData.length)
-      setLinks(linksData)
-    } catch (err) {
-      console.error('Error loading project data:', err)
-      setError('Failed to load project data')
-    } finally {
-      setLoading(false)
-    }
+  // Загружаем связи между объектами
+  console.log('🔗 Loading links...')
+  const linksData = await linkService.getLinks(projectId)
+  console.log('🔗 Links loaded:', linksData)
+  console.log('🔗 Links count:', linksData.length)
+  setLinks(linksData)
+} catch (err) {
+  console.error('Error loading project data:', err)
+  setError('Failed to load project data')
+} finally {
+  setLoading(false)
+}
   }, [projectId])
+
+  const handleZoneChange = useCallback((payload: RealtimePostgresChangesPayload<Zone>) => {
+    console.log('[useProjectData] zone change event', payload.eventType, {
+      project_id: (payload.new as Zone | null)?.project_id ?? (payload.old as Zone | null)?.project_id,
+      zone_id: (payload.new as Zone | null)?.id ?? (payload.old as Zone | null)?.id
+    })
+    const newRow = (payload.new ?? null) as Zone | null
+    const oldRow = (payload.old ?? null) as Zone | null
+
+    switch (payload.eventType) {
+      case 'INSERT': {
+        if (!newRow?.id) return
+        setZones((prev) => {
+          if (prev.some((zone) => zone.id === newRow.id)) return prev
+          return [newRow, ...prev]
+        })
+        void (async () => {
+          try {
+            const [cells, objects] = await Promise.all([
+              zoneCellService.getZoneCells(newRow.id),
+              zoneObjectService.getZoneObjects(newRow.id)
+            ])
+
+            if (cells.length > 0) {
+              setZoneCells((prev) => {
+                const existing = new Set(prev.map((cell) => cell.id))
+                const additions = cells.filter((cell) => !existing.has(cell.id))
+                if (additions.length === 0) return prev
+                return [...additions, ...prev]
+              })
+            }
+
+            if (objects.length > 0) {
+              setZoneObjects((prevObjects) => {
+                const existing = new Set(prevObjects.map((obj) => obj.id))
+                const additions = objects.filter((obj) => !existing.has(obj.id))
+                if (additions.length === 0) return prevObjects
+                return [...additions, ...prevObjects]
+              })
+              for (const obj of objects) {
+                void (async () => {
+                  try {
+                    const tickets = await ticketService.getTicketsByZoneObject(obj.id)
+                    if (tickets.length > 0) {
+                      setTicketsByZoneObject((prev) => {
+                        if (prev[obj.id]?.length) return prev
+                        return { ...prev, [obj.id]: tickets }
+                      })
+                    }
+                  } catch (hydrateErr) {
+                    console.warn('[useProjectData] Failed to fetch tickets for new zone object', hydrateErr)
+                  }
+                })()
+              }
+            }
+          } catch (hydrateError) {
+            console.warn('[useProjectData] Failed to hydrate new zone data', hydrateError)
+          }
+        })()
+        break
+      }
+      case 'UPDATE': {
+        if (!newRow?.id) return
+        setZones((prev) => prev.map((zone) => (zone.id === newRow.id ? { ...zone, ...newRow } : zone)))
+        break
+      }
+      case 'DELETE': {
+        if (!oldRow?.id) return
+        setZones((prev) => prev.filter((zone) => zone.id !== oldRow.id))
+        setZoneCells((prev) => prev.filter((cell) => cell.zone_id !== oldRow.id))
+        setZoneObjects((prevObjects) => {
+          if (prevObjects.length === 0) return prevObjects
+          const removedIds: string[] = []
+          const nextObjects = prevObjects.filter((obj) => {
+            const keep = obj.zone_id !== oldRow.id
+            if (!keep) removedIds.push(obj.id)
+            return keep
+          })
+
+          if (removedIds.length > 0) {
+            setTicketsByZoneObject((prevTickets) => {
+              const nextTickets = { ...prevTickets }
+              for (const id of removedIds) {
+                delete nextTickets[id]
+              }
+              return nextTickets
+            })
+          }
+
+          return nextObjects
+        })
+        break
+      }
+      default:
+        break
+    }
+  }, [])
+
+  const handleZoneCellChange = useCallback((payload: RealtimePostgresChangesPayload<ZoneCell>) => {
+    console.log('[useProjectData] zone_cell change event', payload.eventType, {
+      zone_id: (payload.new as ZoneCell | null)?.zone_id ?? (payload.old as ZoneCell | null)?.zone_id,
+      cell_id: (payload.new as ZoneCell | null)?.id ?? (payload.old as ZoneCell | null)?.id
+    })
+    const newRow = (payload.new ?? null) as ZoneCell | null
+    const oldRow = (payload.old ?? null) as ZoneCell | null
+
+    switch (payload.eventType) {
+      case 'INSERT': {
+        if (!newRow?.id) return
+        setZoneCells((prev) => {
+          if (prev.some((cell) => cell.id === newRow.id)) return prev
+          return [newRow, ...prev]
+        })
+        break
+      }
+      case 'UPDATE': {
+        if (!newRow?.id) return
+        setZoneCells((prev) => prev.map((cell) => (cell.id === newRow.id ? { ...cell, ...newRow } : cell)))
+        break
+      }
+      case 'DELETE': {
+        if (!oldRow?.id) return
+        setZoneCells((prev) => prev.filter((cell) => cell.id !== oldRow.id))
+        break
+      }
+      default:
+        break
+    }
+  }, [])
+
+  const handleHexCellChange = useCallback((payload: RealtimePostgresChangesPayload<HexCell>) => {
+    console.log('[useProjectData] hex_cell change event', payload.eventType, {
+      project_id: (payload.new as HexCell | null)?.project_id ?? (payload.old as HexCell | null)?.project_id,
+      cell_id: (payload.new as HexCell | null)?.id ?? (payload.old as HexCell | null)?.id
+    })
+    const newRow = (payload.new ?? null) as HexCell | null
+    const oldRow = (payload.old ?? null) as HexCell | null
+
+    switch (payload.eventType) {
+      case 'INSERT': {
+        if (!newRow?.id) return
+        setHexCells((prev) => {
+          if (prev.some((cell) => cell.id === newRow.id)) return prev
+          return [newRow, ...prev]
+        })
+        break
+      }
+      case 'UPDATE': {
+        if (!newRow?.id) return
+        setHexCells((prev) => prev.map((cell) => (cell.id === newRow.id ? { ...cell, ...newRow } : cell)))
+        break
+      }
+      case 'DELETE': {
+        if (!oldRow?.id) return
+        setHexCells((prev) => prev.filter((cell) => cell.id !== oldRow.id))
+        break
+      }
+      default:
+        break
+    }
+  }, [])
+
+  const handleBuildingChange = useCallback((payload: RealtimePostgresChangesPayload<Building>) => {
+    console.log('[useProjectData] building change event', payload.eventType, {
+      project_id: (payload.new as Building | null)?.project_id ?? (payload.old as Building | null)?.project_id,
+      building_id: (payload.new as Building | null)?.id ?? (payload.old as Building | null)?.id
+    })
+    const newRow = (payload.new ?? null) as Building | null
+    const oldRow = (payload.old ?? null) as Building | null
+
+    switch (payload.eventType) {
+      case 'INSERT': {
+        if (!newRow?.id) return
+        setBuildings((prev) => {
+          if (prev.some((building) => building.id === newRow.id)) return prev
+          return [newRow, ...prev]
+        })
+        break
+      }
+      case 'UPDATE': {
+        if (!newRow?.id) return
+        setBuildings((prev) => prev.map((building) => (building.id === newRow.id ? { ...building, ...newRow } : building)))
+        break
+      }
+      case 'DELETE': {
+        if (!oldRow?.id) return
+        setBuildings((prev) => prev.filter((building) => building.id !== oldRow.id))
+        break
+      }
+      default:
+        break
+    }
+  }, [])
+
+  const handleZoneObjectChange = useCallback((payload: RealtimePostgresChangesPayload<ZoneObject>) => {
+    console.log('[useProjectData] zone_object change event', payload.eventType, {
+      zone_id: (payload.new as ZoneObject | null)?.zone_id ?? (payload.old as ZoneObject | null)?.zone_id,
+      object_id: (payload.new as ZoneObject | null)?.id ?? (payload.old as ZoneObject | null)?.id
+    })
+    const newRow = (payload.new ?? null) as ZoneObject | null
+    const oldRow = (payload.old ?? null) as ZoneObject | null
+
+    if (payload.eventType === 'DELETE') {
+      if (!oldRow?.id) return
+      setZoneObjects((prev) => prev.filter((obj) => obj.id !== oldRow.id))
+      setTicketsByZoneObject((prev) => {
+        if (!(oldRow.id in prev)) return prev
+        const next = { ...prev }
+        delete next[oldRow.id]
+        return next
+      })
+      return
+    }
+
+    if (!newRow?.id) return
+
+    setZoneObjects((prev) => {
+      const exists = prev.some((obj) => obj.id === newRow.id)
+
+      if (!exists) {
+        return [newRow, ...prev]
+      }
+
+      return prev.map((obj) => (obj.id === newRow.id ? { ...obj, ...newRow } : obj))
+    })
+
+    if (payload.eventType === 'INSERT') {
+      void (async () => {
+        try {
+          const tickets = await ticketService.getTicketsByZoneObject(newRow.id)
+          if (tickets.length > 0) {
+            setTicketsByZoneObject((prev) => {
+              if (prev[newRow.id]?.length) {
+                return prev
+              }
+              return { ...prev, [newRow.id]: tickets }
+            })
+          }
+        } catch (err) {
+          console.warn('[useProjectData] Failed to load tickets for new zone object', err)
+        }
+      })()
+    }
+  }, [])
+
+  const handleTicketChange = useCallback((payload: RealtimePostgresChangesPayload<ZoneObjectTicket>) => {
+    console.log('[useProjectData] ticket change event', payload.eventType, {
+      zone_object_id: (payload.new as ZoneObjectTicket | null)?.zone_object_id ?? (payload.old as ZoneObjectTicket | null)?.zone_object_id,
+      ticket_id: (payload.new as ZoneObjectTicket | null)?.id ?? (payload.old as ZoneObjectTicket | null)?.id
+    })
+    const newRow = (payload.new ?? null) as ZoneObjectTicket | null
+    const oldRow = (payload.old ?? null) as ZoneObjectTicket | null
+
+    if (payload.eventType === 'DELETE') {
+      if (!oldRow?.id || !oldRow.zone_object_id) return
+      setTicketsByZoneObject((prev) => {
+        const list = prev[oldRow.zone_object_id] ?? []
+        if (!list.some((ticket) => ticket.id === oldRow.id)) {
+          return prev
+        }
+
+        const next = { ...prev }
+        const filtered = list.filter((ticket) => ticket.id !== oldRow.id)
+        if (filtered.length > 0) {
+          next[oldRow.zone_object_id] = filtered
+        } else {
+          delete next[oldRow.zone_object_id]
+        }
+        return next
+      })
+      return
+    }
+
+    if (!newRow?.id || !newRow.zone_object_id) return
+
+    setTicketsByZoneObject((prev) => {
+      const next = { ...prev }
+
+      if (payload.eventType === 'UPDATE' && oldRow?.zone_object_id && oldRow.zone_object_id !== newRow.zone_object_id) {
+        const sourceList = next[oldRow.zone_object_id] ?? []
+        const withoutMoved = sourceList.filter((ticket) => ticket.id !== newRow.id)
+        if (withoutMoved.length > 0) {
+          next[oldRow.zone_object_id] = withoutMoved
+        } else {
+          delete next[oldRow.zone_object_id]
+        }
+      }
+
+      const currentList = next[newRow.zone_object_id] ?? []
+      const index = currentList.findIndex((ticket) => ticket.id === newRow.id)
+      const updatedList =
+        index >= 0
+          ? currentList.map((ticket) => (ticket.id === newRow.id ? { ...ticket, ...newRow } : ticket))
+          : [newRow, ...currentList]
+
+      next[newRow.zone_object_id] = updatedList
+      return next
+    })
+  }, [])
+
+  const handleLinkChange = useCallback((payload: RealtimePostgresChangesPayload<any>) => {
+    const newRow = (payload.new ?? null) as {
+      id: string
+      from_object_id: string
+      to_object_id: string
+      link_type: 'primary' | 'secondary'
+      created_at: string
+      updated_at?: string
+    } | null
+    const oldRow = (payload.old ?? null) as { id: string } | null
+
+    switch (payload.eventType) {
+      case 'INSERT': {
+        if (!newRow?.id) return
+        setLinks((prev) => {
+          if (prev.some((link) => link.id === newRow.id)) return prev
+          return [newRow, ...prev]
+        })
+        break
+      }
+      case 'UPDATE': {
+        if (!newRow?.id) return
+        setLinks((prev) => prev.map((link) => (link.id === newRow.id ? { ...link, ...newRow } : link)))
+        break
+      }
+      case 'DELETE': {
+        if (!oldRow?.id) return
+        setLinks((prev) => prev.filter((link) => link.id !== oldRow.id))
+        break
+      }
+      default:
+        break
+    }
+  }, [])
 
   // Создание зоны
   const createZone = useCallback(async (name: string, color: string, cells: Array<[number, number]>) => {
@@ -608,6 +944,128 @@ export const useProjectData = (projectId: string) => {
   const getPrimaryLink = useCallback(async (fromObjectId: string) => {
     return await linkService.getPrimaryLink(fromObjectId)
   }, [])
+
+  const zoneIds = useMemo(() => {
+    const ids = zones
+      .map((zone) => zone.id)
+      .filter((id): id is string => Boolean(id))
+    return [...new Set(ids)].sort()
+  }, [zones])
+
+  const zoneObjectIds = useMemo(() => {
+    const ids = zoneObjects
+      .map((obj) => obj.id)
+      .filter((id): id is string => Boolean(id))
+    return [...new Set(ids)].sort()
+  }, [zoneObjects])
+
+  useEffect(() => {
+    if (!projectId) {
+      return
+    }
+
+    if (realtimeChannelRef.current) {
+      supabase.removeChannel(realtimeChannelRef.current)
+      realtimeChannelRef.current = null
+    }
+
+    const channel = supabase.channel(`project-realtime:${projectId}`)
+
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'zones', filter: `project_id=eq.'${projectId}'` },
+      handleZoneChange
+    )
+
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'hex_cells', filter: `project_id=eq.${projectId}` },
+      handleHexCellChange
+    )
+
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'buildings', filter: `project_id=eq.${projectId}` },
+      handleBuildingChange
+    )
+
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'zone_object_links', filter: `project_id=eq.${projectId}` },
+      handleLinkChange
+    )
+
+    if (zoneIds.length > 0) {
+      const zoneFilter = zoneIds.map((id) => `'${id}'`).join(',')
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'zone_cells', filter: `zone_id=in.(${zoneFilter})` },
+        handleZoneCellChange
+      )
+
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'zone_objects', filter: `zone_id=in.(${zoneFilter})` },
+        handleZoneObjectChange
+      )
+    } else {
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'zone_objects' },
+        handleZoneObjectChange
+      )
+    }
+
+    if (zoneObjectIds.length > 0) {
+      const ticketFilter = zoneObjectIds.map((id) => `'${id}'`).join(',')
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'object_tickets', filter: `zone_object_id=in.(${ticketFilter})` },
+        handleTicketChange
+      )
+    }
+
+    channel.on('system', { event: 'CHANNEL_ERROR' }, (event) => {
+      console.warn('[useProjectData] realtime channel error', event)
+      void loadProjectData()
+    })
+
+    channel.on('system', { event: 'SUBSCRIPTION_ERROR' }, (event) => {
+      console.warn('[useProjectData] realtime subscription error', event)
+      void loadProjectData()
+    })
+
+    realtimeChannelRef.current = channel
+
+    void channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('[useProjectData] realtime channel subscribed', { projectId })
+      } else if (status === 'CHANNEL_ERROR') {
+        console.warn('[useProjectData] realtime channel subscription error state')
+      }
+    })
+
+    return () => {
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current)
+        realtimeChannelRef.current = null
+      } else {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [
+    projectId,
+    handleZoneChange,
+    handleZoneCellChange,
+    handleHexCellChange,
+    handleBuildingChange,
+    handleZoneObjectChange,
+    handleTicketChange,
+    handleLinkChange,
+    loadProjectData,
+    zoneIds,
+    zoneObjectIds
+  ])
 
   // Загрузка данных при изменении projectId
   useEffect(() => {

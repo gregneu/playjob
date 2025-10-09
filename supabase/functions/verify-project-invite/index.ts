@@ -26,13 +26,12 @@ type InviteRow = {
   status: string
   expires_at: string | null
   project: { name: string | null } | null
-  inviter: { full_name?: string | null; display_name?: string | null; email?: string | null } | null
+  inviter: { full_name?: string | null; email?: string | null } | null
 }
 
 const normalizeInviterName = (inviter: InviteRow['inviter']) => {
   if (!inviter) return null
   return inviter.full_name?.trim()
-    || inviter.display_name?.trim()
     || inviter.email?.trim()
     || null
 }
@@ -79,7 +78,7 @@ serve(async (req) => {
         status,
         expires_at,
         project:projects(name),
-        inviter:profiles!project_invites_inviter_id_fkey(full_name, display_name, email)
+        inviter:profiles!project_invites_inviter_id_fkey(full_name, email)
       `)
       .eq('invite_token', rawToken)
       .maybeSingle()
