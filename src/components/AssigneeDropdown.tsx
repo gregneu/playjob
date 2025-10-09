@@ -11,6 +11,15 @@ interface ProjectMember {
   avatar_url?: string | null
 }
 
+type MembersFunctionRow = {
+  user_id: string | null
+  display_name: string | null
+  email: string | null
+  role?: string | null
+  status?: 'member' | 'invited'
+  avatar_url?: string | null
+}
+
 interface AssigneeDropdownProps {
   projectId: string
   currentAssignee?: string | null
@@ -50,16 +59,16 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
           return
         }
 
-        const payload = (data ?? {}) as { members?: Array<{ user_id?: string | null; role?: string | null; profiles?: { full_name?: string | null; email?: string | null } | null }> }
+        const payload = (data ?? {}) as { members?: MembersFunctionRow[] }
 
         const normalizedMembers: ProjectMember[] = (payload.members ?? [])
-          .filter((member) => Boolean(member.user_id))
+          .filter((member) => member.status !== 'invited' && Boolean(member.user_id))
           .map((member) => ({
             id: member.user_id as string,
-            full_name: member.profiles?.full_name ?? member.profiles?.email ?? 'Unnamed User',
-            email: member.profiles?.email ?? null,
+            full_name: member.display_name ?? member.email ?? 'Unnamed User',
+            email: member.email ?? null,
             role: (member.role ?? 'viewer').toLowerCase(),
-            avatar_url: (member as any)?.profiles?.avatar_url ?? null
+            avatar_url: member.avatar_url ?? null
           }))
 
         setMembers(normalizedMembers)
@@ -172,7 +181,7 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
             <UserAvatar
               userId={selectedMember?.id}
-              fullName={selectedMember?.full_name ?? undefined}
+              userName={selectedMember?.full_name ?? undefined}
               size={40}
               show3D={false}
             />
@@ -335,7 +344,7 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
                   >
                     <UserAvatar
                       userId={member.id}
-                      fullName={member.full_name ?? undefined}
+                      userName={member.full_name ?? undefined}
                       size={28}
                       show3D={false}
                     />

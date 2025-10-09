@@ -23,6 +23,8 @@ type NormalizedRole = 'viewer' | 'editor' | 'admin' | 'owner'
 interface NormalizedProfile {
   full_name: string | null
   email: string | null
+  display_name: string | null
+  avatar_url: string | null
 }
 
 interface NormalizedMemberRow {
@@ -95,7 +97,7 @@ const fetchLegacyMemberDataset = async (projectId: string): Promise<{ memberRows
   if (memberUserIds.length > 0) {
     const { data: profileRows, error: profileError } = await supabase
       .from('profiles')
-      .select('id, full_name, email')
+      .select('id, full_name, email, display_name, avatar_url')
       .in('id', memberUserIds)
 
     if (profileError) {
@@ -105,7 +107,9 @@ const fetchLegacyMemberDataset = async (projectId: string): Promise<{ memberRows
         if (profile?.id) {
           profileMap.set(profile.id, {
             full_name: profile.full_name ?? null,
-            email: profile.email ?? null
+            email: profile.email ?? null,
+            display_name: profile.display_name ?? profile.full_name ?? profile.email ?? null,
+            avatar_url: profile.avatar_url ?? null
           })
         }
       }
@@ -113,7 +117,12 @@ const fetchLegacyMemberDataset = async (projectId: string): Promise<{ memberRows
   }
 
   const memberRows: NormalizedMemberRow[] = acceptedMembers.map((row) => {
-    const profile = profileMap.get(row.user_id ?? '') ?? { full_name: null, email: null }
+    const profile = profileMap.get(row.user_id ?? '') ?? {
+      full_name: null,
+      email: null,
+      display_name: null,
+      avatar_url: null
+    }
     return {
       id: row.id,
       user_id: row.user_id ?? null,
@@ -153,7 +162,7 @@ const fetchMemberDataset = async (projectId: string): Promise<{ memberRows: Norm
   const [{ data: memberRowsRaw, error: membersError }, { data: inviteRowsRaw, error: invitesError }] = await Promise.all([
     supabase
       .from('project_memberships')
-      .select('id, user_id, role, created_at, profiles:profiles(full_name, email)')
+      .select('id, user_id, role, created_at, profiles:profiles(full_name, email, display_name, avatar_url)')
       .eq('project_id', projectId),
     supabase
       .from('project_invites')
@@ -170,7 +179,9 @@ const fetchMemberDataset = async (projectId: string): Promise<{ memberRows: Norm
       created_at: row.created_at ?? new Date().toISOString(),
       profiles: {
         full_name: row.profiles?.full_name ?? null,
-        email: row.profiles?.email ?? null
+        email: row.profiles?.email ?? null,
+        display_name: row.profiles?.display_name ?? row.profiles?.full_name ?? row.profiles?.email ?? null,
+        avatar_url: row.profiles?.avatar_url ?? null
       }
     }))
 
@@ -391,6 +402,7 @@ serve(async (req) => {
       invite_id: string | null
       user_id: string | null
       display_name: string | null
+      avatar_url: string | null
       email: string
       role: string
       status: 'member' | 'invited'
@@ -415,7 +427,8 @@ serve(async (req) => {
         membership_id: row.id ?? null,
         invite_id: null,
         user_id: row.user_id ?? null,
-        display_name: row.profiles.full_name ?? null,
+        display_name: row.profiles.display_name ?? row.profiles.full_name ?? row.profiles.email ?? null,
+        avatar_url: row.profiles.avatar_url ?? null,
         email,
         role: row.role,
         status: 'member',
@@ -446,14 +459,19 @@ serve(async (req) => {
 
       const { data: membershipOwner } = await supabase
         .from('project_memberships')
-        .select('id, user_id, created_at, profiles:profiles(full_name, email)')
+        .select('id, user_id, created_at, profiles:profiles(full_name, email, display_name, avatar_url)')
         .eq('project_id', projectId)
         .eq('role', 'owner')
         .maybeSingle()
 
+      let fallbackAvatar: string | null = null
+
       if (membershipOwner) {
         fallbackEmail = membershipOwner.profiles?.email ?? fallbackEmail
-        fallbackName = membershipOwner.profiles?.full_name ?? fallbackName
+        fallbackName = membershipOwner.profiles?.full_name
+          ?? membershipOwner.profiles?.display_name
+          ?? fallbackName
+        fallbackAvatar = membershipOwner.profiles?.avatar_url ?? null
       }
 
       const fallbackEmailLower = fallbackEmail.trim().toLowerCase()
@@ -466,7 +484,8 @@ serve(async (req) => {
         membership_id: membershipOwner?.id ?? null,
         invite_id: null,
         user_id: membershipOwner?.user_id ?? ownerId ?? null,
-        display_name: fallbackName ?? 'Owner',
+        display_name: fallbackName ?? fallbackEmail || 'Owner',
+        avatar_url: fallbackAvatar,
         email: fallbackEmail || 'owner@unknown.local',
         role: 'owner',
         status: 'member',
@@ -490,6 +509,7 @@ serve(async (req) => {
         invite_id: row.id,
         user_id: null,
         display_name: null,
+        avatar_url: null,
         email,
         role: row.role,
         status: 'invited',

@@ -11,6 +11,7 @@ interface MemberRow {
   invite_id: string | null
   user_id: string | null
   display_name: string | null
+  avatar_url?: string | null
   email: string
   role: Role
   status: MemberStatus
