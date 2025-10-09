@@ -54,6 +54,11 @@ interface UnifiedHexCellProps {
   registerHoverTarget?: (key: string, mesh: THREE.Object3D) => void
   unregisterHoverTarget?: (key: string) => void
   sprintProgress?: { total: number; done: number } | undefined
+  energyPulse?: 'source' | 'target' | null
+  energyPulseKey?: string | number
+  energyPulseColor?: string | null
+  ticketBadgeAnimation?: 'gain' | 'lose' | null
+  ticketBadgeAnimationKey?: string | number
 }
 
 // Конвертация hex-координат в мировые для сетки с ПЛОСКИМ верхом
@@ -95,6 +100,11 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   registerHoverTarget,
   unregisterHoverTarget,
   sprintProgress,
+  energyPulse = null,
+  energyPulseKey,
+  energyPulseColor = null,
+  ticketBadgeAnimation = null,
+  ticketBadgeAnimationKey,
 }) => {
   console.log(`🏠 UnifiedHexCell [${q},${r}] rendering:`, {
     state,
@@ -112,6 +122,18 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   // Анимация для hover эффекта
   const [targetScale, setTargetScale] = useState(1)
   const [currentScale, setCurrentScale] = useState(1)
+  const [activeAura, setActiveAura] = useState<{ type: 'source' | 'target'; startedAt: number; key?: string | number; color: string } | null>(null)
+  const auraMeshRef = useRef<THREE.Mesh>(null)
+  const auraMaterialRef = useRef<THREE.MeshBasicMaterial>(null)
+  const lastPulseKeyRef = useRef<string | number | null>(null)
+  const AURA_DURATION = 1.25
+  const badgeClassName = useMemo(() => {
+    const classes = ['ticket-badge']
+    if (ticketBadgeAnimation === 'gain') classes.push('ticket-badge--gain')
+    if (ticketBadgeAnimation === 'lose') classes.push('ticket-badge--lose')
+    return classes.join(' ')
+  }, [ticketBadgeAnimation])
+  const badgeDomKey = ticketBadgeAnimationKey != null ? `badge-${ticketBadgeAnimationKey}` : 'badge-default'
   
   // Регистрируем mesh для hover detection
   useEffect(() => {
@@ -137,6 +159,15 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
     }
   }, [q, r, registerHoverTarget, unregisterHoverTarget])
   
+  useEffect(() => {
+    if (auraMeshRef.current) {
+      auraMeshRef.current.visible = false
+    }
+    if (auraMaterialRef.current) {
+      auraMaterialRef.current.opacity = 0
+    }
+  }, [])
+  
   // Обновляем визуальное состояние при drag
   useEffect(() => {
     if (isDragTarget) {
@@ -145,16 +176,70 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
       setTargetScale(1)
     }
   }, [isDragTarget])
+
+  useEffect(() => {
+    if (!energyPulse) return
+    const pulseKey = energyPulseKey ?? `${energyPulse}-${performance.now()}`
+    if (lastPulseKeyRef.current === pulseKey) return
+    lastPulseKeyRef.current = pulseKey
+
+    const startedAt = performance.now() / 1000
+    const fallbackColor = energyPulse === 'source' ? '#38bdf8' : '#f59e0b'
+    const auraColor = energyPulseColor ?? fallbackColor
+    setActiveAura({ type: energyPulse, startedAt, key: pulseKey, color: auraColor })
+
+    if (auraMaterialRef.current) {
+      auraMaterialRef.current.color.set(auraColor)
+      auraMaterialRef.current.opacity = energyPulse === 'source' ? 0.45 : 0.38
+    }
+    if (auraMeshRef.current) {
+      auraMeshRef.current.visible = true
+      auraMeshRef.current.scale.setScalar(0.8)
+    }
+  }, [energyPulse, energyPulseKey])
+
+  useEffect(() => {
+    if (!activeAura && auraMeshRef.current) {
+      auraMeshRef.current.visible = false
+    }
+    if (!activeAura && auraMaterialRef.current) {
+      auraMaterialRef.current.opacity = 0
+    }
+  }, [activeAura])
   
   // Плавная анимация масштаба и частиц
   useFrame((state, delta) => {
-    if (currentScale !== targetScale) {
+    const now = performance.now() / 1000
+
+    let desiredScale = targetScale
+    if (activeAura) {
+      const auraElapsed = now - activeAura.startedAt
+      if (auraElapsed >= AURA_DURATION) {
+        setActiveAura(null)
+      } else {
+        const wave = 1 + Math.sin(auraElapsed * 8.5) * 0.04
+        desiredScale = Math.max(desiredScale, 1.04 * wave)
+
+        if (auraMeshRef.current && auraMaterialRef.current) {
+          const progress = Math.min(1, auraElapsed / AURA_DURATION)
+          const scale = THREE.MathUtils.lerp(0.85, 2.35, progress)
+          auraMeshRef.current.scale.setScalar(scale)
+          auraMeshRef.current.position.y = 0.06 + Math.sin(auraElapsed * 6.0) * 0.05
+          auraMeshRef.current.rotation.z = auraElapsed * (activeAura.type === 'source' ? 2.4 : -2.0)
+          const baseOpacity = activeAura.type === 'source' ? 0.45 : 0.35
+          auraMaterialRef.current.color.set(activeAura.color)
+          auraMaterialRef.current.opacity = baseOpacity * (1 - progress)
+        }
+      }
+    }
+
+    if (currentScale !== desiredScale) {
       const speed = 5
-      const diff = targetScale - currentScale
+      const diff = desiredScale - currentScale
       const step = diff * speed * delta
       
       if (Math.abs(diff) < 0.01) {
-        setCurrentScale(targetScale)
+        setCurrentScale(desiredScale)
       } else {
         setCurrentScale(currentScale + step)
       }
@@ -455,6 +540,34 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
       
       {/* Убираем зеленый куб - оставляем только кольца и outline */}
 
+      {activeAura && (
+        <pointLight
+          position={[0, 1.6, 0]}
+          intensity={activeAura.type === 'source' ? 1.3 : 1.0}
+          distance={5}
+          decay={2.4}
+          color={activeAura.color}
+        />
+      )}
+
+      <mesh
+        ref={auraMeshRef}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.02, 0]}
+        visible={Boolean(activeAura)}
+      >
+        <ringGeometry args={[0.45, 1.1, 64]} />
+        <meshBasicMaterial
+          ref={auraMaterialRef}
+          color="#38bdf8"
+          transparent
+          opacity={0}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
       {/* Остальная часть компонента без изменений */}
       {showPlusIcon && (
         <mesh position={[0, totalHeight + 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -498,8 +611,9 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
 
       {/* Bubble с количеством тикетов - по центру здания */}
       {isZoneCenter && ticketCount > 0 && !isSprintObject && (
-        <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
+        <Html key={badgeDomKey} position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div 
+            className={badgeClassName}
             style={{
               background: '#3B82F6',
               color: 'white',
@@ -515,8 +629,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
               border: '2px solid white',
               pointerEvents: 'auto', // Включаем pointer events для hover
               zIndex: 10,
-              cursor: 'pointer',
-              transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+              cursor: 'pointer'
             }}
             onMouseEnter={() => setIsBubbleHovered(true)}
             onMouseLeave={() => setIsBubbleHovered(false)}

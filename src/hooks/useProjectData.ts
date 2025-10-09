@@ -412,10 +412,15 @@ export const useProjectData = (projectId: string) => {
 
     if (!newRow?.id || !newRow.zone_object_id) return
 
+    const movedBetweenZones =
+      payload.eventType === 'UPDATE' &&
+      oldRow?.zone_object_id &&
+      oldRow.zone_object_id !== newRow.zone_object_id
+
     setTicketsByZoneObject((prev) => {
       const next = { ...prev }
 
-      if (payload.eventType === 'UPDATE' && oldRow?.zone_object_id && oldRow.zone_object_id !== newRow.zone_object_id) {
+      if (movedBetweenZones) {
         const sourceList = next[oldRow.zone_object_id] ?? []
         const withoutMoved = sourceList.filter((ticket) => ticket.id !== newRow.id)
         if (withoutMoved.length > 0) {
@@ -435,6 +440,18 @@ export const useProjectData = (projectId: string) => {
       next[newRow.zone_object_id] = updatedList
       return next
     })
+
+    if (movedBetweenZones && typeof window !== 'undefined') {
+      const detail = {
+        from: oldRow!.zone_object_id!,
+        to: newRow.zone_object_id,
+        ticketId: newRow.id,
+        optimistic: false,
+        emittedAt: Date.now()
+      }
+      window.dispatchEvent(new CustomEvent('ticket-move-start', { detail }))
+      window.dispatchEvent(new CustomEvent('ticket-moved', { detail }))
+    }
   }, [])
 
   const handleLinkChange = useCallback((payload: RealtimePostgresChangesPayload<any>) => {
@@ -1010,6 +1027,11 @@ export const useProjectData = (projectId: string) => {
         )
       }
     } else {
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'zone_cells' },
+        handleZoneCellChange
+      )
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'zone_objects' },

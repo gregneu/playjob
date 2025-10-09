@@ -49,6 +49,8 @@ interface HexGridProps {
   activeSprintObjectId?: string | null
   activeSprintProgress?: { total: number; done: number } | null
   sprintProgressMap?: Record<string, { total: number; done: number }>
+  energyPulseMap?: Record<string, { type: 'source' | 'target'; key: string; color: string }>
+  badgeAnimationMap?: Record<string, { type: 'gain' | 'lose'; key: string }>
 }
 
 export const SmartHexGrid: React.FC<HexGridProps> = ({ 
@@ -71,7 +73,9 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
   unregisterHoverTarget,
   activeSprintObjectId = null,
   activeSprintProgress = null,
-  sprintProgressMap = {}
+  sprintProgressMap = {},
+  energyPulseMap,
+  badgeAnimationMap
 }) => {
   const hexSize = 2.0
 
@@ -303,6 +307,10 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
           console.log(`🌳 SmartHexGrid: ${treeCount} деревьев размещены на ячейке [${cell.q}, ${cell.r}] в зоне "${zone?.name}"`)
         }
 
+        const buildingId = building?.id ?? null
+        const pulse = buildingId && energyPulseMap ? energyPulseMap[buildingId] : undefined
+        const badgeAnim = buildingId && badgeAnimationMap ? badgeAnimationMap[buildingId] : undefined
+
         return (
           <group key={`smart-${cell.q}-${cell.r}-${cell.state}-${cell.cellType}`}>
             <UnifiedHexCell
@@ -349,6 +357,11 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
               treeCount={treeCount}
               registerHoverTarget={registerHoverTarget}
               unregisterHoverTarget={unregisterHoverTarget}
+              energyPulse={pulse ? pulse.type : null}
+              energyPulseKey={pulse?.key}
+              energyPulseColor={pulse?.color ?? null}
+              ticketBadgeAnimation={badgeAnim?.type ?? null}
+              ticketBadgeAnimationKey={badgeAnim?.key}
               isDragTarget={(() => {
                 // Drag target только если ячейка под курсором И является центром зоны И идет drag операция
                 const isHovered = hoveredCellDuringDrag && 

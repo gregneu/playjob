@@ -26,7 +26,7 @@ import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
 import { Vegetation } from './Vegetation'
 import { DustBurst } from './effects/DustBurst'
-import { TicketTravelOrb } from './effects/TicketTravelOrb'
+import { TicketBeamEffects, type BeamLifecyclePayload } from './effects/TicketBeamEffects'
 import { ZoneColorPicker } from './ZoneColorPicker'
 import BottomTapbar from './BottomTapbar'
 import ConnectedRoadSystem from './ConnectedRoadSystem'
@@ -44,6 +44,7 @@ import {
 } from '../utils/hybridDragEvents'
 // import { PerformanceMonitor } from './PerformanceMonitor' // Removed
 // import DragTestElement from './DragTestElement' // Removed
+import './HexGridSystem.css'
 
 type CellState = 'empty' | 'occupied' | 'highlighted' | 'hidden'
 
@@ -115,48 +116,6 @@ const generateUUID = (): string => {
   const s4 = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1)
   return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`
 }
-const TicketMoveEffects: React.FC = () => {
-  const [effects, setEffects] = React.useState<Array<{
-    id: string
-    start: [number, number, number]
-    end: [number, number, number]
-  }>>([])
-
-  React.useEffect(() => {
-    const onStart = (e: any) => {
-      const { from, to } = e.detail || {}
-      if (!from || !to) return
-      try {
-        const all = (window as any)._zoneObjects as any[] | undefined
-        if (!Array.isArray(all)) return
-        const fromObj = all.find(o => o && o.id === from)
-        const toObj = all.find(o => o && o.id === to)
-        if (!fromObj || !toObj) return
-        const [sx, , sz] = hexToWorldPosition(fromObj.q, fromObj.r)
-        const [ex, , ez] = hexToWorldPosition(toObj.q, toObj.r)
-        setEffects(prev => [{ id: generateUUID(), start: [sx, 0.4, sz], end: [ex, 0.4, ez] }, ...prev])
-      } catch {}
-    }
-    window.addEventListener('ticket-move-start' as any, onStart as any, true)
-    return () => window.removeEventListener('ticket-move-start' as any, onStart as any, true)
-  }, [])
-
-  return (
-    <group>
-      {effects.map(eff => (
-        <TicketTravelOrb
-          key={eff.id}
-          start={eff.start}
-          end={eff.end}
-          duration={0.9}
-          color="#ffd54f"
-          onComplete={() => setEffects(prev => prev.filter(x => x.id !== eff.id))}
-        />
-      ))}
-    </group>
-  )
-}
-
 interface HexGridSystemProps {
   projectId: string
 }
@@ -210,7 +169,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [])
+  }, [schedulePulse])
   const [isSprintOpen, setIsSprintOpen] = useState(false)
   const [sprintObjectId, setSprintObjectId] = useState<string | null>(null)
   const [sprintWeeks, setSprintWeeks] = useState<number>(2)
@@ -751,6 +710,102 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     console.log('🎯 Available drop targets (zone centers):', zones.map(z => getZoneCenter(z.id)))
   }, [zones])
   const [dragTicketId, setDragTicketId] = useState<string | null>(null)
+  const [sourcePulses, setSourcePulses] = useState<Record<string, { key: string; color: string }>>({})
+  const [targetPulses, setTargetPulses] = useState<Record<string, { key: string; color: string }>>({})
+  const [badgeAnimations, setBadgeAnimations] = useState<Record<string, { type: 'gain' | 'lose'; key: string }>>({})
+  const pulseTimeoutsRef = useRef<number[]>([])
+  const badgeTimeoutsRef = useRef<number[]>([])
+
+  const schedulePulse = useCallback((
+    zoneObjectId: string | null | undefined,
+    type: 'source' | 'target',
+    color: string,
+    duration = 1400
+  ) => {
+    if (!zoneObjectId || typeof window === 'undefined') return null
+    const key = generateUUID()
+    const setter = type === 'source' ? setSourcePulses : setTargetPulses
+    setter((prev) => ({
+      ...prev,
+      [zoneObjectId]: { key, color }
+    }))
+    const timeoutId = window.setTimeout(() => {
+      setter((prev) => {
+        const entry = prev[zoneObjectId]
+        if (!entry || entry.key !== key) return prev
+        const next = { ...prev }
+        delete next[zoneObjectId]
+        return next
+      })
+      pulseTimeoutsRef.current = pulseTimeoutsRef.current.filter((id) => id !== timeoutId)
+    }, duration)
+    pulseTimeoutsRef.current.push(timeoutId)
+    return key
+  }, [])
+
+  const scheduleBadgeAnimation = useCallback((
+    zoneObjectId: string | null | undefined,
+    type: 'gain' | 'lose',
+    duration = type === 'gain' ? 680 : 520
+  ) => {
+    if (!zoneObjectId || typeof window === 'undefined') return null
+    const key = generateUUID()
+    setBadgeAnimations((prev) => ({
+      ...prev,
+      [zoneObjectId]: { type, key }
+    }))
+    const timeoutId = window.setTimeout(() => {
+      setBadgeAnimations((prev) => {
+        const entry = prev[zoneObjectId]
+        if (!entry || entry.key !== key) return prev
+        const next = { ...prev }
+        delete next[zoneObjectId]
+        return next
+      })
+      badgeTimeoutsRef.current = badgeTimeoutsRef.current.filter((id) => id !== timeoutId)
+    }, duration)
+    badgeTimeoutsRef.current.push(timeoutId)
+    return key
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (typeof window === 'undefined') return
+      pulseTimeoutsRef.current.forEach((id) => window.clearTimeout(id))
+      badgeTimeoutsRef.current.forEach((id) => window.clearTimeout(id))
+      pulseTimeoutsRef.current = []
+      badgeTimeoutsRef.current = []
+    }
+  }, [])
+
+  const handleBeamStart = useCallback((payload: BeamLifecyclePayload) => {
+    if (!payload?.fromId) return
+    if (payload.fromId === payload.toId) return
+    schedulePulse(payload.fromId, 'source', payload.colorScheme.start, 1250)
+    scheduleBadgeAnimation(payload.fromId, 'lose', 540)
+  }, [scheduleBadgeAnimation, schedulePulse])
+
+  const handleBeamImpact = useCallback((payload: BeamLifecyclePayload) => {
+    if (!payload?.toId) return
+    const impactColor = payload.colorScheme.spark || payload.colorScheme.middle
+    schedulePulse(payload.toId, 'target', impactColor, 1550)
+    scheduleBadgeAnimation(payload.toId, 'gain', 720)
+  }, [scheduleBadgeAnimation, schedulePulse])
+
+  const handleBeamFinish = useCallback((_payload: BeamLifecyclePayload) => {
+    // Reserved for future cleanup hooks if necessary
+  }, [])
+
+  const energyPulseMap = useMemo(() => {
+    const map: Record<string, { type: 'source' | 'target'; key: string; color: string }> = {}
+    Object.entries(sourcePulses).forEach(([zoneObjectId, entry]) => {
+      map[zoneObjectId] = { type: 'source', key: entry.key, color: entry.color }
+    })
+    Object.entries(targetPulses).forEach(([zoneObjectId, entry]) => {
+      map[zoneObjectId] = { type: 'target', key: entry.key, color: entry.color }
+    })
+    return map
+  }, [sourcePulses, targetPulses])
   
   // Ref для отслеживания состояния перетаскивания в обработчиках событий
   const isDraggingRef = useRef<boolean>(false)
@@ -781,6 +836,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           // Это существующий тикет - сохраняем полную информацию
           console.log('📝 Setting pendingTicketType for existing ticket:', ticketDetail)
           setPendingTicketType(ticketDetail)
+          schedulePulse(ticketDetail.fromZoneObjectId, 'source', '#38bdf8', 950)
         } else if (ticketDetail.type) {
           // Это новый тикет - сохраняем только тип
           console.log('📝 Setting pendingTicketType for new ticket:', ticketDetail.type)
@@ -4260,10 +4316,12 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             }
           }}
         >
-          {/* Глобальный слушатель анимации перемещения тикетов */}
-          <TicketMoveEffects />
-          {/* Глобальный слушатель анимации перемещения тикетов */}
-          <TicketMoveEffects />
+          <TicketBeamEffects
+            zoneObjects={zoneObjects}
+            onBeamStart={handleBeamStart}
+            onBeamImpact={handleBeamImpact}
+            onBeamFinish={handleBeamFinish}
+          />
           {/* Zone names теперь рендерятся в UnifiedHexCell */}
           <CameraBridge onReady={(cam) => { cameraRef.current = cam }} />
           
@@ -4351,6 +4409,8 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             activeSprintObjectId={sprintObjectId}
             activeSprintProgress={sprintObjectId ? activeSprintProgress : null}
             sprintProgressMap={sprintProgressByObject}
+            energyPulseMap={energyPulseMap}
+            badgeAnimationMap={badgeAnimations}
           />
         )}
           
@@ -4496,6 +4556,10 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
               console.log(`🌳 ${treeCount} деревьев размещены на ячейке [${q}, ${r}] в зоне "${zone?.name}" (${zoneColor})`)
             }
 
+            const buildingId = building?.id ?? null
+            const pulse = buildingId ? energyPulseMap[buildingId] : undefined
+            const badgeAnim = buildingId ? badgeAnimations[buildingId] : undefined
+
             return (
               <>
               <UnifiedHexCell
@@ -4540,6 +4604,11 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
                 registerHoverTarget={registerHoverTarget}
                 unregisterHoverTarget={unregisterHoverTarget}
                 sprintProgress={sprintProgressForCell || undefined}
+                energyPulse={pulse ? pulse.type : null}
+                energyPulseKey={pulse?.key}
+                energyPulseColor={pulse?.color ?? null}
+                ticketBadgeAnimation={badgeAnim?.type ?? null}
+                ticketBadgeAnimationKey={badgeAnim?.key}
               />
               {isDraggingTicket && dragTicketId && isZoneCenterCell && candidateCenterCell && candidateCenterCell[0] === q && candidateCenterCell[1] === r && (() => {
                 const foundObject = getZoneObjectForCellLocal(q, r)
