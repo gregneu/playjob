@@ -996,7 +996,7 @@ export const useProjectData = (projectId: string) => {
     )
 
     if (zoneIds.length > 0) {
-      const zoneFilter = zoneIds.map((id) => `"${id}"`).join(',')
+      const zoneFilter = zoneIds.join(',')
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'zone_cells', filter: `zone_id=in.(${zoneFilter})` },
@@ -1017,7 +1017,7 @@ export const useProjectData = (projectId: string) => {
     }
 
     if (zoneObjectIds.length > 0) {
-      const ticketFilter = zoneObjectIds.map((id) => `"${id}"`).join(',')
+      const ticketFilter = zoneObjectIds.join(',')
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'object_tickets', filter: `zone_object_id=in.(${ticketFilter})` },
@@ -1026,11 +1026,19 @@ export const useProjectData = (projectId: string) => {
     }
 
     channel.on('system', { event: 'CHANNEL_ERROR' }, (event) => {
+      if (event?.status === 'ok') {
+        console.log('[useProjectData] realtime channel ack', event)
+        return
+      }
       console.warn('[useProjectData] realtime channel error', event)
       void loadProjectData()
     })
 
     channel.on('system', { event: 'SUBSCRIPTION_ERROR' }, (event) => {
+      if (event?.status === 'ok') {
+        console.log('[useProjectData] realtime subscription ack', event)
+        return
+      }
       console.warn('[useProjectData] realtime subscription error', event)
       void loadProjectData()
     })
