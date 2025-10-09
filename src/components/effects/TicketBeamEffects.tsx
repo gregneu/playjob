@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { hexToWorldPosition } from '../../lib/hex-utils'
-import { LaserBeam } from './LaserBeam'
+import { MagicalTicketTrail } from './MagicalTicketTrail'
 import { EnergyPulse } from './EnergyPulse'
 import { EnergySpark } from './EnergySpark'
 
@@ -109,10 +109,14 @@ const BeamVisual: React.FC<{
 
   return (
     <group>
-      <LaserBeam
+      <MagicalTicketTrail
         start={beam.start}
         end={beam.end}
-        colors={beam.colorScheme}
+        particleColor={beam.colorScheme.middle}
+        headColor={beam.colorScheme.end}
+        duration={1.25}
+        swirlRadius={0.36}
+        flowSpeed={1.8}
         onComplete={() => onFinish(beam)}
       />
       <EnergyPulse
