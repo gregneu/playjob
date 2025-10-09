@@ -41,7 +41,7 @@ export const TicketFlight: React.FC<TicketFlightProps> = ({
   const distance = useMemo(() => startVec.distanceTo(endVec), [startVec, endVec])
   const controlHeight = useMemo(() => {
     if (typeof arcHeight === 'number') return arcHeight
-    return Math.max(1.2, distance * 0.35)
+    return Math.max(0.8, distance * 0.45)
   }, [arcHeight, distance])
   const controlPoint = useMemo(() => {
     const mid = startVec.clone().add(endVec).multiplyScalar(0.5)
@@ -138,4 +138,3 @@ export const TicketFlight: React.FC<TicketFlightProps> = ({
     </group>
   )
 }
-

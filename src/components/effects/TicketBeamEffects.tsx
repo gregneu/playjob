@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import * as THREE from 'three'
 import { hexToWorldPosition } from '../../lib/hex-utils'
 import { TicketFlight } from './TicketFlight'
 
@@ -104,14 +105,21 @@ const BeamVisual: React.FC<{
     }
   }, [])
 
+  const arcHeight = useMemo(() => {
+    const startVec = new THREE.Vector3(...beam.start)
+    const endVec = new THREE.Vector3(...beam.end)
+    const dist = startVec.distanceTo(endVec)
+    return Math.max(0.8, dist * 0.55)
+  }, [beam.start, beam.end])
+
   return (
     <TicketFlight
       start={beam.start}
       end={beam.end}
       ticketColor={beam.colorScheme.middle}
       ticketBackColor={beam.colorScheme.start}
-      duration={0.95}
-      arcHeight={2.1}
+      duration={0.85}
+      arcHeight={arcHeight}
       onArrive={() => onImpact?.(beam)}
       onComplete={() => onFinish(beam)}
     />
@@ -120,7 +128,7 @@ const BeamVisual: React.FC<{
 
 export const TicketBeamEffects: React.FC<TicketBeamEffectsProps> = ({
   zoneObjects,
-  heightOffset = 1.2,
+  heightOffset = 0.25,
   onBeamStart,
   onBeamImpact,
   onBeamFinish
