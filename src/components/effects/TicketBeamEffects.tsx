@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { hexToWorldPosition } from '../../lib/hex-utils'
-import { MagicalTicketTrail } from './MagicalTicketTrail'
-import { EnergyPulse } from './EnergyPulse'
-import { EnergySpark } from './EnergySpark'
+import { ConfettiBurst } from './ConfettiBurst'
 
 type ZoneObjectLike = {
   id: string
@@ -100,40 +98,30 @@ const BeamVisual: React.FC<{
   onFinish: (beam: BeamState) => void
   onImpact?: (beam: BeamState) => void
 }> = ({ beam, onFinish, onImpact }) => {
-  const [spark, setSpark] = useState(false)
-
-  const handlePulseComplete = useCallback(() => {
-    setSpark(true)
+  useEffect(() => {
     onImpact?.(beam)
   }, [beam, onImpact])
 
+  const palette = useMemo(
+    () => [
+      beam.colorScheme.spark,
+      beam.colorScheme.end,
+      beam.colorScheme.middle,
+      '#ffffff'
+    ],
+    [beam.colorScheme]
+  )
+
   return (
-    <group>
-      <MagicalTicketTrail
-        start={beam.start}
-        end={beam.end}
-        particleColor={beam.colorScheme.middle}
-        headColor={beam.colorScheme.end}
-        duration={1.25}
-        swirlRadius={0.36}
-        flowSpeed={1.8}
-        onComplete={() => onFinish(beam)}
-      />
-      <EnergyPulse
-        start={beam.start}
-        end={beam.end}
-        color={beam.colorScheme.pulse}
-        duration={0.68}
-        onComplete={handlePulseComplete}
-      />
-      {spark && (
-        <EnergySpark
-          position={beam.end}
-          color={beam.colorScheme.spark}
-          onComplete={() => setSpark(false)}
-        />
-      )}
-    </group>
+    <ConfettiBurst
+      position={beam.end}
+      duration={2}
+      particleCount={52}
+      palette={palette}
+      swirlRadius={0.9}
+      liftHeight={1.8}
+      onComplete={() => onFinish(beam)}
+    />
   )
 }
 
