@@ -169,7 +169,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [schedulePulse])
+  }, [])
   const [isSprintOpen, setIsSprintOpen] = useState(false)
   const [sprintObjectId, setSprintObjectId] = useState<string | null>(null)
   const [sprintWeeks, setSprintWeeks] = useState<number>(2)
