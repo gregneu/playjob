@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { hexToWorldPosition } from '../../lib/hex-utils'
-import { ConfettiBurst } from './ConfettiBurst'
+import { TicketFlight } from './TicketFlight'
 
 type ZoneObjectLike = {
   id: string
@@ -99,27 +99,20 @@ const BeamVisual: React.FC<{
   onImpact?: (beam: BeamState) => void
 }> = ({ beam, onFinish, onImpact }) => {
   useEffect(() => {
-    onImpact?.(beam)
-  }, [beam, onImpact])
-
-  const palette = useMemo(
-    () => [
-      beam.colorScheme.spark,
-      beam.colorScheme.end,
-      beam.colorScheme.middle,
-      '#ffffff'
-    ],
-    [beam.colorScheme]
-  )
+    return () => {
+      // cleanup no-op; placeholder for future side-effects
+    }
+  }, [])
 
   return (
-    <ConfettiBurst
-      position={beam.end}
-      duration={2}
-      particleCount={52}
-      palette={palette}
-      swirlRadius={0.9}
-      liftHeight={1.8}
+    <TicketFlight
+      start={beam.start}
+      end={beam.end}
+      ticketColor={beam.colorScheme.middle}
+      ticketBackColor={beam.colorScheme.start}
+      duration={0.95}
+      arcHeight={2.1}
+      onArrive={() => onImpact?.(beam)}
       onComplete={() => onFinish(beam)}
     />
   )
