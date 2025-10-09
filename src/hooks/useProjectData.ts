@@ -996,18 +996,19 @@ export const useProjectData = (projectId: string) => {
     )
 
     if (zoneIds.length > 0) {
-      const zoneFilter = zoneIds.join(',')
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'zone_cells', filter: `zone_id=in.(${zoneFilter})` },
-        handleZoneCellChange
-      )
+      for (const zoneId of zoneIds) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'zone_cells', filter: `zone_id=eq.${zoneId}` },
+          handleZoneCellChange
+        )
 
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'zone_objects', filter: `zone_id=in.(${zoneFilter})` },
-        handleZoneObjectChange
-      )
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'zone_objects', filter: `zone_id=eq.${zoneId}` },
+          handleZoneObjectChange
+        )
+      }
     } else {
       channel.on(
         'postgres_changes',
@@ -1017,12 +1018,13 @@ export const useProjectData = (projectId: string) => {
     }
 
     if (zoneObjectIds.length > 0) {
-      const ticketFilter = zoneObjectIds.join(',')
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'object_tickets', filter: `zone_object_id=in.(${ticketFilter})` },
-        handleTicketChange
-      )
+      for (const zoneObjectId of zoneObjectIds) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'object_tickets', filter: `zone_object_id=eq.${zoneObjectId}` },
+          handleTicketChange
+        )
+      }
     }
 
     channel.on('system', { event: 'CHANNEL_ERROR' }, (event) => {

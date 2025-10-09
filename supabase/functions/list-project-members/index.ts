@@ -97,7 +97,7 @@ const fetchLegacyMemberDataset = async (projectId: string): Promise<{ memberRows
   if (memberUserIds.length > 0) {
     const { data: profileRows, error: profileError } = await supabase
       .from('profiles')
-      .select('id, full_name, email, display_name, avatar_url')
+      .select('*')
       .in('id', memberUserIds)
 
     if (profileError) {
@@ -108,8 +108,8 @@ const fetchLegacyMemberDataset = async (projectId: string): Promise<{ memberRows
           profileMap.set(profile.id, {
             full_name: profile.full_name ?? null,
             email: profile.email ?? null,
-            display_name: profile.display_name ?? profile.full_name ?? profile.email ?? null,
-            avatar_url: profile.avatar_url ?? null
+            display_name: ('display_name' in profile ? profile.display_name : null) ?? profile.full_name ?? profile.email ?? null,
+            avatar_url: ('avatar_url' in profile ? profile.avatar_url : null) ?? null
           })
         }
       }
@@ -162,7 +162,7 @@ const fetchMemberDataset = async (projectId: string): Promise<{ memberRows: Norm
   const [{ data: memberRowsRaw, error: membersError }, { data: inviteRowsRaw, error: invitesError }] = await Promise.all([
     supabase
       .from('project_memberships')
-      .select('id, user_id, role, created_at, profiles:profiles(full_name, email, display_name, avatar_url)')
+      .select('id, user_id, role, created_at, profiles:profiles(*)')
       .eq('project_id', projectId),
     supabase
       .from('project_invites')
@@ -427,8 +427,8 @@ serve(async (req) => {
         membership_id: row.id ?? null,
         invite_id: null,
         user_id: row.user_id ?? null,
-        display_name: row.profiles.display_name ?? row.profiles.full_name ?? row.profiles.email ?? null,
-        avatar_url: row.profiles.avatar_url ?? null,
+        display_name: (row.profiles?.display_name ?? row.profiles?.full_name ?? row.profiles?.email ?? null),
+        avatar_url: row.profiles?.avatar_url ?? null,
         email,
         role: row.role,
         status: 'member',
@@ -445,7 +445,7 @@ serve(async (req) => {
       if (ownerId) {
         const { data: ownerProfile, error: ownerProfileError } = await supabase
           .from('profiles')
-          .select('email, full_name')
+          .select('*')
           .eq('id', ownerId)
           .maybeSingle()
 
@@ -454,12 +454,12 @@ serve(async (req) => {
         }
 
         fallbackEmail = ownerProfile?.email ?? ''
-        fallbackName = ownerProfile?.full_name ?? null
+        fallbackName = ownerProfile?.display_name ?? ownerProfile?.full_name ?? null
       }
 
       const { data: membershipOwner } = await supabase
         .from('project_memberships')
-        .select('id, user_id, created_at, profiles:profiles(full_name, email, display_name, avatar_url)')
+        .select('id, user_id, created_at, profiles:profiles(*)')
         .eq('project_id', projectId)
         .eq('role', 'owner')
         .maybeSingle()
