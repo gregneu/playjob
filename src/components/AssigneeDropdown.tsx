@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { UserAvatar } from './UserAvatar'
-import { supabase } from '../lib/supabase'
+import { getBrowserClient } from '@/lib/supabase-browser'
 import { Search, ChevronDown, UserPlus } from 'lucide-react'
 
 interface ProjectMember {
@@ -35,6 +35,7 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
   disabled = false,
   onAssigneeSelected
 }) => {
+  const supabase = useMemo(() => getBrowserClient(), [])
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [members, setMembers] = useState<ProjectMember[]>([])
@@ -80,7 +81,7 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
     }
 
     loadProjectMembers()
-  }, [projectId]) // Убрали currentAssignee из зависимостей
+  }, [projectId, supabase])
 
   // Отдельный useEffect для установки selectedMember
   useEffect(() => {

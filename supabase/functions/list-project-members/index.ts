@@ -484,7 +484,7 @@ serve(async (req) => {
         membership_id: membershipOwner?.id ?? null,
         invite_id: null,
         user_id: membershipOwner?.user_id ?? ownerId ?? null,
-        display_name: fallbackName ?? fallbackEmail || 'Owner',
+        display_name: fallbackName ?? (fallbackEmail || 'Owner'),
         avatar_url: fallbackAvatar,
         email: fallbackEmail || 'owner@unknown.local',
         role: 'owner',
