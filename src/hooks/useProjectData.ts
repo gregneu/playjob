@@ -912,6 +912,17 @@ export const useProjectData = (projectId: string) => {
       const toList = optimisticTicket ? [optimisticTicket, ...prevToList] : prevToList
       return { ...prev, [fromZoneObjectId]: fromList, [toZoneObjectId]: toList }
     })
+    if (typeof window !== 'undefined') {
+      const detail = {
+        from: fromZoneObjectId,
+        to: toZoneObjectId,
+        ticketId,
+        optimistic: true,
+        emittedAt: Date.now()
+      }
+      window.dispatchEvent(new CustomEvent('ticket-move-start', { detail }))
+      window.dispatchEvent(new CustomEvent('ticket-moved', { detail }))
+    }
 
     // Fire request in background; reconcile on result
     try {
