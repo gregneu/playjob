@@ -7,9 +7,9 @@ ALTER TABLE object_tickets REPLICA IDENTITY FULL;
 
 -- Verify the change
 SELECT 
-  schemaname,
-  tablename,
-  CASE relreplident
+  n.nspname as schemaname,
+  c.relname as tablename,
+  CASE c.relreplident
     WHEN 'd' THEN 'DEFAULT (only primary key in old payload)'
     WHEN 'f' THEN 'FULL (all columns in old payload) ✅'
     WHEN 'i' THEN 'INDEX'
