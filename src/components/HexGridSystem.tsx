@@ -941,6 +941,28 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null)
   const [selectedTicketPosition, setSelectedTicketPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+  
+  // Sync selectedTicket with realtime updates from ticketsByZoneObject
+  useEffect(() => {
+    if (!selectedTicket || !isTicketModalOpen) return
+    
+    // Find updated ticket data in ticketsByZoneObject
+    const zoneObjectId = selectedTicket.zone_object_id
+    if (!zoneObjectId) return
+    
+    const ticketList = ticketsByZoneObject[zoneObjectId] || []
+    const updatedTicket = ticketList.find(t => t.id === selectedTicket.id)
+    
+    if (updatedTicket) {
+      console.log('🔄 Syncing selectedTicket with realtime update:', {
+        ticketId: updatedTicket.id,
+        oldCommentCount: selectedTicket.comments?.length || 0,
+        newCommentCount: updatedTicket.comments?.length || 0
+      })
+      setSelectedTicket({ ...updatedTicket, zone_object_id: zoneObjectId })
+    }
+  }, [ticketsByZoneObject, selectedTicket?.id, selectedTicket?.zone_object_id, isTicketModalOpen])
+  
   // Helper: play drop sound (declare before any conditional returns)
   const playDropSound = useCallback(() => {
     // Sound disabled - no audio playback
@@ -4463,6 +4485,16 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             const hasMentions = building 
               ? buildingHasUnreadMentions(building.id, ticketsByZoneObject[building.id] || [])
               : false
+            
+            // Debug mentions for zone centers
+            if (isZoneCenterCell && building && hasMentions) {
+              console.log('💬 Building has unread mentions!', {
+                buildingId: building.id,
+                buildingTitle: building.title,
+                hasMentions,
+                ticketCount: (ticketsByZoneObject[building.id] || []).length
+              })
+            }
             
             // Отладка: проверяем данные тикетов
             if (isZoneCenterCell && zone) {

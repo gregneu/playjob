@@ -5,6 +5,13 @@ interface MentionBubbleProps {
 }
 
 export const MentionBubble: React.FC<MentionBubbleProps> = ({ hasMentions }) => {
+  // Debug render
+  React.useEffect(() => {
+    if (hasMentions) {
+      console.log('🔵 MentionBubble rendered with hasMentions=true')
+    }
+  }, [hasMentions])
+  
   if (!hasMentions) return null
 
   const size = 30
