@@ -20,6 +20,12 @@ export const useProjectData = (projectId: string) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null)
+  const ticketsByZoneObjectRef = useRef<Record<string, ZoneObjectTicket[]>>({})
+  
+  // Keep ref in sync with state for use in callbacks without adding to dependencies
+  useEffect(() => {
+    ticketsByZoneObjectRef.current = ticketsByZoneObject
+  }, [ticketsByZoneObject])
 
   // Загрузка всех данных проекта
   const loadProjectData = useCallback(async () => {
@@ -427,10 +433,25 @@ export const useProjectData = (projectId: string) => {
       return
     }
 
-    const movedBetweenZones =
+    // FALLBACK: If oldRow.zone_object_id is empty (REPLICA IDENTITY DEFAULT),
+    // try to find the old zone_object_id from local state (using ref to avoid dependency cycle)
+    let oldZoneObjectId = oldRow?.zone_object_id
+    if (payload.eventType === 'UPDATE' && !oldZoneObjectId) {
+      // Search through all zone objects to find where this ticket currently lives
+      for (const [zoneObjId, tickets] of Object.entries(ticketsByZoneObjectRef.current)) {
+        if (tickets.some(t => t.id === newRow.id)) {
+          oldZoneObjectId = zoneObjId
+          console.log(`🔍 FALLBACK: Found old zone_object_id from local state: ${oldZoneObjectId}`)
+          break
+        }
+      }
+    }
+
+    const movedBetweenZones = Boolean(
       payload.eventType === 'UPDATE' &&
-      oldRow?.zone_object_id &&
-      oldRow.zone_object_id !== newRow.zone_object_id
+      oldZoneObjectId &&
+      oldZoneObjectId !== newRow.zone_object_id
+    )
 
     // For UPDATE and INSERT events, fetch full ticket data including JSONB fields (comments, links, checklist)
     // Realtime payloads may not include full JSONB data
@@ -447,7 +468,7 @@ export const useProjectData = (projectId: string) => {
           if (error) {
             console.error('❌ Error fetching full ticket:', error)
             // Fallback to partial update
-            updateTicketState(newRow, movedBetweenZones, oldRow)
+            updateTicketState(newRow, movedBetweenZones, oldZoneObjectId)
             return
           }
           
@@ -460,31 +481,34 @@ export const useProjectData = (projectId: string) => {
             hasChecklist: !!fullTicket.checklist
           })
           
-          updateTicketState(fullTicket as ZoneObjectTicket, movedBetweenZones, oldRow)
+          updateTicketState(fullTicket as ZoneObjectTicket, movedBetweenZones, oldZoneObjectId)
         } catch (err) {
           console.error('❌ Exception fetching full ticket:', err)
-          updateTicketState(newRow, movedBetweenZones, oldRow)
+          updateTicketState(newRow, movedBetweenZones, oldZoneObjectId)
         }
       })()
     } else {
       // For other events, use the payload data
-      updateTicketState(newRow, movedBetweenZones, oldRow)
+      updateTicketState(newRow, movedBetweenZones, oldZoneObjectId)
     }
     
-    function updateTicketState(ticketData: ZoneObjectTicket, moved: boolean, oldTicket: ZoneObjectTicket | null) {
+    function updateTicketState(ticketData: ZoneObjectTicket, moved: boolean, oldZoneObjId: string | undefined) {
       setTicketsByZoneObject((prev) => {
         const next = { ...prev }
 
-        if (moved && oldTicket?.zone_object_id) {
-          const sourceList = next[oldTicket.zone_object_id] ?? []
+        // Remove ticket from old zone_object if it was moved
+        if (moved && oldZoneObjId) {
+          const sourceList = next[oldZoneObjId] ?? []
           const withoutMoved = sourceList.filter((ticket) => ticket.id !== ticketData.id)
           if (withoutMoved.length > 0) {
-            next[oldTicket.zone_object_id] = withoutMoved
+            next[oldZoneObjId] = withoutMoved
           } else {
-            delete next[oldTicket.zone_object_id]
+            delete next[oldZoneObjId]
           }
+          console.log(`🔄 Removed ticket ${ticketData.id} from old zone_object ${oldZoneObjId}`)
         }
 
+        // Add/update ticket in new zone_object
         const currentList = next[ticketData.zone_object_id] ?? []
         const index = currentList.findIndex((ticket) => ticket.id === ticketData.id)
         const updatedList =
@@ -497,9 +521,9 @@ export const useProjectData = (projectId: string) => {
       })
       
       // Dispatch move events after state update
-      if (moved && oldTicket?.zone_object_id && typeof window !== 'undefined') {
+      if (moved && oldZoneObjId && typeof window !== 'undefined') {
         const detail = {
-          from: oldTicket.zone_object_id,
+          from: oldZoneObjId,
           to: ticketData.zone_object_id,
           ticketId: ticketData.id,
           optimistic: false,
