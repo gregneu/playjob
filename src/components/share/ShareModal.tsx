@@ -46,15 +46,14 @@ const STATUS_PRIORITY: Record<MemberStatus, number> = {
 }
 
 const OWNER_BADGE_STYLE: React.CSSProperties = {
-  padding: '4px 10px',
-  borderRadius: '999px',
-  background: 'rgba(34, 211, 238, 0.16)',
+  padding: '4px 12px',
+  borderRadius: '14px',
+  background: 'rgba(148, 163, 184, 0.24)',
   fontSize: '12px',
   fontWeight: 600,
-  color: '#67e8f9',
-  letterSpacing: '0.08em'
-}
-  color: '#fff'
+  color: 'rgba(248, 250, 252, 0.85)',
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase'
 }
 
 export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareModalProps) {
@@ -295,49 +294,49 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '40px 24px',
-    background: 'rgba(15, 23, 42, 0.48)',
-    backdropFilter: 'blur(16px)'
+    padding: '48px 24px',
+    background: 'rgba(8, 11, 19, 0.45)',
+    backdropFilter: 'blur(18px)'
   }
 
   const modalStyle: React.CSSProperties = {
     width: '100%',
-    maxWidth: '720px',
-    borderRadius: '28px',
-    padding: '28px 32px',
-    background: 'rgba(17, 24, 39, 0.92)',
+    maxWidth: '700px',
+    borderRadius: '20px',
+    padding: '32px',
+    background: 'rgba(24, 28, 37, 0.72)' ,
     backdropFilter: 'blur(24px)',
-    color: '#F9FAFB',
-    boxShadow: '0 32px 80px rgba(15, 23, 42, 0.45)',
-    border: '1px solid rgba(148, 163, 184, 0.12)',
+    color: 'rgba(248, 250, 252, 0.88)',
+    boxShadow: '0 28px 70px rgba(8, 11, 19, 0.55)',
+    border: '1px solid rgba(148, 163, 184, 0.16)',
     display: 'flex',
     flexDirection: 'column',
-    gap: '24px'
+    gap: '28px'
   }
   const headerStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '16px'
+    gap: '18px'
   }
   const sectionTitleStyle: React.CSSProperties = {
-    fontSize: '15px',
+    fontSize: '12px',
     fontWeight: 600,
+    letterSpacing: '0.18em',
     textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    color: 'rgba(248, 250, 252, 0.65)',
-    marginBottom: '10px'
+    color: 'rgba(203, 213, 225, 0.58)',
+    marginBottom: '12px'
   }
   const mutedTextStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: 'rgba(226, 232, 240, 0.6)'
+    color: 'rgba(226, 232, 240, 0.62)'
   }
   const actionButtonStyle: React.CSSProperties = {
-    borderRadius: '14px',
+    borderRadius: '16px',
     border: '1px solid rgba(148, 163, 184, 0.18)',
-    background: 'rgba(30, 41, 59, 0.8)',
+    background: 'rgba(15, 18, 28, 0.68)',
     padding: '12px 16px',
-    color: '#E2E8F0',
+    color: 'rgba(241, 245, 249, 0.88)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -349,64 +348,75 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
   }
   const formRowStyle: React.CSSProperties = {
     display: 'flex',
-    gap: '12px',
+    gap: '16px',
     alignItems: 'center'
   }
   const inputStyle: React.CSSProperties = {
     flex: 1,
-    padding: '14px 16px',
-    borderRadius: '14px',
-    border: '1px solid rgba(148, 163, 184, 0.22)',
-    background: 'rgba(15, 23, 42, 0.8)',
-    color: '#F8FAFC',
+    padding: '14px 18px',
+    borderRadius: '16px',
+    border: '1px solid rgba(148, 163, 184, 0.2)',
+    background: 'rgba(15, 18, 28, 0.72)',
+    color: 'rgba(248, 250, 252, 0.9)',
     fontSize: '15px',
     transition: 'border 0.2s ease, background 0.2s ease'
   }
   const selectStyle: React.CSSProperties = {
-    borderRadius: '14px',
-    border: '1px solid rgba(148, 163, 184, 0.22)',
-    background: 'rgba(15, 23, 42, 0.8)',
-    color: '#F8FAFC',
-    padding: '14px 44px 14px 16px',
+    borderRadius: '16px',
+    border: '1px solid rgba(148, 163, 184, 0.2)',
+    background: 'rgba(15, 18, 28, 0.72)',
+    color: 'rgba(248, 250, 252, 0.9)',
+    padding: '14px 48px 14px 18px',
     fontSize: '15px',
-    appearance: 'none' as const,
-    position: 'relative' as const
+    appearance: 'none',
+    position: 'relative'
   }
   const primaryButtonStyle: React.CSSProperties = {
-    borderRadius: '14px',
-    border: 'none',
-    background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 100%)',
-    color: '#0f172a',
-    fontWeight: 600,
-    padding: '14px 24px',
+    borderRadius: '16px',
+    border: '1px solid rgba(148, 163, 184, 0.25)',
+    background: 'rgba(248, 250, 252, 0.12)',
+    color: 'rgba(248, 250, 252, 0.92)',
+    fontWeight: 500,
+    padding: '14px 28px',
     cursor: loading ? 'not-allowed' : 'pointer',
-    opacity: loading ? 0.7 : 1,
-    boxShadow: '0 14px 32px rgba(14, 165, 233, 0.35)',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
+    opacity: loading ? 0.6 : 1,
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease'
   }
-  const memberEntryStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: '18px',
-    padding: '14px 18px',
-    background: 'rgba(15, 23, 42, 0.72)',
-    border: '1px solid rgba(148, 163, 184, 0.16)',
-    transition: 'transform 0.2s ease, border 0.2s ease, background 0.2s ease'
-  }
-  return createPortal(
+  const memberListWrapperStyle: React.CSSProperties = {
+  borderRadius: '18px',
+  padding: '14px 16px',
+  background: 'rgba(12, 15, 23, 0.58)',
+  border: '1px solid rgba(148, 163, 184, 0.12)'
+}
+
+const memberListStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+  maxHeight: '320px',
+  overflowY: 'auto',
+  padding: '6px 2px'
+}
+
+const memberEntryStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '10px 12px',
+  borderRadius: '12px',
+  background: 'transparent',
+  transition: 'background 0.2s ease, transform 0.2s ease'
+}
+
+return createPortal(
     <div style={overlayStyle}>
       <div style={modalStyle}>
         <header style={headerStyle}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <UserAvatar userId={currentUserId} size={32} showName={false} />
-              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Share “{projectName}”</h2>
+              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>Share "{projectName}"</h2>
             </div>
-            <p style={mutedTextStyle}>Invite teammates and manage access levels</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
@@ -419,14 +429,6 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
                 height: 44
               }}
               title={copyState === 'copied' ? 'Link copied' : 'Copy invite link'}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.transform = 'translateY(-2px)'
-                event.currentTarget.style.boxShadow = '0 12px 28px rgba(148, 163, 184, 0.25)'
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.transform = 'translateY(0)'
-                event.currentTarget.style.boxShadow = 'none'
-              }}
             >
               <span style={{ fontSize: '18px', lineHeight: 1, opacity: 0.9 }}>🔗</span>
             </button>
@@ -452,31 +454,6 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
               <span style={{ fontSize: '18px', lineHeight: 1 }}>✕</span>
             </button>
           </div>
-                ...actionButtonStyle,
-                borderRadius: '16px',
-                width: 44,
-                height: 44
-              }}
-              title="Close"
-            >
-              <span style={{ fontSize: '18px', lineHeight: 1 }}>✕</span>
-            </button>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close share modal"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'rgba(255,255,255,0.6)',
-              fontSize: '24px',
-              lineHeight: 1,
-              cursor: 'pointer'
-            }}
-          >
-            ×
-          </button>
-          </div>
         </header>
 
         <section>
@@ -490,11 +467,11 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
               onChange={(event) => setEmail(event.target.value)}
               onFocus={(event) => {
                 event.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.45)'
-                event.currentTarget.style.background = 'rgba(15, 23, 42, 0.92)'
+                event.currentTarget.style.background = 'rgba(15, 18, 28, 0.88)'
               }}
               onBlur={(event) => {
-                event.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.22)'
-                event.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
+                event.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.2)'
+                event.currentTarget.style.background = 'rgba(15, 18, 28, 0.72)'
               }}
               style={inputStyle}
             />
@@ -504,11 +481,11 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
                 onChange={(event) => setRole(event.target.value as Role)}
                 onFocus={(event) => {
                   event.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.45)'
-                  event.currentTarget.style.background = 'rgba(15, 23, 42, 0.92)'
+                  event.currentTarget.style.background = 'rgba(15, 18, 28, 0.88)'
                 }}
                 onBlur={(event) => {
-                  event.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.22)'
-                  event.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
+                  event.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.2)'
+                  event.currentTarget.style.background = 'rgba(15, 18, 28, 0.72)'
                 }}
                 style={selectStyle}
               >
@@ -535,12 +512,14 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
               disabled={loading}
               style={primaryButtonStyle}
               onMouseEnter={(event) => {
-                event.currentTarget.style.transform = 'translateY(-2px)'
-                event.currentTarget.style.boxShadow = '0 18px 36px rgba(14, 165, 233, 0.45)'
+                if (!loading) {
+                  event.currentTarget.style.transform = 'translateY(-2px)'
+                  event.currentTarget.style.boxShadow = '0 8px 20px rgba(148, 163, 184, 0.25)'
+                }
               }}
               onMouseLeave={(event) => {
                 event.currentTarget.style.transform = 'translateY(0)'
-                event.currentTarget.style.boxShadow = '0 14px 32px rgba(14, 165, 233, 0.35)'
+                event.currentTarget.style.boxShadow = 'none'
               }}
             >
               Invite
@@ -550,156 +529,157 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
 
         <section>
           <p style={sectionTitleStyle}>Members</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '320px', overflowY: 'auto' }}>
-            {members.map((member) => {
-              const initials = (member.display_name ?? member.email ?? '?').slice(0, 2).toUpperCase()
-              const statusLabel = member.status === 'invited' ? 'Pending' : undefined
-              const isOwner = member.role === 'owner'
-              const showAvatar = Boolean(member.user_id)
+          <div style={memberListWrapperStyle}>
+            <div style={memberListStyle}>
+              {members.map((member) => {
+                const initials = (member.display_name ?? member.email ?? '?').slice(0, 2).toUpperCase()
+                const statusLabel = member.status === 'invited' ? 'Pending' : undefined
+                const isOwner = member.role === 'owner'
+                const showAvatar = Boolean(member.user_id)
 
-              return (
-                <div
-                  key={member.id}
-                  style={memberEntryStyle}
-                  onMouseEnter={(event) => {
-                    event.currentTarget.style.transform = 'translateY(-2px)'
-                    event.currentTarget.style.border = '1px solid rgba(148, 163, 184, 0.26)'
-                    event.currentTarget.style.background = 'rgba(15, 23, 42, 0.85)'
-                  }}
-                  onMouseLeave={(event) => {
-                    event.currentTarget.style.transform = 'translateY(0)'
-                    event.currentTarget.style.border = '1px solid rgba(148, 163, 184, 0.16)'
-                    event.currentTarget.style.background = 'rgba(15, 23, 42, 0.72)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {showAvatar ? (
-                      <UserAvatar
-                        userId={member.user_id ?? undefined}
-                        userName={member.display_name ?? member.email}
-                        size={40}
-                        showName={false}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #334155 0%, #1f2937 100%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 600,
-                          color: '#e2e8f0'
-                        }}
-                      >
-                        {initials}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <p style={{ fontWeight: 600 }}>{member.display_name ?? member.email}</p>
-                        {isOwner ? (
-                          <span style={OWNER_BADGE_STYLE}>
-                            Owner
+                return (
+                  <div
+                    key={member.id}
+                    style={memberEntryStyle}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.background = 'rgba(148, 163, 184, 0.12)'
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {showAvatar ? (
+                        <UserAvatar
+                          userId={member.user_id ?? undefined}
+                          userName={member.display_name ?? member.email}
+                          size={40}
+                          showName={false}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '12px',
+                            background: 'rgba(15, 18, 28, 0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 600,
+                            color: '#e2e8f0'
+                          }}
+                        >
+                          {initials}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <p style={{ fontWeight: 600 }}>{member.display_name ?? member.email}</p>
+                          {isOwner ? (
+                            <span style={OWNER_BADGE_STYLE}>
+                              Owner
+                            </span>
+                          ) : null}
+                        </div>
+                        <p style={mutedTextStyle}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{member.email}</span>
+                            {statusLabel ? (
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '8px',
+                                  background: 'rgba(148, 163, 184, 0.18)',
+                                  fontSize: '11px',
+                                  color: 'rgba(226, 232, 240, 0.8)',
+                                  letterSpacing: '0.08em',
+                                  textTransform: 'uppercase'
+                                }}
+                                title={member.status === 'invited' ? 'Awaiting acceptance' : undefined}
+                              >
+                                {statusLabel}
+                              </span>
+                            ) : null}
                           </span>
-                        ) : null}
+                        </p>
                       </div>
-                      <p style={mutedTextStyle}>
-                        {member.email}
-                        {statusLabel ? (
-                          <span
-                            style={{
-                              marginLeft: '8px',
-                              padding: '2px 8px',
-                              borderRadius: '9999px',
-                              background: 'rgba(99, 102, 241, 0.18)',
-                              fontSize: '12px',
-                              color: '#c7d2fe',
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase'
-                            }}
-                            title={member.status === 'invited' ? 'Awaiting acceptance' : undefined}
-                          >
-                            {statusLabel}
-                          </span>
-                        ) : null}
-                      </p>
                     </div>
-                  </div>
 
-                  {isOwner ? (
-                    <span
-                      style={{
-                        ...OWNER_BADGE_STYLE,
-                        borderRadius: '12px',
-                        padding: '6px 14px'
-                      }}
-                    >
-                      Owner
-                    </span>
-                  ) : (
-                    <div style={{ position: 'relative' }}>
-                      <select
-                        value={member.role}
-                        onChange={(event) => {
-                          const nextValue = event.target.value
-                          if (nextValue === '__remove') {
-                            removeMember(member)
-                            return
-                          }
-                          if (nextValue !== member.role) {
-                            changeRole(member, nextValue as Role)
-                          }
-                        }}
-                        onFocus={(event) => {
-                          event.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.45)'
-                          event.currentTarget.style.background = 'rgba(15, 23, 42, 0.92)'
-                        }}
-                        onBlur={(event) => {
-                          event.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.22)'
-                          event.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
-                        }}
-                        style={{
-                          ...selectStyle,
-                          minWidth: '150px',
-                          opacity: member.status === 'invited' ? 0.85 : 1,
-                          cursor: canManageMembers ? 'pointer' : 'not-allowed'
-                        }}
-                        disabled={!canManageMembers}
-                      >
-                        {(Object.keys(ROLE_LABEL) as Array<Exclude<Role, 'owner'>>).map((r) => (
-                          <option key={r} value={r}>
-                            {ROLE_LABEL[r]}
-                          </option>
-                        ))}
-                        {canManageMembers && (member.user_id !== currentUserId || member.status === 'invited') ? (
-                          <option value="__remove">Remove</option>
-                        ) : null}
-                      </select>
+                    {isOwner ? (
                       <span
                         style={{
-                          position: 'absolute',
-                          right: 20,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          pointerEvents: 'none',
-                          color: 'rgba(226, 232, 240, 0.5)',
-                          fontSize: '12px'
+                          ...OWNER_BADGE_STYLE,
+                          borderRadius: '12px',
+                          padding: '6px 14px'
                         }}
                       >
-                        ⌄
+                        Owner
                       </span>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-
-            {members.length === 0 && <p style={mutedTextStyle}>No members yet.</p>}
+                    ) : (
+                      <div style={{ position: 'relative' }}>
+                        <select
+                          value={member.role}
+                          onChange={(event) => {
+                            const nextValue = event.target.value
+                            if (nextValue === '__remove') {
+                              removeMember(member)
+                              return
+                            }
+                            if (nextValue !== member.role) {
+                              changeRole(member, nextValue as Role)
+                            }
+                          }}
+                          onFocus={(event) => {
+                            event.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.45)'
+                            event.currentTarget.style.background = 'rgba(15, 23, 42, 0.92)'
+                          }}
+                          onBlur={(event) => {
+                            event.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.22)'
+                            event.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
+                          }}
+                          style={{
+                            ...selectStyle,
+                            minWidth: '150px',
+                            opacity: member.status === 'invited' ? 0.85 : 1,
+                            cursor: canManageMembers ? 'pointer' : 'not-allowed'
+                          }}
+                          disabled={!canManageMembers}
+                        >
+                          {(Object.keys(ROLE_LABEL) as Array<Exclude<Role, 'owner'>>).map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABEL[r]}
+                            </option>
+                          ))}
+                          {canManageMembers && (member.user_id !== currentUserId || member.status === 'invited') ? (
+                            <option value="__remove">Remove</option>
+                          ) : null}
+                        </select>
+                        <span
+                          style={{
+                            position: 'absolute',
+                            right: 20,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            pointerEvents: 'none',
+                            color: 'rgba(226, 232, 240, 0.5)',
+                            fontSize: '12px'
+                          }}
+                        >
+                          ⌄
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {members.length === 0 && (
+              <p style={{ ...mutedTextStyle, textAlign: 'center', padding: '16px 0' }}>No members yet.</p>
+            )}
           </div>
         </section>
+
       </div>
     </div>,
     document.body
