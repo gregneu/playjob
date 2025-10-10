@@ -26,6 +26,13 @@ export function useUnreadMentions(
       const username = userEmail.split('@')[0]
       const mentionPattern = new RegExp(`@${username}`, 'i')
       
+      console.log('🔍 useUnreadMentions: Checking mentions for user:', {
+        userEmail,
+        username,
+        mentionPattern: mentionPattern.toString(),
+        ticketCount: tickets.length
+      })
+      
       // Get all ticket IDs
       const ticketIds = tickets.map(t => t.id)
       
@@ -38,6 +45,10 @@ export function useUnreadMentions(
       
       if (error) {
         console.error('❌ Error loading read comments:', error)
+        if (error.message.includes('relation "comment_reads" does not exist')) {
+          console.warn('⚠️ comment_reads table does not exist - showing all mentions as unread')
+          // If table doesn't exist, treat all mentions as unread
+        }
         // Continue with empty read data
       }
       
@@ -62,11 +73,24 @@ export function useUnreadMentions(
           const text = comment.text || ''
           const isMentioned = mentionPattern.test(text)
           const isUnread = !readCommentIds.has(comment.id)
+          
+          if (text.includes('@')) {
+            console.log('💬 Comment analysis:', {
+              ticketId: ticket.id,
+              commentId: comment.id,
+              text,
+              isMentioned,
+              isUnread,
+              readCommentIds: Array.from(readCommentIds)
+            })
+          }
+          
           return isMentioned && isUnread
         })
         
         if (unreadMentionComments.length > 0) {
           unreadMap[ticket.id] = unreadMentionComments.map((c: any) => c.id)
+          console.log('✅ Found unread mentions for ticket:', ticket.id, unreadMap[ticket.id])
         }
       })
       
@@ -90,8 +114,15 @@ export function useUnreadMentions(
 
   // Return whether a building (zone object) has unread mentions in any of its tickets
   const buildingHasUnreadMentions = useCallback((buildingId: string, ticketsByBuilding: any[]): boolean => {
-    return ticketsByBuilding.some(ticket => hasUnreadMentions(ticket.id))
-  }, [hasUnreadMentions])
+    const hasUnread = ticketsByBuilding.some(ticket => hasUnreadMentions(ticket.id))
+    console.log('🏢 Building mention check:', {
+      buildingId,
+      ticketCount: ticketsByBuilding.length,
+      hasUnread,
+      unreadMentions
+    })
+    return hasUnread
+  }, [hasUnreadMentions, unreadMentions])
 
   return {
     unreadMentions,

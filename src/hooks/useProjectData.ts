@@ -385,7 +385,8 @@ export const useProjectData = (projectId: string) => {
   const handleTicketChange = useCallback((payload: RealtimePostgresChangesPayload<ZoneObjectTicket>) => {
     console.log('[useProjectData] ticket change event', payload.eventType, {
       zone_object_id: (payload.new as ZoneObjectTicket | null)?.zone_object_id ?? (payload.old as ZoneObjectTicket | null)?.zone_object_id,
-      ticket_id: (payload.new as ZoneObjectTicket | null)?.id ?? (payload.old as ZoneObjectTicket | null)?.id
+      ticket_id: (payload.new as ZoneObjectTicket | null)?.id ?? (payload.old as ZoneObjectTicket | null)?.id,
+      payload_new: payload.new
     })
     const newRow = (payload.new ?? null) as ZoneObjectTicket | null
     const oldRow = (payload.old ?? null) as ZoneObjectTicket | null
@@ -417,29 +418,66 @@ export const useProjectData = (projectId: string) => {
       oldRow?.zone_object_id &&
       oldRow.zone_object_id !== newRow.zone_object_id
 
-    setTicketsByZoneObject((prev) => {
-      const next = { ...prev }
-
-      if (movedBetweenZones) {
-        const sourceList = next[oldRow.zone_object_id] ?? []
-        const withoutMoved = sourceList.filter((ticket) => ticket.id !== newRow.id)
-        if (withoutMoved.length > 0) {
-          next[oldRow.zone_object_id] = withoutMoved
-        } else {
-          delete next[oldRow.zone_object_id]
+    // For UPDATE events, fetch full ticket data including JSONB fields (comments, links, checklist)
+    if (payload.eventType === 'UPDATE') {
+      void (async () => {
+        try {
+          console.log('🔄 Fetching full ticket data after UPDATE event:', newRow.id)
+          const { data: fullTicket, error } = await supabase
+            .from('object_tickets')
+            .select('*')
+            .eq('id', newRow.id)
+            .single()
+          
+          if (error) {
+            console.error('❌ Error fetching full ticket:', error)
+            // Fallback to partial update
+            updateTicketState(newRow, movedBetweenZones, oldRow)
+            return
+          }
+          
+          console.log('✅ Full ticket data loaded:', {
+            id: fullTicket.id,
+            hasComments: !!fullTicket.comments,
+            commentCount: fullTicket.comments?.length || 0
+          })
+          
+          updateTicketState(fullTicket as ZoneObjectTicket, movedBetweenZones, oldRow)
+        } catch (err) {
+          console.error('❌ Exception fetching full ticket:', err)
+          updateTicketState(newRow, movedBetweenZones, oldRow)
         }
-      }
+      })()
+    } else {
+      // For INSERT, use the payload data directly
+      updateTicketState(newRow, movedBetweenZones, oldRow)
+    }
+    
+    function updateTicketState(ticketData: ZoneObjectTicket, moved: boolean, oldTicket: ZoneObjectTicket | null) {
+      setTicketsByZoneObject((prev) => {
+        const next = { ...prev }
 
-      const currentList = next[newRow.zone_object_id] ?? []
-      const index = currentList.findIndex((ticket) => ticket.id === newRow.id)
-      const updatedList =
-        index >= 0
-          ? currentList.map((ticket) => (ticket.id === newRow.id ? { ...ticket, ...newRow } : ticket))
-          : [newRow, ...currentList]
+        if (moved && oldTicket?.zone_object_id) {
+          const sourceList = next[oldTicket.zone_object_id] ?? []
+          const withoutMoved = sourceList.filter((ticket) => ticket.id !== ticketData.id)
+          if (withoutMoved.length > 0) {
+            next[oldTicket.zone_object_id] = withoutMoved
+          } else {
+            delete next[oldTicket.zone_object_id]
+          }
+        }
 
-      next[newRow.zone_object_id] = updatedList
-      return next
-    })
+        const currentList = next[ticketData.zone_object_id] ?? []
+        const index = currentList.findIndex((ticket) => ticket.id === ticketData.id)
+        const updatedList =
+          index >= 0
+            ? currentList.map((ticket) => (ticket.id === ticketData.id ? ticketData : ticket))
+            : [ticketData, ...currentList]
+
+        next[ticketData.zone_object_id] = updatedList
+        return next
+      })
+    }
 
     if (movedBetweenZones && typeof window !== 'undefined') {
       const detail = {

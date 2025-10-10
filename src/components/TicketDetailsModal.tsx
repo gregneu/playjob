@@ -215,14 +215,31 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
       if (username) {
         const mentionPattern = new RegExp(`@${username}`, 'i')
         const mentionedCommentIds = ticket.comments
-          .filter(c => mentionPattern.test(c.text || ''))
+          .filter(c => {
+            const isMentioned = mentionPattern.test(c.text || '')
+            if (isMentioned) {
+              console.log('📖 Found mentioned comment:', {
+                commentId: c.id,
+                text: c.text,
+                username,
+                userEmail: user.email
+              })
+            }
+            return isMentioned
+          })
           .map(c => c.id)
         
         if (mentionedCommentIds.length > 0) {
-          console.log(`📖 Marking ${mentionedCommentIds.length} mentioned comments as read for ticket ${ticket.id}`)
-          markAllCommentsAsRead(ticket.id, mentionedCommentIds, user.id).catch(err => {
-            console.error('❌ Failed to mark comments as read:', err)
+          console.log(`📖 Marking ${mentionedCommentIds.length} mentioned comments as read for ticket ${ticket.id}`, mentionedCommentIds)
+          markAllCommentsAsRead(ticket.id, mentionedCommentIds, user.id).then(result => {
+            if (result.success) {
+              console.log('✅ Successfully marked comments as read')
+            } else {
+              console.error('❌ Failed to mark comments as read:', result.error)
+            }
           })
+        } else {
+          console.log('📖 No mentioned comments found for user:', username)
         }
       }
     }
