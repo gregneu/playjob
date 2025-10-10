@@ -418,11 +418,12 @@ export const useProjectData = (projectId: string) => {
       oldRow?.zone_object_id &&
       oldRow.zone_object_id !== newRow.zone_object_id
 
-    // For UPDATE events, fetch full ticket data including JSONB fields (comments, links, checklist)
-    if (payload.eventType === 'UPDATE') {
+    // For UPDATE and INSERT events, fetch full ticket data including JSONB fields (comments, links, checklist)
+    // Realtime payloads may not include full JSONB data
+    if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
       void (async () => {
         try {
-          console.log('🔄 Fetching full ticket data after UPDATE event:', newRow.id)
+          console.log(`🔄 Fetching full ticket data after ${payload.eventType} event:`, newRow.id)
           const { data: fullTicket, error } = await supabase
             .from('object_tickets')
             .select('*')
@@ -438,8 +439,11 @@ export const useProjectData = (projectId: string) => {
           
           console.log('✅ Full ticket data loaded:', {
             id: fullTicket.id,
+            eventType: payload.eventType,
             hasComments: !!fullTicket.comments,
-            commentCount: fullTicket.comments?.length || 0
+            commentCount: fullTicket.comments?.length || 0,
+            hasLinks: !!fullTicket.links,
+            hasChecklist: !!fullTicket.checklist
           })
           
           updateTicketState(fullTicket as ZoneObjectTicket, movedBetweenZones, oldRow)
@@ -449,7 +453,7 @@ export const useProjectData = (projectId: string) => {
         }
       })()
     } else {
-      // For INSERT, use the payload data directly
+      // For other events, use the payload data
       updateTicketState(newRow, movedBetweenZones, oldRow)
     }
     
@@ -477,18 +481,19 @@ export const useProjectData = (projectId: string) => {
         next[ticketData.zone_object_id] = updatedList
         return next
       })
-    }
-
-    if (movedBetweenZones && typeof window !== 'undefined') {
-      const detail = {
-        from: oldRow!.zone_object_id!,
-        to: newRow.zone_object_id,
-        ticketId: newRow.id,
-        optimistic: false,
-        emittedAt: Date.now()
+      
+      // Dispatch move events after state update
+      if (moved && oldTicket?.zone_object_id && typeof window !== 'undefined') {
+        const detail = {
+          from: oldTicket.zone_object_id,
+          to: ticketData.zone_object_id,
+          ticketId: ticketData.id,
+          optimistic: false,
+          emittedAt: Date.now()
+        }
+        window.dispatchEvent(new CustomEvent('ticket-move-start', { detail }))
+        window.dispatchEvent(new CustomEvent('ticket-moved', { detail }))
       }
-      window.dispatchEvent(new CustomEvent('ticket-move-start', { detail }))
-      window.dispatchEvent(new CustomEvent('ticket-moved', { detail }))
     }
   }, [])
 
