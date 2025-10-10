@@ -71,22 +71,19 @@ const isMissingRelationError = (error: unknown, relation: string) => {
 }
 
 const fetchLegacyMemberDataset = async (projectId: string): Promise<{ memberRows: NormalizedMemberRow[]; inviteRows: NormalizedInviteRow[] }> => {
-  console.warn('[list-project-members] Falling back to legacy project_members/project_invitations tables')
+  console.warn('[list-project-members] Falling back to legacy project_memberships/project_invites tables')
 
   const { data: legacyMembers, error: legacyMembersError } = await supabase
-    .from('project_members')
-    .select('id, user_id, role, status, invited_at, joined_at')
+    .from('project_memberships')
+    .select('id, user_id, role, created_at')
     .eq('project_id', projectId)
 
   if (legacyMembersError) {
     throw legacyMembersError
   }
 
-  const acceptedMembers = (legacyMembers ?? []).filter((row) => {
-    const normalizedRole = normalizeRole(row.role)
-    const status = (row.status ?? '').toLowerCase()
-    return normalizedRole === 'owner' || status === 'accepted'
-  })
+  // project_memberships contains only active members, no status field
+  const acceptedMembers = (legacyMembers ?? [])
 
   const memberUserIds = Array.from(new Set(acceptedMembers
     .map((row) => row.user_id)
@@ -127,19 +124,19 @@ const fetchLegacyMemberDataset = async (projectId: string): Promise<{ memberRows
       id: row.id,
       user_id: row.user_id ?? null,
       role: normalizeRole(row.role),
-      created_at: row.joined_at ?? row.invited_at ?? new Date().toISOString(),
+      created_at: row.created_at ?? new Date().toISOString(),
       profiles: profile
     }
   })
 
   const { data: legacyInvites, error: legacyInvitesError } = await supabase
-    .from('project_invitations')
-    .select('id, email, role, status, invited_at')
+    .from('project_invites')
+    .select('id, invitee_email, role, status, created_at')
     .eq('project_id', projectId)
 
   if (legacyInvitesError) {
-    if (isMissingRelationError(legacyInvitesError, 'project_invitations')) {
-      console.warn('[list-project-members] legacy project_invitations table missing, skipping invites fallback')
+    if (isMissingRelationError(legacyInvitesError, 'project_invites')) {
+      console.warn('[list-project-members] legacy project_invites table missing, skipping invites fallback')
       return { memberRows, inviteRows: [] }
     }
     throw legacyInvitesError
@@ -149,10 +146,10 @@ const fetchLegacyMemberDataset = async (projectId: string): Promise<{ memberRows
     .filter((row) => (row.status ?? '').toLowerCase() === 'pending')
     .map((row) => ({
       id: row.id,
-      invitee_email: (row.email ?? '').trim() || null,
+      invitee_email: (row.invitee_email ?? '').trim() || null,
       role: normalizeRole(row.role),
       status: 'pending' as const,
-      created_at: row.invited_at ?? new Date().toISOString()
+      created_at: row.created_at ?? new Date().toISOString()
     }))
 
   return { memberRows, inviteRows }
@@ -307,8 +304,8 @@ serve(async (req) => {
 
     if (membershipError && isMissingRelationError(membershipError, 'project_memberships')) {
       const legacyQuery = supabase
-        .from('project_members')
-        .select('user_id, role, status')
+        .from('project_memberships')
+        .select('user_id, role')
         .eq('project_id', projectId)
 
       const finalLegacyQuery = candidateUserIds.length === 1
@@ -322,11 +319,7 @@ serve(async (req) => {
         return new Response('Failed to verify membership', { status: 500, headers: corsHeaders })
       }
 
-      const acceptedLegacyMembership = (legacyMembershipRows ?? []).find((row: any) => {
-        const normalizedRole = normalizeRole(row.role)
-        const status = (row.status ?? '').toLowerCase()
-        return normalizedRole === 'owner' || status === 'accepted'
-      })
+      const acceptedLegacyMembership = (legacyMembershipRows ?? [])[0]
 
       membership = acceptedLegacyMembership
         ? { user_id: acceptedLegacyMembership.user_id, role: normalizeRole(acceptedLegacyMembership.role) }
@@ -348,8 +341,8 @@ serve(async (req) => {
     if (!membership && !isOwner) {
       try {
         const legacyQuery = supabase
-          .from('project_members')
-          .select('user_id, role, status')
+          .from('project_memberships')
+          .select('user_id, role')
           .eq('project_id', projectId)
 
         const finalLegacyQuery = candidateUserIds.length === 1
@@ -358,15 +351,11 @@ serve(async (req) => {
 
         const { data: legacyMembershipRows, error: legacyMembershipError } = await finalLegacyQuery
 
-        if (legacyMembershipError && !isMissingRelationError(legacyMembershipError, 'project_members')) {
+        if (legacyMembershipError && !isMissingRelationError(legacyMembershipError, 'project_memberships')) {
           console.error('[list-project-members] legacy membership fetch error', legacyMembershipError)
         }
 
-        const acceptedLegacyMembership = (legacyMembershipRows ?? []).find((row: any) => {
-          const normalizedRole = normalizeRole(row.role)
-          const status = (row.status ?? '').toLowerCase()
-          return normalizedRole === 'owner' || status === 'accepted'
-        })
+        const acceptedLegacyMembership = (legacyMembershipRows ?? [])[0]
 
         if (acceptedLegacyMembership) {
           membership = {

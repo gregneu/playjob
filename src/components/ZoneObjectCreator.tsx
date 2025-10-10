@@ -95,7 +95,7 @@ export const ZoneObjectCreator: React.FC<ZoneObjectCreatorProps> = ({
         
         // Сначала пробуем простой запрос без JOIN
         let { data, error } = await supabase
-          .from('project_members')
+          .from('project_memberships')
           .select('user_id')
           .eq('project_id', projectId)
         

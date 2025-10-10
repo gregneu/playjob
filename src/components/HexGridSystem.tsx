@@ -20,6 +20,8 @@ import { hexToWorldPosition, worldToHexPosition, getNeighbors, calculateHexZoneC
 import { useProjectData } from '../hooks/useProjectData'
 // import type { Zone } from '../types/enhanced'
 import { BuildingType } from '../types/building'
+import { useAuth } from '../hooks/useAuth'
+import { useUnreadMentions } from '../hooks/useUnreadMentions'
 import { GlassPanel } from './GlassPanel'
 import { ObjectDetailsPanel } from './ObjectDetailsPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
@@ -127,6 +129,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   console.log('Project ID length:', projectId?.length)
   console.log('Project ID is valid UUID:', /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(projectId || ''))
   
+  // Get current user
+  const { user } = useAuth()
+  
   // Use hook for working with server data
   const {
     zones,
@@ -153,6 +158,18 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     moveTicket
   } = useProjectData(projectId)
 
+  // Get all tickets for unread mentions tracking
+  const allTickets = useMemo(() => {
+    return Object.values(ticketsByZoneObject).flat()
+  }, [ticketsByZoneObject])
+
+  // Track unread mentions
+  const { buildingHasUnreadMentions, reload: reloadUnreadMentions } = useUnreadMentions(
+    projectId,
+    allTickets,
+    user?.id || null,
+    user?.email || null
+  )
 
   // Current user id for user-scoped counters (теперь не используется, так как имена рендерятся в UnifiedHexCell)
   // const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -4442,6 +4459,11 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             // Тикеты хранятся по ID здания (zoneObject), а не по ID зоны
             const zoneTicketCount = building ? (ticketsByZoneObject[building.id] || []).length : 0
             
+            // Check if building has unread comments mentioning current user
+            const hasMentions = building 
+              ? buildingHasUnreadMentions(building.id, ticketsByZoneObject[building.id] || [])
+              : false
+            
             // Отладка: проверяем данные тикетов
             if (isZoneCenterCell && zone) {
               console.log('🔍 Zone ticket debug:', {
@@ -4452,6 +4474,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
                 ticketsByZone: ticketsByZoneObject[zone.id] || [],
                 ticketsByBuilding: building ? (ticketsByZoneObject[building.id] || []) : [],
                 zoneTicketCount,
+                hasMentions,
                 allTicketKeys: Object.keys(ticketsByZoneObject)
               })
             }
@@ -4582,6 +4605,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
                 } : null}
                 zoneName={showZoneNames ? (building?.title || zone?.name) : undefined}
                 ticketCount={zoneTicketCount}
+                hasMentions={hasMentions}
                 showStone={finalShouldShowStone}
                 stoneSeed={stoneSeed}
                 stoneCount={stoneCount}
@@ -5008,7 +5032,11 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
       {/* Ticket details modal */}
       <TicketDetailsModal
         isOpen={isTicketModalOpen}
-        onClose={() => setIsTicketModalOpen(false)}
+        onClose={() => {
+          setIsTicketModalOpen(false)
+          // Reload unread mentions after closing modal (comments may have been marked as read)
+          setTimeout(() => reloadUnreadMentions(), 300)
+        }}
         projectId={projectId}
         ticket={selectedTicket}
         ticketPosition={selectedTicketPosition}

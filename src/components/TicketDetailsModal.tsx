@@ -6,6 +6,7 @@ import { SmartLink } from './SmartLink'
 import { SmartText } from './SmartText'
 import { UserAvatar } from './UserAvatar'
 import { AssigneeDropdown } from './AssigneeDropdown'
+import { markAllCommentsAsRead } from '../lib/commentReads'
 
 
 type TicketStatus = 'open' | 'in_progress' | 'done'
@@ -122,69 +123,110 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
         const { supabase } = await import('../lib/supabase')
         console.log('🔍 Loading project members for project:', projectId)
         
-        // Используем простой запрос без JOIN
-        const { data, error } = await supabase
-          .from('project_members')
-          .select('user_id')
-          .eq('project_id', projectId)
+        // Use list-project-members function to get all members (owner, members, invites)
+        const { data, error } = await supabase.functions.invoke('list-project-members', {
+          body: { project_id: projectId }
+        })
         
-        console.log('📊 Project members data:', data, 'Error:', error)
+        console.log('📊 Project members from function - RAW DATA:', JSON.stringify(data, null, 2))
+        console.log('📊 Project members from function - ERROR:', error)
+        console.log('📊 Data type:', typeof data, 'Has members:', data?.members)
         
-        if (!error && data && data.length > 0) {
-          // Получаем профили отдельно
-          const userIds = data.map(pm => pm.user_id).filter(Boolean)
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, full_name, email')
-            .in('id', userIds)
+        if (!error && data && data.members && data.members.length > 0) {
+          console.log('✅ Got members array, length:', data.members.length)
+          console.log('📋 All members before filtering:', data.members)
           
-          if (!profilesError && profilesData) {
-            const mappedMembers = profilesData.map(p => ({ 
-              id: p.id, 
-              full_name: p.full_name ?? null, 
-              email: p.email ?? null 
-            }))
-            console.log('👥 Mapped members:', mappedMembers)
-            
-            // Сохраняем в кэш
-            membersCacheRef.current.set(projectId, mappedMembers)
-            
-            setMembers(mappedMembers)
-            setIsMembersLoading(false)
-          } else {
-            console.error('❌ Failed to load profiles:', profilesError)
-            // Fallback: try to get current user as a member
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-              console.log('🔄 Using current user as fallback:', user)
-              const fallbackMembers = [{ id: user.id, full_name: user.user_metadata?.full_name || null, email: user.email || null }]
-              membersCacheRef.current.set(projectId, fallbackMembers)
-              setMembers(fallbackMembers)
-            } else {
-              setMembers([])
-            }
-            setIsMembersLoading(false)
-          }
+          // Filter only active members (not invited)
+          const activeMembers = data.members.filter((m: any) => m.status === 'member' && m.user_id)
+          console.log('✅ Active members after filtering:', activeMembers.length, activeMembers)
+          
+          const mappedMembers = activeMembers.map((m: any) => ({ 
+            id: m.user_id, 
+            full_name: m.display_name ?? null, 
+            email: m.email ?? null 
+          }))
+          console.log('👥 Mapped members from function:', mappedMembers)
+          
+          // Сохраняем в кэш
+          membersCacheRef.current.set(projectId, mappedMembers)
+          
+          setMembers(mappedMembers)
+          setIsMembersLoading(false)
         } else {
-          console.error('❌ Failed to load project members:', error)
-          // Fallback: try to get current user as a member
+          console.error('❌ Failed to load project members from function:', error)
+          console.log('🔄 Trying direct database query as fallback...')
+          
+          // Fallback: Load directly from database
+          try {
+            const { data: membershipsData, error: membershipsError } = await supabase
+              .from('project_memberships')
+              .select('user_id')
+              .eq('project_id', projectId)
+            
+            console.log('📊 Direct query - memberships:', membershipsData, 'Error:', membershipsError)
+            
+            if (!membershipsError && membershipsData && membershipsData.length > 0) {
+              const userIds = membershipsData.map(m => m.user_id).filter(Boolean)
+              const { data: profilesData, error: profilesError } = await supabase
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', userIds)
+              
+              console.log('📊 Direct query - profiles:', profilesData, 'Error:', profilesError)
+              
+              if (!profilesError && profilesData) {
+                const mappedMembers = profilesData.map(p => ({ 
+                  id: p.id, 
+                  full_name: p.full_name ?? null, 
+                  email: p.email ?? null 
+                }))
+                console.log('👥 Mapped members from direct query:', mappedMembers)
+                membersCacheRef.current.set(projectId, mappedMembers)
+                setMembers(mappedMembers)
+                setIsMembersLoading(false)
+                return
+              }
+            }
+          } catch (fallbackErr) {
+            console.error('❌ Fallback query also failed:', fallbackErr)
+          }
+          
+          // Last resort: use current user
           const { data: { user } } = await supabase.auth.getUser()
           if (user) {
-            console.log('🔄 Using current user as fallback:', user)
+            console.log('🔄 Using current user as last resort:', user)
             const fallbackMembers = [{ id: user.id, full_name: user.user_metadata?.full_name || null, email: user.email || null }]
             membersCacheRef.current.set(projectId, fallbackMembers)
             setMembers(fallbackMembers)
-            setIsMembersLoading(false)
           } else {
-            setIsMembersLoading(false)
+            setMembers([])
           }
+          setIsMembersLoading(false)
         }
       } catch (err) {
         console.error('❌ Error loading project members:', err)
         setIsMembersLoading(false)
       }
     })()
-  }, [isOpen, projectId])
+    
+    // Mark all comments mentioning current user as read when modal opens
+    if (ticket && user && ticket.comments && ticket.comments.length > 0) {
+      const username = user.email?.split('@')[0]
+      if (username) {
+        const mentionPattern = new RegExp(`@${username}`, 'i')
+        const mentionedCommentIds = ticket.comments
+          .filter(c => mentionPattern.test(c.text || ''))
+          .map(c => c.id)
+        
+        if (mentionedCommentIds.length > 0) {
+          console.log(`📖 Marking ${mentionedCommentIds.length} mentioned comments as read for ticket ${ticket.id}`)
+          markAllCommentsAsRead(ticket.id, mentionedCommentIds, user.id).catch(err => {
+            console.error('❌ Failed to mark comments as read:', err)
+          })
+        }
+      }
+    }
+  }, [isOpen, projectId, ticket?.id, user?.id, user?.email])
 
   useEffect(() => {
     if (prevProgressRef.current !== progress) {
@@ -1154,10 +1196,14 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                       background: '#000',
                       color: '#fff',
                       borderRadius: 999,
-                      padding: '6px 10px',
-                      fontSize: 14,
-                      fontWeight: 800,
-                      pointerEvents: 'none'
+                      padding: '4px 8px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      pointerEvents: 'none',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '150px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
                     }}
                   >@{leadMention}</div>
                 )}
@@ -1179,7 +1225,8 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                   if (last.startsWith('@')) {
                     const q = last.slice(1).toLowerCase()
                     setMentionQuery(q)
-                    setShowMentionList(Boolean(q.length))
+                    // Show mention list even with empty query (just @ typed)
+                    setShowMentionList(true)
                     setMentionIndex(0)
                   } else {
                     setMentionQuery('')
@@ -1192,7 +1239,7 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                     if (showMentionList) {
                       e.preventDefault()
                       const list = members
-                        .filter(m => (m.email || '').toLowerCase().includes(mentionQuery) || (m.full_name || '').toLowerCase().includes(mentionQuery))
+                        .filter(m => !mentionQuery || (m.email || '').toLowerCase().includes(mentionQuery) || (m.full_name || '').toLowerCase().includes(mentionQuery))
                       if (list.length > 0) {
                         const m = list[Math.max(0, Math.min(mentionIndex, list.length - 1))]
                         // Move selected mention to chip and keep input clean
@@ -1211,7 +1258,7 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                   }
                   if (e.key === 'ArrowDown') {
                     const list = members
-                      .filter(m => (m.email || '').toLowerCase().includes(mentionQuery) || (m.full_name || '').toLowerCase().includes(mentionQuery))
+                      .filter(m => !mentionQuery || (m.email || '').toLowerCase().includes(mentionQuery) || (m.full_name || '').toLowerCase().includes(mentionQuery))
                     if (list.length > 0) {
                       e.preventDefault()
                       setShowMentionList(true)
@@ -1220,7 +1267,7 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                   }
                   if (e.key === 'ArrowUp') {
                     const list = members
-                      .filter(m => (m.email || '').toLowerCase().includes(mentionQuery) || (m.full_name || '').toLowerCase().includes(mentionQuery))
+                      .filter(m => !mentionQuery || (m.email || '').toLowerCase().includes(mentionQuery) || (m.full_name || '').toLowerCase().includes(mentionQuery))
                     if (list.length > 0) {
                       e.preventDefault()
                       setShowMentionList(true)
@@ -1253,7 +1300,7 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                 />
               </div>
 
-              {showMentionList && mentionQuery && (
+              {showMentionList && (
                 <div style={{
                   position: 'absolute',
                   bottom: 46,
@@ -1269,6 +1316,8 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                 }}>
                   {(() => {
                     const filteredMembers = members.filter(m => {
+                      // If no query, show all members
+                      if (!mentionQuery) return true
                       const emailMatch = (m.email || '').toLowerCase().includes(mentionQuery.toLowerCase())
                       const nameMatch = (m.full_name || '').toLowerCase().includes(mentionQuery.toLowerCase())
                       console.log(`🔍 Filtering member ${m.full_name || m.email}: emailMatch=${emailMatch}, nameMatch=${nameMatch}, query="${mentionQuery}"`)

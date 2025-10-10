@@ -7,6 +7,7 @@ import { Html } from '@react-three/drei'
 import { Stones, getStoneColorTint } from './Stones'
 import { Trees, getTreeColorTint } from './Trees'
 import BuildingProgressBubble from './BuildingProgressBubble'
+import MentionBubble from './MentionBubble'
 
 export const HexCellState = {
   DEFAULT: 'default',
@@ -43,6 +44,7 @@ interface UnifiedHexCellProps {
   } | null
   zoneName?: string // Имя зоны для отображения
   ticketCount?: number // Количество тикетов в зоне
+  hasMentions?: boolean // Есть ли упоминания текущего пользователя в комментариях
   showStone?: boolean // Показывать ли камень на этой ячейке
   stoneSeed?: number // Seed для генерации камня
   stoneCount?: number // Количество камней в кластере (1-5)
@@ -89,6 +91,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   zoneObject = null,
   zoneName,
   ticketCount = 0,
+  hasMentions = false,
   showStone = false,
   stoneSeed = 0,
   stoneCount = 1,
@@ -641,7 +644,10 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
 
       {isZoneCenter && isSprintObject && sprintProgress && sprintProgress.total > 0 && (
         <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
-          <BuildingProgressBubble total={sprintProgress.total} done={sprintProgress.done} />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <BuildingProgressBubble total={sprintProgress.total} done={sprintProgress.done} />
+            <MentionBubble hasMentions={hasMentions} />
+          </div>
         </Html>
       )}
 
