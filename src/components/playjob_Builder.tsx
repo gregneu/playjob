@@ -8,7 +8,6 @@ import AvatarPickerModal from './AvatarPickerModal'
 import { CreateProjectModal } from './CreateProjectModal'
 import { ProjectPage } from './ProjectPage'
 import { GlassPanel } from './GlassPanel'
-import BuildingShowcase from './BuildingShowcase'
 import { UserAvatar } from './UserAvatar'
 import type { Project } from '../types/enhanced'
 // Removed HexAvatarPanel/AvatarPanel for placeholder layout
@@ -20,7 +19,6 @@ const PlayjobBuilder = () => {
   const { projects, loading, createProject, reloadProjects } = useProjects(user?.id || null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [showBuildingShowcase, setShowBuildingShowcase] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const reloadAttemptRef = useRef<string | null>(null)
 
@@ -110,19 +108,6 @@ const PlayjobBuilder = () => {
   //     console.error('Error during sign out:', err)
   //   }
   // }
-
-
-  if (showBuildingShowcase) {
-    return <BuildingShowcase onBack={() => setShowBuildingShowcase(false)} />
-  }
-
-
-
-
-
-
-
-
 
 
 
@@ -240,28 +225,6 @@ const PlayjobBuilder = () => {
           Новый проект
         </button>
 
-        {/* Building Showcase Button */}
-        <button 
-          onClick={() => setShowBuildingShowcase(true)}
-          style={{
-            padding: '8px 16px',
-            background: '#7C3AED',
-            color: 'white',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          🏗️ Building Showcase
-        </button>
-        
-        
         {/* User Avatar clickable to open picker */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <UserAvatar 
