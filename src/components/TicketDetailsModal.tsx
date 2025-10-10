@@ -1156,8 +1156,8 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                     setLeadMention(null)
                   }
                   }}
-                  placeholder={inputMode === 'comment' ? 'Напишите комментарий, @username или #hashtag...' : 
-                             inputMode === 'link' ? 'http://... или www...' : 
+                  placeholder={inputMode === 'comment' ? 'Write a comment, @username or #hashtag...' : 
+                             inputMode === 'link' ? 'http://... or www...' : 
                              inputMode === 'requirement' ? '+requirement...' : 
                              inputMode === 'file' ? 'Drop files here or type...' :
                              'Type a command or add content...'}

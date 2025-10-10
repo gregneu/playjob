@@ -231,7 +231,7 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
             <Search size={16} style={{ color: '#64748B' }} />
             <input
               type="text"
-              placeholder="Поиск участников..."
+              placeholder="Search members..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -312,7 +312,7 @@ export const AssigneeDropdown: React.FC<AssigneeDropdownProps> = ({
                       borderRadius: '999px',
                       background: '#DC2626'
                     }} />
-                    Снять назначение
+                    Unassign
                   </button>
                 )}
 
