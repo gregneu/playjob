@@ -94,6 +94,32 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
   const [teamMembers, setTeamMembers] = useState<Array<{id: string, name: string, avatar?: string, email?: string}>>([])
   const [isLoadingTeam, setIsLoadingTeam] = useState(false)
   // hexagonPosition removed - no longer needed
+  
+  // Ref for content div to handle touch events with passive: false
+  const contentRef = React.useRef<HTMLDivElement>(null)
+  
+  // Handle touch events with preventDefault (non-passive)
+  React.useEffect(() => {
+    const element = contentRef.current
+    if (!element || !isOpen) return
+    
+    const handleTouchMove = (e: TouchEvent) => {
+      e.stopPropagation()
+      // Prevent default only if not scrolling inside the panel
+      if (element.scrollHeight > element.clientHeight) {
+        // Let touch scroll work inside the panel
+        return
+      }
+      e.preventDefault()
+    }
+    
+    // Add listener with passive: false to allow preventDefault
+    element.addEventListener('touchmove', handleTouchMove, { passive: false })
+    
+    return () => {
+      element.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [isOpen])
 
   // ESC key handler
   React.useEffect(() => {
@@ -140,21 +166,45 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
     }
   }
 
-  // Функция для загрузки пользователей здания (используем участников зоны)
+  // Функция для загрузки пользователей здания (используем участников проекта)
   const loadZoneTeamMembers = async () => {
     setIsLoadingTeam(true)
     try {
       const { supabase } = await import('../lib/supabase')
-      console.log('🔍 Loading zone members for zone team:', zoneObject?.id)
       
-      // Временно отключаем запрос zone_members - таблица может не существовать
-      console.log('⚠️ Zone members loading temporarily disabled')
-      const data = null
-      const error = null
+      // Get project_id from zone_object
+      if (!zoneObject?.zone_id) {
+        console.warn('⚠️ No zone_id available for zoneObject')
+        setTeamMembers([])
+        setIsLoadingTeam(false)
+        return
+      }
       
-      console.log('📊 Zone members data:', data, 'Error:', error)
+      // Get zone to find project_id
+      const { data: zoneData } = await supabase
+        .from('zones')
+        .select('project_id')
+        .eq('id', zoneObject.zone_id)
+        .single()
       
-      if (!error && data) {
+      if (!zoneData?.project_id) {
+        console.warn('⚠️ No project_id found for zone')
+        setTeamMembers([])
+        setIsLoadingTeam(false)
+        return
+      }
+      
+      console.log('🔍 Loading project members for project:', zoneData.project_id)
+      
+      // Load project members instead of zone members
+      const { data, error } = await supabase
+        .from('project_memberships')
+        .select('user_id, role')
+        .eq('project_id', zoneData.project_id)
+      
+      console.log('📊 Project members data:', data, 'Error:', error)
+      
+      if (!error && data && data.length > 0) {
         // Загружаем профили отдельно для каждого user_id
         const userIds = (data as any[]).map(m => m.user_id)
         const { data: profilesData, error: profilesError } = await supabase
@@ -188,7 +238,7 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
           setTeamMembers(fallbackMembers)
         }
       } else {
-        console.error('❌ Failed to load zone members:', error)
+        console.warn('⚠️ No project members found or error:', error)
         // Fallback: try to get current user as a member
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
@@ -673,6 +723,7 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
 
         {/* Content */}
         <div
+          ref={contentRef}
           style={{ 
             flex: 1, 
             overflow: 'auto', 
@@ -681,7 +732,6 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
             zIndex: 999 // Чуть ниже grid
           }}
           onWheel={(e) => { e.stopPropagation() }}
-          onTouchMove={(e) => { e.stopPropagation() }}
           onMouseDown={(e) => {
             console.log('🖱️ ZoneObjectDetailsPanel CONTENT: onMouseDown triggered')
             console.log('🖱️ ZoneObjectDetailsPanel CONTENT: target:', e.target)
