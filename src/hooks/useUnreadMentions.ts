@@ -107,6 +107,53 @@ export function useUnreadMentions(
     loadUnreadMentions()
   }, [loadUnreadMentions])
 
+  // Subscribe to realtime updates for tickets to detect new comments
+  useEffect(() => {
+    if (!projectId || !userId) return
+
+    console.log('🔔 useUnreadMentions: Setting up realtime subscription for project:', projectId)
+
+    const channel = supabase.channel(`mentions:${projectId}:${userId}`)
+
+    // Listen for ticket UPDATE events (new comments added)
+    channel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'object_tickets' },
+      (payload) => {
+        console.log('🔔 useUnreadMentions: Ticket updated, reloading mentions', {
+          ticketId: payload.new.id,
+          hasNewComments: !!payload.new.comments
+        })
+        // Reload mentions when any ticket is updated
+        // The loadUnreadMentions will check all tickets and compute unread mentions
+        setTimeout(() => loadUnreadMentions(), 500) // Small delay to ensure ticket data is fresh
+      }
+    )
+
+    // Subscribe to comment_reads changes (when user marks comments as read)
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'comment_reads', filter: `user_id=eq.${userId}` },
+      (payload) => {
+        console.log('🔔 useUnreadMentions: Comment read status changed, reloading mentions', payload)
+        setTimeout(() => loadUnreadMentions(), 300)
+      }
+    )
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ useUnreadMentions: Realtime subscription active')
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('❌ useUnreadMentions: Realtime subscription error')
+      }
+    })
+
+    return () => {
+      console.log('🔔 useUnreadMentions: Cleaning up realtime subscription')
+      supabase.removeChannel(channel)
+    }
+  }, [projectId, userId, loadUnreadMentions])
+
   // Return whether a specific ticket has unread mentions
   const hasUnreadMentions = useCallback((ticketId: string): boolean => {
     return !!(unreadMentions[ticketId] && unreadMentions[ticketId].length > 0)

@@ -21,7 +21,7 @@ import { useProjectData } from '../hooks/useProjectData'
 // import type { Zone } from '../types/enhanced'
 import { BuildingType } from '../types/building'
 import { useAuth } from '../hooks/useAuth'
-import { useUnreadMentions } from '../hooks/useUnreadMentions'
+import { useNotifications } from '../hooks/useNotifications'
 import { GlassPanel } from './GlassPanel'
 import { ObjectDetailsPanel } from './ObjectDetailsPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
@@ -158,18 +158,23 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     moveTicket
   } = useProjectData(projectId)
 
-  // Get all tickets for unread mentions tracking
+  // Get all tickets for notification tracking
   const allTickets = useMemo(() => {
     return Object.values(ticketsByZoneObject).flat()
   }, [ticketsByZoneObject])
 
-  // Track unread mentions
-  const { buildingHasUnreadMentions, reload: reloadUnreadMentions } = useUnreadMentions(
+  // Track all notifications (mentions, status changes, etc.)
+  const { 
+    buildingHasNotifications,
+    buildingHasUnreadMentions, // Legacy compatibility
+    notificationsByBuilding,
+    reload: reloadNotifications 
+  } = useNotifications({
     projectId,
-    allTickets,
-    user?.id || null,
-    user?.email || null
-  )
+    tickets: allTickets,
+    userId: user?.id || null,
+    userEmail: user?.email || null
+  })
 
   // Current user id for user-scoped counters (теперь не используется, так как имена рендерятся в UnifiedHexCell)
   // const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -4486,14 +4491,32 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
               ? buildingHasUnreadMentions(building.id, ticketsByZoneObject[building.id] || [])
               : false
             
+            // Check notification data for this building
+            const buildingNotifications = building ? notificationsByBuilding[building.id] : null
+            
             // Debug mentions for zone centers
-            if (isZoneCenterCell && building && hasMentions) {
-              console.log('💬 Building has unread mentions!', {
-                buildingId: building.id,
-                buildingTitle: building.title,
-                hasMentions,
-                ticketCount: (ticketsByZoneObject[building.id] || []).length
-              })
+            if (isZoneCenterCell && building) {
+              if (hasMentions) {
+                console.log('💬 Building has unread mentions!', {
+                  buildingId: building.id,
+                  buildingTitle: building.title,
+                  hasMentions,
+                  ticketCount: (ticketsByZoneObject[building.id] || []).length,
+                  notifications: buildingNotifications,
+                  userEmail: user?.email,
+                  userId: user?.id
+                })
+              }
+              
+              // Also log when no mentions but we have a building with tickets
+              if (!hasMentions && (ticketsByZoneObject[building.id] || []).length > 0) {
+                console.log('📭 Building has tickets but no unread mentions', {
+                  buildingId: building.id,
+                  buildingTitle: building.title,
+                  ticketCount: (ticketsByZoneObject[building.id] || []).length,
+                  userEmail: user?.email
+                })
+              }
             }
             
             // Отладка: проверяем данные тикетов
@@ -5066,8 +5089,8 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
         isOpen={isTicketModalOpen}
         onClose={() => {
           setIsTicketModalOpen(false)
-          // Reload unread mentions after closing modal (comments may have been marked as read)
-          setTimeout(() => reloadUnreadMentions(), 300)
+          // Reload notifications after closing modal (comments may have been marked as read)
+          setTimeout(() => reloadNotifications(), 300)
         }}
         projectId={projectId}
         ticket={selectedTicket}
