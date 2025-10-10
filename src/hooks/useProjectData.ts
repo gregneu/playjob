@@ -393,6 +393,13 @@ export const useProjectData = (projectId: string) => {
 
     if (payload.eventType === 'DELETE') {
       if (!oldRow?.id || !oldRow.zone_object_id) return
+      
+      // Filter: only process if the zone_object belongs to our project
+      const belongsToProject = zoneObjects.some(zo => zo.id === oldRow.zone_object_id)
+      if (!belongsToProject) {
+        console.log('[useProjectData] Ignoring DELETE - zone_object not in our project', oldRow.zone_object_id)
+        return
+      }
       setTicketsByZoneObject((prev) => {
         const list = prev[oldRow.zone_object_id] ?? []
         if (!list.some((ticket) => ticket.id === oldRow.id)) {
@@ -412,6 +419,13 @@ export const useProjectData = (projectId: string) => {
     }
 
     if (!newRow?.id || !newRow.zone_object_id) return
+
+    // Filter: only process if the zone_object belongs to our project (for new tickets)
+    const belongsToProject = zoneObjects.some(zo => zo.id === newRow.zone_object_id)
+    if (!belongsToProject) {
+      console.log('[useProjectData] Ignoring event - zone_object not in our project', newRow.zone_object_id)
+      return
+    }
 
     const movedBetweenZones =
       payload.eventType === 'UPDATE' &&
@@ -495,7 +509,7 @@ export const useProjectData = (projectId: string) => {
         window.dispatchEvent(new CustomEvent('ticket-moved', { detail }))
       }
     }
-  }, [])
+  }, [zoneObjects])
 
   const handleLinkChange = useCallback((payload: RealtimePostgresChangesPayload<any>) => {
     const newRow = (payload.new ?? null) as {
@@ -1093,11 +1107,12 @@ export const useProjectData = (projectId: string) => {
       )
     }
 
-    // Subscribe to ALL tickets in the project (not just for existing zone_objects)
+    // Subscribe to ALL tickets (no filter - object_tickets doesn't have project_id column)
+    // We'll filter on client side by checking if ticket belongs to our zone_objects
     // This ensures realtime updates work even when tickets are added to empty buildings
     channel.on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'object_tickets', filter: `project_id=eq.${projectId}` },
+      { event: '*', schema: 'public', table: 'object_tickets' },
       handleTicketChange
     )
 
