@@ -1093,15 +1093,13 @@ export const useProjectData = (projectId: string) => {
       )
     }
 
-    if (zoneObjectIds.length > 0) {
-      for (const zoneObjectId of zoneObjectIds) {
-        channel.on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'object_tickets', filter: `zone_object_id=eq.${zoneObjectId}` },
-          handleTicketChange
-        )
-      }
-    }
+    // Subscribe to ALL tickets in the project (not just for existing zone_objects)
+    // This ensures realtime updates work even when tickets are added to empty buildings
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'object_tickets', filter: `project_id=eq.${projectId}` },
+      handleTicketChange
+    )
 
     channel.on('system', { event: 'CHANNEL_ERROR' }, (event) => {
       if (event?.status === 'ok') {
