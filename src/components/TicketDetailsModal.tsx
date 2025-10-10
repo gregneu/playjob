@@ -47,6 +47,7 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
   const [showMentionList, setShowMentionList] = useState(false)
   const [mentionIndex, setMentionIndex] = useState(0)
   const [members, setMembers] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([])
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null)
   const smartInputRef = useRef<HTMLInputElement>(null)
   const [leadMention, setLeadMention] = useState<string | null>(null)
   const [showInputGlow, setShowInputGlow] = useState(false)
@@ -744,7 +745,19 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
             {/* Items */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {checklistItems.map(it => (
-                <label key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', cursor: 'pointer' }}>
+                <div 
+                  key={it.id} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 10, 
+                    padding: '8px 4px', 
+                    cursor: 'pointer',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={() => setHoveredItemId(it.id)}
+                  onMouseLeave={() => setHoveredItemId(null)}
+                >
                   <img
                     src={it.done ? '/icons/tabler-icon-square-check-filled.svg' : '/icons/tabler-icon-square.svg'}
                     width={24}
@@ -764,23 +777,86 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
                       }
                     }}
                   />
-                  <span contentEditable suppressContentEditableWarning onBlur={async (e) => {
-                    const v = (e.currentTarget.textContent || '').trim()
-                    if (v && v !== it.text) {
-                      const next = checklistItems.map(x => x.id === it.id ? { ...x, text: v } : x)
-                      onSave({ checklist: next });
-                      
-                      // Сохраняем в базу данных
-                      if (onSaveToDatabase && ticket) {
-                        try {
-                          await onSaveToDatabase(ticket.id, { checklist: next });
-                        } catch (error) {
-                          console.error('Error saving checklist to database:', error);
+                  <span 
+                    contentEditable 
+                    suppressContentEditableWarning 
+                    style={{ flex: 1 }}
+                    onBlur={async (e) => {
+                      const v = (e.currentTarget.textContent || '').trim()
+                      if (v && v !== it.text) {
+                        const next = checklistItems.map(x => x.id === it.id ? { ...x, text: v } : x)
+                        onSave({ checklist: next });
+                        
+                        // Сохраняем в базу данных
+                        if (onSaveToDatabase && ticket) {
+                          try {
+                            await onSaveToDatabase(ticket.id, { checklist: next });
+                          } catch (error) {
+                            console.error('Error saving checklist to database:', error);
+                          }
                         }
                       }
-                    }
-                  }}>{it.text}</span>
-                </label>
+                    }}
+                    onKeyDown={async (e) => {
+                      // Delete item on Backspace when text is empty
+                      if (e.key === 'Backspace') {
+                        const currentText = (e.currentTarget.textContent || '').trim()
+                        if (!currentText) {
+                          e.preventDefault()
+                          const next = checklistItems.filter(x => x.id !== it.id)
+                          onSave({ checklist: next });
+                          
+                          // Сохраняем в базу данных
+                          if (onSaveToDatabase && ticket) {
+                            try {
+                              await onSaveToDatabase(ticket.id, { checklist: next });
+                            } catch (error) {
+                              console.error('Error saving checklist to database:', error);
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  >{it.text}</span>
+                  
+                  {/* Delete button on hover */}
+                  {hoveredItemId === it.id && (
+                    <button
+                      onClick={async () => {
+                        const next = checklistItems.filter(x => x.id !== it.id)
+                        onSave({ checklist: next });
+                        
+                        // Сохраняем в базу данных
+                        if (onSaveToDatabase && ticket) {
+                          try {
+                            await onSaveToDatabase(ticket.id, { checklist: next });
+                          } catch (error) {
+                            console.error('Error saving checklist to database:', error);
+                          }
+                        }
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#DC2626',
+                        fontSize: 20,
+                        cursor: 'pointer',
+                        padding: '0 4px',
+                        lineHeight: 1,
+                        transition: 'transform 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.2)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)'
+                      }}
+                      title="Delete requirement"
+                    >
+                      −
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
