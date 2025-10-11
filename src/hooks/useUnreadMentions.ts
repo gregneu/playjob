@@ -13,13 +13,14 @@ export function useUnreadMentions(
   tickets: any[],
   userId: string | null,
   userEmail: string | null,
-  userDisplayName?: string | null
+  userDisplayName?: string | null,
+  extraAliases: string[] = []
 ) {
   const [unreadMentions, setUnreadMentions] = useState<UnreadMentionsMap>({})
   const [isLoading, setIsLoading] = useState(false)
 
   const loadUnreadMentions = useCallback(async () => {
-    if (!projectId || !userId || (!userEmail && !userDisplayName) || tickets.length === 0) {
+    if (!projectId || !userId || (!userEmail && !userDisplayName && extraAliases.length === 0) || tickets.length === 0) {
       setUnreadMentions({})
       return
     }
@@ -28,39 +29,42 @@ export function useUnreadMentions(
     try {
       const mentionTokens: string[] = []
 
-      if (userEmail) {
-        const lowerEmail = userEmail.toLowerCase().trim()
-        mentionTokens.push(lowerEmail)
-        const localPart = lowerEmail.split('@')[0]
-        if (localPart) {
-          mentionTokens.push(localPart)
-          localPart.split(/[._\-]/).forEach((segment) => {
-            if (segment && segment.length >= 2) {
-              mentionTokens.push(segment)
-            }
-          })
+      const addTokenVariants = (value?: string | null) => {
+        if (!value) return
+        const trimmed = value.toString().trim().toLowerCase()
+        if (!trimmed) return
+        mentionTokens.push(trimmed)
+
+        const alphaNum = trimmed.replace(/[^a-z0-9]/gi, '')
+        if (alphaNum && alphaNum !== trimmed) {
+          mentionTokens.push(alphaNum)
         }
+
+        trimmed.split(/[\s._\-@]+/).forEach((segment) => {
+          const part = segment.trim()
+          if (part && part.length >= 2) {
+            mentionTokens.push(part.toLowerCase())
+          }
+        })
+      }
+
+      if (userEmail) {
+        addTokenVariants(userEmail)
+        const localPart = userEmail.toLowerCase().split('@')[0]
+        addTokenVariants(localPart)
       }
 
       if (userDisplayName) {
-        const lowerName = userDisplayName.toLowerCase().trim()
-        if (lowerName) {
-          mentionTokens.push(lowerName)
-          lowerName.split(/\s+/).forEach((segment) => {
-            if (segment && segment.length >= 2) {
-              mentionTokens.push(segment)
-            }
-          })
-          const squashed = lowerName.replace(/\s+/g, '')
-          if (squashed.length >= 2) {
-            mentionTokens.push(squashed)
-          }
-        }
+        addTokenVariants(userDisplayName)
       }
 
       if (userId) {
-        mentionTokens.push(userId.toLowerCase())
+        addTokenVariants(userId)
       }
+
+      extraAliases.forEach((alias) => {
+        addTokenVariants(alias)
+      })
 
       const normalizedTokens = Array.from(new Set(mentionTokens.filter(Boolean))).map((token) => token.toLowerCase())
       const mentionRegexes = normalizedTokens.map((token) => new RegExp(`@${escapeRegExp(token)}`, 'i'))
@@ -167,7 +171,7 @@ export function useUnreadMentions(
     } finally {
       setIsLoading(false)
     }
-  }, [projectId, tickets, userId, userEmail, userDisplayName])
+  }, [projectId, tickets, userId, userEmail, userDisplayName, extraAliases])
 
   useEffect(() => {
     loadUnreadMentions()

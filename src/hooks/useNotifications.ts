@@ -1,8 +1,9 @@
 // Unified notification management hook
 // Handles all notification types with extensible architecture
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useEffect, useState } from 'react'
 import { useUnreadMentions } from './useUnreadMentions'
 import type { BuildingNotifications, NotificationType } from '../types/notifications'
+import { supabase } from '../lib/supabase'
 
 interface UseNotificationsProps {
   projectId: string | null
@@ -19,6 +20,63 @@ export function useNotifications({
   userEmail,
   userDisplayName
 }: UseNotificationsProps) {
+  const [profileAliases, setProfileAliases] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!userId) {
+      setProfileAliases([])
+      return
+    }
+
+    let cancelled = false
+
+    const loadProfileAliases = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('display_name, full_name, username, handle, email, slug')
+          .eq('id', userId)
+          .maybeSingle()
+
+        if (error) {
+          console.warn('[useNotifications] Failed to load profile aliases', error)
+        }
+
+        if (!cancelled) {
+          const aliases: string[] = []
+          const addAlias = (value?: string | null) => {
+            if (!value) return
+            const trimmed = value.toString().trim()
+            if (!trimmed) return
+            aliases.push(trimmed)
+          }
+
+          if (data) {
+            addAlias((data as any).handle)
+            addAlias((data as any).username)
+            addAlias((data as any).display_name)
+            addAlias((data as any).full_name)
+            addAlias((data as any).slug)
+            addAlias((data as any).email)
+          }
+
+          setProfileAliases(aliases)
+        }
+      } catch (profileErr) {
+        if (!cancelled) {
+          console.warn('[useNotifications] Exception while loading profile aliases', profileErr)
+          setProfileAliases([])
+        }
+      }
+    }
+
+    void loadProfileAliases()
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
   // Load comment mention notifications
   const {
     unreadMentions,
@@ -26,7 +84,7 @@ export function useNotifications({
     hasUnreadMentions,
     buildingHasUnreadMentions,
     reload: reloadMentions
-  } = useUnreadMentions(projectId, tickets, userId, userEmail, userDisplayName)
+  } = useUnreadMentions(projectId, tickets, userId, userEmail, userDisplayName, profileAliases)
 
   // Future: Add other notification type hooks here
   // const { unreadStatusChanges, ... } = useStatusChangeNotifications(...)
