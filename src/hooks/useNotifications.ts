@@ -9,13 +9,15 @@ interface UseNotificationsProps {
   tickets: any[]
   userId: string | null
   userEmail: string | null
+  userDisplayName?: string | null
 }
 
 export function useNotifications({
   projectId,
   tickets,
   userId,
-  userEmail
+  userEmail,
+  userDisplayName
 }: UseNotificationsProps) {
   // Load comment mention notifications
   const {
@@ -24,7 +26,7 @@ export function useNotifications({
     hasUnreadMentions,
     buildingHasUnreadMentions,
     reload: reloadMentions
-  } = useUnreadMentions(projectId, tickets, userId, userEmail)
+  } = useUnreadMentions(projectId, tickets, userId, userEmail, userDisplayName)
 
   // Future: Add other notification type hooks here
   // const { unreadStatusChanges, ... } = useStatusChangeNotifications(...)

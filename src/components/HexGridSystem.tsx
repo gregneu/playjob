@@ -173,7 +173,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     projectId,
     tickets: allTickets,
     userId: user?.id || null,
-    userEmail: user?.email || null
+    userEmail: user?.email || user?.user_metadata?.email || null,
+    userDisplayName: (user?.user_metadata?.full_name as string | undefined) ||
+      (user?.user_metadata?.display_name as string | undefined) ||
+      user?.email || null
   })
 
   // Current user id for user-scoped counters (теперь не используется, так как имена рендерятся в UnifiedHexCell)

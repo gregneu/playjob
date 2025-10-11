@@ -6,30 +6,92 @@ interface UnreadMentionsMap {
   [ticketId: string]: string[] // Array of unread comment IDs
 }
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 export function useUnreadMentions(
   projectId: string | null,
   tickets: any[],
   userId: string | null,
-  userEmail: string | null
+  userEmail: string | null,
+  userDisplayName?: string | null
 ) {
   const [unreadMentions, setUnreadMentions] = useState<UnreadMentionsMap>({})
   const [isLoading, setIsLoading] = useState(false)
 
   const loadUnreadMentions = useCallback(async () => {
-    if (!projectId || !userId || !userEmail || tickets.length === 0) {
+    if (!projectId || !userId || (!userEmail && !userDisplayName) || tickets.length === 0) {
       setUnreadMentions({})
       return
     }
 
     setIsLoading(true)
     try {
-      const username = userEmail.split('@')[0]
-      const mentionPattern = new RegExp(`@${username}`, 'i')
+      const mentionTokens: string[] = []
+
+      if (userEmail) {
+        const lowerEmail = userEmail.toLowerCase().trim()
+        mentionTokens.push(lowerEmail)
+        const localPart = lowerEmail.split('@')[0]
+        if (localPart) {
+          mentionTokens.push(localPart)
+          localPart.split(/[._\-]/).forEach((segment) => {
+            if (segment && segment.length >= 2) {
+              mentionTokens.push(segment)
+            }
+          })
+        }
+      }
+
+      if (userDisplayName) {
+        const lowerName = userDisplayName.toLowerCase().trim()
+        if (lowerName) {
+          mentionTokens.push(lowerName)
+          lowerName.split(/\s+/).forEach((segment) => {
+            if (segment && segment.length >= 2) {
+              mentionTokens.push(segment)
+            }
+          })
+          const squashed = lowerName.replace(/\s+/g, '')
+          if (squashed.length >= 2) {
+            mentionTokens.push(squashed)
+          }
+        }
+      }
+
+      if (userId) {
+        mentionTokens.push(userId.toLowerCase())
+      }
+
+      const normalizedTokens = Array.from(new Set(mentionTokens.filter(Boolean))).map((token) => token.toLowerCase())
+      const mentionRegexes = normalizedTokens.map((token) => new RegExp(`@${escapeRegExp(token)}`, 'i'))
+      const resolveMentionList = (raw: any): string[] => {
+        if (!raw) return []
+        if (Array.isArray(raw)) {
+          return raw
+            .map((item) => {
+              if (!item) return null
+              if (typeof item === 'string') return item.toLowerCase()
+              if (typeof item === 'object') {
+                return (
+                  item.user_id?.toString().toLowerCase() ??
+                  item.userId?.toString().toLowerCase() ??
+                  item.id?.toString().toLowerCase() ??
+                  item.email?.toString().toLowerCase() ??
+                  item.value?.toString().toLowerCase() ??
+                  null
+                )
+              }
+              return null
+            })
+            .filter((value): value is string => Boolean(value))
+        }
+        return []
+      }
       
       console.log('🔍 useUnreadMentions: Checking mentions for user:', {
         userEmail,
-        username,
-        mentionPattern: mentionPattern.toString(),
+        userDisplayName,
+        mentionTokens: normalizedTokens,
         ticketCount: tickets.length
       })
       
@@ -70,22 +132,26 @@ export function useUnreadMentions(
         const readCommentIds = readMap[ticket.id] || new Set()
         
         const unreadMentionComments = comments.filter((comment: any) => {
-          const text = comment.text || ''
-          const isMentioned = mentionPattern.test(text)
+          const text = (comment.text || '').toString()
           const isUnread = !readCommentIds.has(comment.id)
-          
+
+          const directMentionMatch = mentionRegexes.some((regex) => regex.test(text))
+          const list = resolveMentionList(comment.mentions || comment.mention_ids || comment.mentionIds)
+          const listMentionMatch = list.some((value) => normalizedTokens.includes(value))
+
           if (text.includes('@')) {
             console.log('💬 Comment analysis:', {
               ticketId: ticket.id,
               commentId: comment.id,
               text,
-              isMentioned,
+              directMentionMatch,
+              listMentionMatch,
               isUnread,
               readCommentIds: Array.from(readCommentIds)
             })
           }
-          
-          return isMentioned && isUnread
+
+          return isUnread && (directMentionMatch || listMentionMatch)
         })
         
         if (unreadMentionComments.length > 0) {
@@ -101,7 +167,7 @@ export function useUnreadMentions(
     } finally {
       setIsLoading(false)
     }
-  }, [projectId, tickets, userId, userEmail])
+  }, [projectId, tickets, userId, userEmail, userDisplayName])
 
   useEffect(() => {
     loadUnreadMentions()
@@ -179,4 +245,3 @@ export function useUnreadMentions(
     reload: loadUnreadMentions
   }
 }
-
