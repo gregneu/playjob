@@ -20,7 +20,21 @@ export const useProjectData = (projectId: string) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null)
+  const realtimeReadyRef = useRef(false)
   const ticketsByZoneObjectRef = useRef<Record<string, ZoneObjectTicket[]>>({})
+  const pendingTicketBroadcastsRef = useRef<Array<{ reason: string; context?: Record<string, unknown> }>>([])
+  const realtimeClientIdRef = useRef<string>('')
+
+  if (!realtimeClientIdRef.current) {
+    try {
+      realtimeClientIdRef.current =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2)
+    } catch {
+      realtimeClientIdRef.current = Math.random().toString(36).slice(2)
+    }
+  }
   
   // Keep ref in sync with state for use in callbacks without adding to dependencies
   useEffect(() => {
@@ -143,6 +157,57 @@ export const useProjectData = (projectId: string) => {
   setLoading(false)
 }
   }, [projectId])
+
+  const sendTicketBroadcast = useCallback(
+    async (reason: string, context?: Record<string, unknown>) => {
+      const channel = realtimeChannelRef.current
+      if (!projectId || !channel) {
+        return
+      }
+
+      try {
+        const result = await channel.send({
+          type: 'broadcast',
+          event: 'tickets:refresh',
+          payload: {
+            projectId,
+            reason,
+            context: context ?? {},
+            source: realtimeClientIdRef.current,
+            emittedAt: Date.now()
+          }
+        })
+
+        if (result !== 'ok') {
+          console.warn('[useProjectData] Ticket sync broadcast ack timeout', { reason, result })
+        }
+      } catch (err) {
+        console.warn('[useProjectData] Ticket sync broadcast failed', { reason, err })
+      }
+    },
+    [projectId]
+  )
+
+  const notifyTicketSync = useCallback(
+    async (reason: string, context?: Record<string, unknown>) => {
+      if (!realtimeReadyRef.current || !realtimeChannelRef.current) {
+        console.log('[useProjectData] Queueing ticket sync broadcast', {
+          reason,
+          ready: realtimeReadyRef.current,
+          hasChannel: Boolean(realtimeChannelRef.current),
+          projectId
+        })
+        pendingTicketBroadcastsRef.current = [
+          ...pendingTicketBroadcastsRef.current,
+          { reason, context }
+        ]
+        return
+      }
+
+      await sendTicketBroadcast(reason, context)
+    },
+    [projectId, sendTicketBroadcast]
+  )
 
   const handleZoneChange = useCallback((payload: RealtimePostgresChangesPayload<Zone>) => {
     console.log('[useProjectData] zone change event', payload.eventType, {
@@ -917,9 +982,10 @@ export const useProjectData = (projectId: string) => {
         ...prev,
         [zoneObjectId]: [created, ...(prev[zoneObjectId] || [])]
       }))
+      void notifyTicketSync('ticket-created', { zoneObjectId, ticketId: created.id })
     }
     return created
-  }, [])
+  }, [notifyTicketSync])
 
   const updateTicket = useCallback(async (ticketId: string, zoneObjectId: string, updates: Partial<{ 
     title: string; 
@@ -941,9 +1007,10 @@ export const useProjectData = (projectId: string) => {
         ...prev,
         [zoneObjectId]: (prev[zoneObjectId] || []).map(t => t.id === ticketId ? { ...t, ...updated } : t)
       }))
+      void notifyTicketSync('ticket-updated', { zoneObjectId, ticketId })
     }
     return updated
-  }, [])
+  }, [notifyTicketSync])
 
   // Локальное обновление после перемещения тикета между объектами
   useEffect(() => {
@@ -1013,6 +1080,7 @@ export const useProjectData = (projectId: string) => {
           ...prev,
           [toZoneObjectId]: (prev[toZoneObjectId] || []).map(t => (t.id === ticketId ? { ...t, ...moved } : t))
         }))
+        void notifyTicketSync('ticket-moved', { ticketId, fromZoneObjectId, toZoneObjectId })
       } else {
         // rollback
         setTicketsByZoneObject(prev => ({
@@ -1031,7 +1099,7 @@ export const useProjectData = (projectId: string) => {
       }))
       return null
     }
-  }, [])
+  }, [notifyTicketSync])
 
   // Методы для работы со связями
   const createLink = useCallback(async (fromObjectId: string, toObjectId: string, linkType: 'primary' | 'secondary' = 'primary') => {
@@ -1076,9 +1144,14 @@ export const useProjectData = (projectId: string) => {
     if (realtimeChannelRef.current) {
       supabase.removeChannel(realtimeChannelRef.current)
       realtimeChannelRef.current = null
+      realtimeReadyRef.current = false
     }
 
-    const channel = supabase.channel(`project-realtime:${projectId}`)
+    const channel = supabase.channel(`project-realtime:${projectId}`, {
+      config: {
+        broadcast: { ack: true }
+      }
+    })
 
     channel.on(
       'postgres_changes',
@@ -1140,6 +1213,24 @@ export const useProjectData = (projectId: string) => {
       handleTicketChange
     )
 
+    channel.on('broadcast', { event: 'tickets:refresh' }, (event) => {
+      const payload = (event?.payload ?? null) as {
+        projectId?: string
+        source?: string
+        emittedAt?: number
+        reason?: string
+      } | null
+
+      if (!payload) return
+      if (payload.projectId !== projectId) return
+      if (payload.source && payload.source === realtimeClientIdRef.current) {
+        return
+      }
+
+      console.log('[useProjectData] tickets:refresh broadcast received', payload)
+      void loadProjectData()
+    })
+
     channel.on('system', { event: 'CHANNEL_ERROR' }, (event) => {
       if (event?.status === 'ok') {
         console.log('[useProjectData] realtime channel ack', event)
@@ -1159,12 +1250,26 @@ export const useProjectData = (projectId: string) => {
     })
 
     realtimeChannelRef.current = channel
+    realtimeReadyRef.current = false
 
     void channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         console.log('[useProjectData] realtime channel subscribed', { projectId })
-      } else if (status === 'CHANNEL_ERROR') {
-        console.warn('[useProjectData] realtime channel subscription error state')
+        realtimeReadyRef.current = true
+        if (pendingTicketBroadcastsRef.current.length > 0) {
+          const pending = [...pendingTicketBroadcastsRef.current]
+          pendingTicketBroadcastsRef.current = []
+          for (const item of pending) {
+            void sendTicketBroadcast(item.reason, item.context)
+          }
+        }
+      } else {
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('[useProjectData] realtime channel subscription error state')
+        } else {
+          console.log('[useProjectData] realtime channel status update', { status })
+        }
+        realtimeReadyRef.current = false
       }
     })
 
@@ -1172,8 +1277,10 @@ export const useProjectData = (projectId: string) => {
       if (realtimeChannelRef.current) {
         supabase.removeChannel(realtimeChannelRef.current)
         realtimeChannelRef.current = null
+        realtimeReadyRef.current = false
       } else {
         supabase.removeChannel(channel)
+        realtimeReadyRef.current = false
       }
     }
   }, [
@@ -1186,6 +1293,7 @@ export const useProjectData = (projectId: string) => {
     handleTicketChange,
     handleLinkChange,
     loadProjectData,
+    sendTicketBroadcast,
     zoneIds,
     zoneObjectIds
   ])

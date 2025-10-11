@@ -5102,10 +5102,16 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
         }}
         onSaveToDatabase={async (ticketId, updates) => {
           try {
-            console.log('🔄 Saving to database:', { ticketId, updates })
-            const { ticketService } = await import('../lib/supabase')
-            const result = await ticketService.updateTicket(ticketId, updates)
-            console.log('✅ Save result:', result)
+            console.log('🔄 Saving to database via useProjectData:', { ticketId, updates })
+            // Use hook helper so realtime broadcast + state stay in sync
+            const zoneObjectId = selectedTicket?.zone_object_id || updates.zone_object_id || ''
+            if (!zoneObjectId) {
+              console.warn('⚠️ Missing zone_object_id for ticket save, falling back to direct service call')
+              const { ticketService } = await import('../lib/supabase')
+              const directResult = await ticketService.updateTicket(ticketId, updates)
+              return !!directResult
+            }
+            const result = await updateTicket(ticketId, zoneObjectId, updates as any)
             return !!result
           } catch (error) {
             console.error('❌ Error saving ticket to database:', error)
