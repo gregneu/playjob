@@ -42,7 +42,8 @@ export const useProjectData = (projectId: string) => {
   }, [ticketsByZoneObject])
 
   // Загрузка всех данных проекта
-  const loadProjectData = useCallback(async () => {
+  const loadProjectData = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false
     console.log('🚀 loadProjectData called with projectId:', projectId)
     
     if (!projectId) {
@@ -71,8 +72,10 @@ export const useProjectData = (projectId: string) => {
     console.log('=== LOADING PROJECT DATA ===')
     console.log('Project ID:', projectId)
     
-    setLoading(true)
-    setError(null)
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
 
     try {
       // Загружаем зоны
@@ -139,23 +142,27 @@ export const useProjectData = (projectId: string) => {
           console.warn('⚠️ Error loading tickets for zone object:', obj.id, err)
         }
       }
-  console.log('🎫 Final ticketsMap:', ticketsMap)
-  console.log('🎫 Final ticketsMap keys:', Object.keys(ticketsMap))
-  console.log('🎫 Final ticketsMap total tickets:', Object.values(ticketsMap).flat().length)
-  setTicketsByZoneObject(ticketsMap)
+      console.log('🎫 Final ticketsMap:', ticketsMap)
+      console.log('🎫 Final ticketsMap keys:', Object.keys(ticketsMap))
+      console.log('🎫 Final ticketsMap total tickets:', Object.values(ticketsMap).flat().length)
+      setTicketsByZoneObject(ticketsMap)
 
-  // Загружаем связи между объектами
-  console.log('🔗 Loading links...')
-  const linksData = await linkService.getLinks(projectId)
-  console.log('🔗 Links loaded:', linksData)
-  console.log('🔗 Links count:', linksData.length)
-  setLinks(linksData)
-} catch (err) {
-  console.error('Error loading project data:', err)
-  setError('Failed to load project data')
-} finally {
-  setLoading(false)
-}
+      // Загружаем связи между объектами
+      console.log('🔗 Loading links...')
+      const linksData = await linkService.getLinks(projectId)
+      console.log('🔗 Links loaded:', linksData)
+      console.log('🔗 Links count:', linksData.length)
+      setLinks(linksData)
+    } catch (err) {
+      console.error('Error loading project data:', err)
+      if (!silent) {
+        setError('Failed to load project data')
+      }
+    } finally {
+      if (!silent) {
+        setLoading(false)
+      }
+    }
   }, [projectId])
 
   const sendTicketBroadcast = useCallback(
@@ -868,7 +875,7 @@ export const useProjectData = (projectId: string) => {
       if (success) {
         console.log('useProjectData: Zone object position updated successfully')
         // Перезагружаем данные, чтобы обновить UI
-        await loadProjectData()
+        await loadProjectData({ silent: true })
       } else {
         console.warn('useProjectData: Failed to update zone object position')
         setError('Failed to update zone object position')
@@ -1228,7 +1235,7 @@ export const useProjectData = (projectId: string) => {
       }
 
       console.log('[useProjectData] tickets:refresh broadcast received', payload)
-      void loadProjectData()
+      void loadProjectData({ silent: true })
     })
 
     channel.on('system', { event: 'CHANNEL_ERROR' }, (event) => {
