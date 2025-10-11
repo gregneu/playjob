@@ -165,7 +165,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Track all notifications (mentions, status changes, etc.)
   const { 
-    buildingHasNotifications,
+    getBuildingAssignmentCount,
     buildingHasUnreadMentions, // Legacy compatibility
     notificationsByBuilding,
     reload: reloadNotifications 
@@ -4485,14 +4485,13 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             // Вычисляем количество тикетов в зоне
             // Тикеты хранятся по ID здания (zoneObject), а не по ID зоны
             const zoneTicketCount = building ? (ticketsByZoneObject[building.id] || []).length : 0
-            
-            // Check if building has unread comments mentioning current user
-            const hasMentions = building 
-              ? buildingHasUnreadMentions(building.id, ticketsByZoneObject[building.id] || [])
-              : false
-            
+
             // Check notification data for this building
             const buildingNotifications = building ? notificationsByBuilding[building.id] : null
+            const hasMentions = buildingNotifications?.hasCommentMentions ?? (building
+              ? buildingHasUnreadMentions(building.id, ticketsByZoneObject[building.id] || [])
+              : false)
+            const assignmentCount = building ? getBuildingAssignmentCount(building.id) : 0
             
             // Debug mentions for zone centers
             if (isZoneCenterCell && building) {
@@ -4661,6 +4660,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
                 zoneName={showZoneNames ? (building?.title || zone?.name) : undefined}
                 ticketCount={zoneTicketCount}
                 hasMentions={hasMentions}
+                assignmentCount={assignmentCount}
                 showStone={finalShouldShowStone}
                 stoneSeed={stoneSeed}
                 stoneCount={stoneCount}

@@ -34,6 +34,20 @@ export function useNotifications({
   const notificationsByBuilding = useMemo(() => {
     const result: { [buildingId: string]: BuildingNotifications } = {}
 
+    const ensureEntry = (buildingId: string): BuildingNotifications => {
+      if (!result[buildingId]) {
+        result[buildingId] = {
+          buildingId,
+          unreadCount: 0,
+          notifications: [],
+          hasCommentMentions: false,
+          hasAssignments: false,
+          assignmentCount: 0
+        }
+      }
+      return result[buildingId]
+    }
+
     // Process comment mentions
     tickets.forEach(ticket => {
       const buildingId = ticket.zone_object_id
@@ -42,17 +56,9 @@ export function useNotifications({
       const hasCommentMentions = hasUnreadMentions(ticket.id)
       
       if (hasCommentMentions) {
-        if (!result[buildingId]) {
-          result[buildingId] = {
-            buildingId,
-            unreadCount: 0,
-            notifications: [],
-            hasCommentMentions: false
-          }
-        }
-        
-        result[buildingId].hasCommentMentions = true
-        result[buildingId].unreadCount += unreadMentions[ticket.id]?.length || 0
+        const entry = ensureEntry(buildingId)
+        entry.hasCommentMentions = true
+        entry.unreadCount += unreadMentions[ticket.id]?.length || 0
         
         // Create notification objects for each unread mention
         const mentionCommentIds = unreadMentions[ticket.id] || []
@@ -61,7 +67,7 @@ export function useNotifications({
         mentionCommentIds.forEach(commentId => {
           const comment = comments.find((c: any) => c.id === commentId)
           if (comment) {
-            result[buildingId].notifications.push({
+            entry.notifications.push({
               id: `mention-${commentId}`,
               type: 'comment_mention' as NotificationType,
               ticketId: ticket.id,
@@ -79,11 +85,36 @@ export function useNotifications({
           }
         })
       }
+
+      // Process assignments for current user
+      if (userId && ticket.assignee_id && ticket.assignee_id === userId) {
+        const isArchived = typeof ticket.board_column === 'string' && ticket.board_column === 'archived'
+        const isDone = typeof ticket.status === 'string' && ticket.status.toLowerCase() === 'done'
+        if (!isArchived && !isDone) {
+          const entry = ensureEntry(buildingId)
+          entry.hasAssignments = true
+          entry.assignmentCount += 1
+          entry.unreadCount += 1
+          entry.notifications.push({
+            id: `assignment-${ticket.id}`,
+            type: 'assignment',
+            ticketId: ticket.id,
+            zoneObjectId: buildingId,
+            userId,
+            read: false,
+            createdAt: ticket.updated_at || ticket.created_at || new Date().toISOString(),
+            metadata: {
+              ticketTitle: ticket.title,
+              priority: ticket.priority,
+              status: ticket.status
+            }
+          })
+        }
+      }
     })
 
     // Future: Process other notification types here
     // - Status changes
-    // - Assignments
     // - Priority changes
     // - Checklist updates
 
@@ -96,9 +127,17 @@ export function useNotifications({
            notificationsByBuilding[buildingId].unreadCount > 0
   }, [notificationsByBuilding])
 
+  const buildingHasAssignments = useCallback((buildingId: string): boolean => {
+    return !!notificationsByBuilding[buildingId]?.hasAssignments
+  }, [notificationsByBuilding])
+
   // Get notification count for a building
   const getBuildingNotificationCount = useCallback((buildingId: string): number => {
     return notificationsByBuilding[buildingId]?.unreadCount || 0
+  }, [notificationsByBuilding])
+
+  const getBuildingAssignmentCount = useCallback((buildingId: string): number => {
+    return notificationsByBuilding[buildingId]?.assignmentCount || 0
   }, [notificationsByBuilding])
 
   // Mark all notifications for a building as read
@@ -117,11 +156,12 @@ export function useNotifications({
   return {
     notificationsByBuilding,
     buildingHasNotifications,
+    buildingHasAssignments,
     getBuildingNotificationCount,
+    getBuildingAssignmentCount,
     buildingHasUnreadMentions, // Legacy compatibility
     markBuildingAsRead,
     reload,
     isLoading: mentionsLoading
   }
 }
-

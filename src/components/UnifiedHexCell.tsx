@@ -8,6 +8,7 @@ import { Stones, getStoneColorTint } from './Stones'
 import { Trees, getTreeColorTint } from './Trees'
 import BuildingProgressBubble from './BuildingProgressBubble'
 import MentionBubble from './MentionBubble'
+import AssignmentBubble from './AssignmentBubble'
 
 export const HexCellState = {
   DEFAULT: 'default',
@@ -45,6 +46,7 @@ interface UnifiedHexCellProps {
   zoneName?: string // Имя зоны для отображения
   ticketCount?: number // Количество тикетов в зоне
   hasMentions?: boolean // Есть ли упоминания текущего пользователя в комментариях
+  assignmentCount?: number // Количество назначенных текущему пользователю тикетов
   showStone?: boolean // Показывать ли камень на этой ячейке
   stoneSeed?: number // Seed для генерации камня
   stoneCount?: number // Количество камней в кластере (1-5)
@@ -92,6 +94,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   zoneName,
   ticketCount = 0,
   hasMentions = false,
+  assignmentCount = 0,
   showStone = false,
   stoneSeed = 0,
   stoneCount = 1,
@@ -137,6 +140,9 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
     return classes.join(' ')
   }, [ticketBadgeAnimation])
   const badgeDomKey = ticketBadgeAnimationKey != null ? `badge-${ticketBadgeAnimationKey}` : 'badge-default'
+  const showTicketBubble = ticketCount > 0
+  const showMentionBubble = hasMentions
+  const showAssignmentBubble = assignmentCount > 0
   
   // Регистрируем mesh для hover detection
   useEffect(() => {
@@ -612,41 +618,57 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
         </group>
       )}
 
-      {/* Bubble с количеством тикетов - по центру здания */}
-      {isZoneCenter && ticketCount > 0 && !isSprintObject && (
+      {/* Bubble с уведомлениями и количеством тикетов - по центру здания */}
+      {isZoneCenter && !isSprintObject && (showTicketBubble || showMentionBubble || showAssignmentBubble) && (
         <Html key={badgeDomKey} position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
-          <div 
-            className={badgeClassName}
+          <div
             style={{
-              background: '#3B82F6',
-              color: 'white',
-              borderRadius: '50%',
-              width: '20px',
-              minHeight: '20px',
               display: 'flex',
+              gap: '6px',
               alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '10px',
-              fontWeight: '600',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-              border: '2px solid white',
-              pointerEvents: 'auto', // Включаем pointer events для hover
-              zIndex: 10,
-              cursor: 'pointer'
+              justifyContent: 'center'
             }}
-            onMouseEnter={() => setIsBubbleHovered(true)}
-            onMouseLeave={() => setIsBubbleHovered(false)}
           >
-            {ticketCount}
+            {showTicketBubble && (
+              <div 
+                className={badgeClassName}
+                style={{
+                  background: '#3B82F6',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '20px',
+                  minHeight: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  border: '2px solid white',
+                  pointerEvents: 'auto',
+                  zIndex: 10,
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={() => setIsBubbleHovered(true)}
+                onMouseLeave={() => setIsBubbleHovered(false)}
+              >
+                {ticketCount}
+              </div>
+            )}
+            {showAssignmentBubble && <AssignmentBubble count={assignmentCount} />}
+            {showMentionBubble && <MentionBubble hasMentions={hasMentions} />}
           </div>
         </Html>
       )}
 
-      {isZoneCenter && isSprintObject && sprintProgress && sprintProgress.total > 0 && (
+      {isZoneCenter && isSprintObject && ((sprintProgress && sprintProgress.total > 0) || showMentionBubble || showAssignmentBubble) && (
         <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <BuildingProgressBubble total={sprintProgress.total} done={sprintProgress.done} />
-            <MentionBubble hasMentions={hasMentions} />
+            {sprintProgress && sprintProgress.total > 0 && (
+              <BuildingProgressBubble total={sprintProgress.total} done={sprintProgress.done} />
+            )}
+            {showAssignmentBubble && <AssignmentBubble count={assignmentCount} />}
+            {showMentionBubble && <MentionBubble hasMentions={hasMentions} />}
           </div>
         </Html>
       )}

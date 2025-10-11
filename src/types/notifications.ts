@@ -46,6 +46,7 @@ export interface BuildingNotifications {
   unreadCount: number
   notifications: Notification[]
   hasCommentMentions: boolean
+  hasAssignments: boolean
+  assignmentCount: number
   // Future: hasStatusChanges, hasAssignments, etc.
 }
-
