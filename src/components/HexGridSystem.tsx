@@ -4492,6 +4492,16 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             const hasMentions = Boolean(buildingNotifications?.hasCommentMentions)
             const assignmentCount = buildingNotifications?.assignmentCount ?? 0
 
+            if (buildingNotifications) {
+              console.log('[HexGridSystem] notifications for building', {
+                buildingId: building.id,
+                title: building.title,
+                hasMentions,
+                assignmentCount,
+                unreadCount: buildingNotifications.unreadCount
+              })
+            }
+
             if (building) {
               console.log('[HexGridSystem] building badge state', JSON.stringify({
                   buildingId: building.id,
