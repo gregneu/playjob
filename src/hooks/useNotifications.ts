@@ -129,14 +129,13 @@ export function useNotifications({
       const buildingId = ticket.zone_object_id
       if (!buildingId) return
 
-      const commentCount = Array.isArray(ticket?.comments) ? ticket.comments.length : 0
-
       const hasCommentMentions = hasUnreadMentions(ticket.id)
       
       if (hasCommentMentions) {
         const entry = ensureEntry(buildingId)
         entry.hasCommentMentions = true
         entry.unreadCount += unreadMentions[ticket.id]?.length || 0
+        entry.commentCount = (entry.commentCount ?? 0) + (unreadMentions[ticket.id]?.length || 0)
         
         // Create notification objects for each unread mention
         const mentionCommentIds = unreadMentions[ticket.id] || []
@@ -190,10 +189,6 @@ export function useNotifications({
         }
       }
 
-      if (commentCount > 0) {
-        const entry = ensureEntry(buildingId)
-        entry.commentCount = (entry.commentCount ?? 0) + commentCount
-      }
     })
 
     console.log('[useNotifications] result keys', Object.keys(result))
