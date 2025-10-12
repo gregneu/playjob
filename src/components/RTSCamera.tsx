@@ -64,6 +64,23 @@ export const RTSCamera: React.FC<RTSCameraProps> = ({
     isMouseInEdgeZone: false,
     edgeDirection: new THREE.Vector2(0, 0)
   })
+  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const panState = useRef<{ isPanning: boolean; lastX: number; lastY: number }>({
+    isPanning: false,
+    lastX: 0,
+    lastY: 0
+  })
+  const pinchState = useRef<{
+    isPinching: boolean
+    initialDistance: number
+    initialHeight: number
+    initialCameraDistance: number
+  }>({
+    isPinching: false,
+    initialDistance: 0,
+    initialHeight: 0,
+    initialCameraDistance: 0
+  })
 
   // Инициализация камеры
   useEffect(() => {
@@ -190,6 +207,45 @@ export const RTSCamera: React.FC<RTSCameraProps> = ({
     }
   }, [])
 
+  const panCamera = useCallback((deltaX: number, deltaY: number) => {
+    const state = cameraState.current
+    const panFactor = state.height * 0.005
+
+    const moveX = -deltaX * panFactor
+    const moveZ = deltaY * panFactor
+
+    const sinR = Math.sin(state.rotation)
+    const cosR = Math.cos(state.rotation)
+
+    const offsetX = moveX * cosR + moveZ * sinR
+    const offsetZ = moveX * -sinR + moveZ * cosR
+
+    state.position.x += offsetX
+    state.position.z += offsetZ
+    state.target.x += offsetX
+    state.target.z += offsetZ
+  }, [])
+
+  const applyPinchZoom = useCallback((distanceRatio: number) => {
+    if (!Number.isFinite(distanceRatio) || distanceRatio <= 0) return
+    const state = cameraState.current
+    const base = pinchState.current
+
+    const newHeight = THREE.MathUtils.clamp(
+      base.initialHeight * distanceRatio,
+      minHeight,
+      maxHeight
+    )
+    const newDistance = THREE.MathUtils.clamp(
+      base.initialCameraDistance * distanceRatio,
+      minDistance,
+      maxDistance
+    )
+
+    state.height = newHeight
+    state.distance = newDistance
+  }, [minHeight, maxHeight, minDistance, maxDistance])
+
   // Обработчик движения мыши
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (disabled || isModalOpen) return // Блокируем управление если камера отключена или модалка открыта
@@ -246,6 +302,103 @@ export const RTSCamera: React.FC<RTSCameraProps> = ({
     }
   }, [disabled, isModalOpen, minHeight, maxHeight, minDistance, maxDistance])
 
+  const handlePointerDown = useCallback((event: PointerEvent) => {
+    if (event.pointerType !== 'touch' || disabled || isModalOpen) return
+    const canvas = gl.domElement
+    try {
+      canvas.setPointerCapture(event.pointerId)
+    } catch {}
+    event.preventDefault()
+
+    activePointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    controls.current.isMouseInEdgeZone = false
+    controls.current.edgeDirection.set(0, 0)
+
+    if (activePointers.current.size === 1) {
+      panState.current.isPanning = true
+      panState.current.lastX = event.clientX
+      panState.current.lastY = event.clientY
+      pinchState.current.isPinching = false
+    } else if (activePointers.current.size === 2) {
+      panState.current.isPanning = false
+      const pointers = Array.from(activePointers.current.values())
+      const distance = Math.hypot(
+        pointers[0].x - pointers[1].x,
+        pointers[0].y - pointers[1].y
+      )
+      const pinch = pinchState.current
+      pinch.isPinching = distance > 0
+      pinch.initialDistance = distance || 0.0001
+      pinch.initialHeight = cameraState.current.height
+      pinch.initialCameraDistance = cameraState.current.distance
+    }
+  }, [disabled, isModalOpen, gl])
+
+  const handlePointerMove = useCallback((event: PointerEvent) => {
+    if (event.pointerType !== 'touch' || disabled || isModalOpen) return
+    const pointer = activePointers.current.get(event.pointerId)
+    if (!pointer) return
+
+    event.preventDefault()
+    pointer.x = event.clientX
+    pointer.y = event.clientY
+
+    if (panState.current.isPanning && activePointers.current.size === 1) {
+      const deltaX = event.clientX - panState.current.lastX
+      const deltaY = event.clientY - panState.current.lastY
+      panState.current.lastX = event.clientX
+      panState.current.lastY = event.clientY
+      panCamera(deltaX, deltaY)
+    } else if (activePointers.current.size === 2) {
+      const pointers = Array.from(activePointers.current.values())
+      const distance = Math.hypot(
+        pointers[0].x - pointers[1].x,
+        pointers[0].y - pointers[1].y
+      )
+      if (!pinchState.current.isPinching) {
+        pinchState.current.isPinching = true
+        pinchState.current.initialDistance = distance || 0.0001
+        pinchState.current.initialHeight = cameraState.current.height
+        pinchState.current.initialCameraDistance = cameraState.current.distance
+      } else if (distance > 0) {
+        const ratio = pinchState.current.initialDistance / distance
+        applyPinchZoom(ratio)
+      }
+    }
+  }, [disabled, isModalOpen, panCamera, applyPinchZoom])
+
+  const handlePointerUp = useCallback((event: PointerEvent) => {
+    if (event.pointerType !== 'touch') return
+    const canvas = gl.domElement
+    try {
+      canvas.releasePointerCapture(event.pointerId)
+    } catch {}
+
+    activePointers.current.delete(event.pointerId)
+
+    if (activePointers.current.size === 0) {
+      panState.current.isPanning = false
+      pinchState.current.isPinching = false
+    } else if (activePointers.current.size === 1) {
+      pinchState.current.isPinching = false
+      const remaining = Array.from(activePointers.current.values())[0]
+      panState.current.isPanning = true
+      panState.current.lastX = remaining.x
+      panState.current.lastY = remaining.y
+    } else if (activePointers.current.size >= 2) {
+      // Reset pinch baseline when one of the fingers is removed but two still remain (rare)
+      const pointers = Array.from(activePointers.current.values()).slice(0, 2)
+      const distance = Math.hypot(
+        pointers[0].x - pointers[1].x,
+        pointers[0].y - pointers[1].y
+      )
+      pinchState.current.isPinching = distance > 0
+      pinchState.current.initialDistance = distance || 0.0001
+      pinchState.current.initialHeight = cameraState.current.height
+      pinchState.current.initialCameraDistance = cameraState.current.distance
+    }
+  }, [gl])
+
   // Устанавливаем обработчики событий
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -260,6 +413,22 @@ export const RTSCamera: React.FC<RTSCameraProps> = ({
       document.removeEventListener('wheel', handleWheel)
     }
   }, [handleKeyDown, handleKeyUp, handleMouseMove, handleWheel])
+
+  useEffect(() => {
+    const canvas = gl.domElement
+    canvas.style.touchAction = 'none'
+    canvas.addEventListener('pointerdown', handlePointerDown, { passive: false })
+    window.addEventListener('pointermove', handlePointerMove, { passive: false })
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
+
+    return () => {
+      canvas.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
+    }
+  }, [gl, handlePointerDown, handlePointerMove, handlePointerUp])
 
   // Переиспользуемые объекты для оптимизации
   const tempVector = useRef(new THREE.Vector3())
