@@ -4495,10 +4495,21 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
               ? buildingNotifications.notifications.filter((notification) => notification.type === 'comment_mention').length
               : 0
             const mentionNotificationExists = mentionNotificationCount > 0
-            const totalCommentCount = buildingTickets.reduce((count, ticket) => {
-              const comments = Array.isArray(ticket?.comments) ? ticket.comments.length : 0
-              return count + comments
+            const commentCountFromTickets = buildingTickets.reduce((count, ticket) => {
+              if (!ticket) return count
+              if (Array.isArray(ticket.comments)) {
+                return count + ticket.comments.length
+              }
+              const fallbackFields = [
+                (ticket as any).commentCount,
+                (ticket as any).comment_count,
+                (ticket as any).comments_count,
+                (ticket as any).comment_counts
+              ]
+              const fallbackValue = fallbackFields.find((value) => typeof value === 'number' && Number.isFinite(value))
+              return count + (fallbackValue ? Number(fallbackValue) : 0)
             }, 0)
+            const totalCommentCount = commentCountFromTickets > 0 ? commentCountFromTickets : mentionNotificationCount
             const hasAnyComments = totalCommentCount > 0
             const hasUnreadMentions = building && buildingTickets.length > 0
               ? buildingHasUnreadMentions(building.id, buildingTickets)
