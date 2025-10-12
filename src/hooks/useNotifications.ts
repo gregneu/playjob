@@ -190,6 +190,29 @@ export function useNotifications({
 
     console.log('[useNotifications] result keys', Object.keys(result))
 
+    Object.values(result).forEach((entry) => {
+      const notifications = Array.isArray(entry.notifications) ? entry.notifications : []
+
+      if (typeof entry.hasCommentMentions !== 'boolean') {
+        entry.hasCommentMentions = notifications.some((notification) => notification.type === 'comment_mention')
+      }
+
+      if (typeof entry.hasAssignments !== 'boolean') {
+        entry.hasAssignments = notifications.some((notification) => notification.type === 'assignment')
+      }
+
+      if (entry.assignmentCount == null) {
+        entry.assignmentCount = notifications.filter((notification) => notification.type === 'assignment').length
+      }
+
+      if ((entry.unreadCount == null || entry.unreadCount === 0) && notifications.length > 0) {
+        const unreadNotificationCount = notifications.filter((notification) => notification.read === false).length
+        if (unreadNotificationCount > 0) {
+          entry.unreadCount = unreadNotificationCount
+        }
+      }
+    })
+
     // Future: Process other notification types here
     // - Status changes
     // - Priority changes

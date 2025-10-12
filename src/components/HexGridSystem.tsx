@@ -4489,8 +4489,18 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
 
             // Check notification data for this building
             const buildingNotifications = building ? notificationsByBuilding[building.id] ?? null : null
-            const hasMentions = Boolean(buildingNotifications?.hasCommentMentions)
-            const assignmentCount = buildingNotifications?.assignmentCount ?? 0
+            const mentionNotificationExists = Array.isArray(buildingNotifications?.notifications)
+              ? buildingNotifications.notifications.some((notification) => notification.type === 'comment_mention')
+              : false
+            const hasMentions = Boolean(
+              typeof buildingNotifications?.hasCommentMentions === 'boolean'
+                ? buildingNotifications.hasCommentMentions
+                : mentionNotificationExists
+            )
+            const assignmentCount = buildingNotifications?.assignmentCount ??
+              (Array.isArray(buildingNotifications?.notifications)
+                ? buildingNotifications.notifications.filter((notification) => notification.type === 'assignment').length
+                : 0)
 
             if (buildingNotifications) {
               console.log('[HexGridSystem] notifications for building', {
