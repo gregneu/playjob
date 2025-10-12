@@ -349,6 +349,7 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
               } : null}
               zoneName={showZoneNames ? (building?.title || zone?.name) : undefined}
               ticketCount={zoneTicketCount}
+              commentCount={0}
               showStone={finalShouldShowStone}
               stoneSeed={stoneSeed}
               stoneCount={stoneCount}

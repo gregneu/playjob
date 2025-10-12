@@ -4701,6 +4701,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
                 } : null}
                 zoneName={showZoneNames ? (building?.title || zone?.name) : undefined}
                 ticketCount={zoneTicketCount}
+                commentCount={totalCommentCount}
                 hasMentions={hasMentions}
                 assignmentCount={assignmentCount}
                 showStone={finalShouldShowStone}

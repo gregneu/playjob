@@ -45,6 +45,7 @@ interface UnifiedHexCellProps {
   } | null
   zoneName?: string // Имя зоны для отображения
   ticketCount?: number // Количество тикетов в зоне
+  commentCount?: number // Количество комментариев в тикетах здания
   hasMentions?: boolean // Есть ли упоминания текущего пользователя в комментариях
   assignmentCount?: number // Количество назначенных текущему пользователю тикетов
   showStone?: boolean // Показывать ли камень на этой ячейке
@@ -93,6 +94,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   zoneObject = null,
   zoneName,
   ticketCount = 0,
+  commentCount = 0,
   hasMentions = false,
   assignmentCount = 0,
   showStone = false,
@@ -141,6 +143,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   }, [ticketBadgeAnimation])
   const badgeDomKey = ticketBadgeAnimationKey != null ? `badge-${ticketBadgeAnimationKey}` : 'badge-default'
   const showTicketBubble = ticketCount > 0
+  const showCommentBubble = commentCount > 0
   const showMentionBubble = hasMentions
   const showAssignmentBubble = assignmentCount > 0
 
@@ -151,14 +154,16 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
         r,
         zoneObjectId: zoneObject?.id ?? null,
         ticketCount,
+        commentCount,
         hasMentions,
         assignmentCount,
         showTicketBubble,
+        showCommentBubble,
         showMentionBubble,
         showAssignmentBubble
       }, null, 2))
     }
-  }, [isZoneCenter, q, r, zoneObject?.id, ticketCount, hasMentions, assignmentCount, showTicketBubble, showMentionBubble, showAssignmentBubble])
+  }, [isZoneCenter, q, r, zoneObject?.id, ticketCount, commentCount, hasMentions, assignmentCount, showTicketBubble, showCommentBubble, showMentionBubble, showAssignmentBubble])
   
   // Регистрируем mesh для hover detection
   useEffect(() => {
@@ -671,6 +676,34 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
                 {ticketCount}
               </div>
             )}
+            {showCommentBubble && (
+              <div
+                className="ticket-badge comment-badge"
+                style={{
+                  background: '#F97316',
+                  color: 'white',
+                  borderRadius: '50%',
+                  minWidth: '20px',
+                  minHeight: '20px',
+                  padding: '0 4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  border: '2px solid white',
+                  pointerEvents: 'auto',
+                  zIndex: 10,
+                  cursor: 'pointer',
+                  gap: '2px'
+                }}
+                title="Total comments in this building"
+              >
+                <span role="img" aria-label="comments">💬</span>
+                {commentCount}
+              </div>
+            )}
             {showAssignmentBubble && <AssignmentBubble count={assignmentCount} />}
             {showMentionBubble && <MentionBubble hasMentions={hasMentions} />}
           </div>
@@ -684,6 +717,34 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
               <BuildingProgressBubble total={sprintProgress.total} done={sprintProgress.done} />
             )}
             {showAssignmentBubble && <AssignmentBubble count={assignmentCount} />}
+            {showCommentBubble && (
+              <div
+                className="ticket-badge comment-badge"
+                style={{
+                  background: '#F97316',
+                  color: 'white',
+                  borderRadius: '50%',
+                  minWidth: '20px',
+                  minHeight: '20px',
+                  padding: '0 4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  border: '2px solid white',
+                  pointerEvents: 'auto',
+                  zIndex: 10,
+                  cursor: 'pointer',
+                  gap: '2px'
+                }}
+                title="Total comments in this building"
+              >
+                <span role="img" aria-label="comments">💬</span>
+                {commentCount}
+              </div>
+            )}
             {showMentionBubble && <MentionBubble hasMentions={hasMentions} />}
           </div>
         </Html>
