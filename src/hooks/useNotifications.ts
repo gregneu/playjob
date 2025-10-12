@@ -32,7 +32,7 @@ export function useNotifications({
 
     const loadProfileAliases = async () => {
       try {
-    const { data, error } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
@@ -62,7 +62,7 @@ export function useNotifications({
             addAlias(record.name)
           }
 
-          console.log('[useNotifications] profile aliases', { userId, aliases })
+          console.log('[useNotifications] profile aliases', JSON.stringify({ userId, aliases }, null, 2))
           setProfileAliases(aliases)
         }
       } catch (profileErr) {
@@ -185,10 +185,10 @@ export function useNotifications({
 
   useEffect(() => {
     try {
-      console.log('[useNotifications] notifications snapshot', {
+    console.log('[useNotifications] notifications snapshot', JSON.stringify({
         userId,
-        notificationsByBuilding: JSON.parse(JSON.stringify(notificationsByBuilding))
-      })
+        notificationsByBuilding: notificationsByBuilding
+      }, null, 2))
     } catch (err) {
       console.log('[useNotifications] notifications snapshot (serialization failed)', {
         userId,

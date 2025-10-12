@@ -4497,22 +4497,15 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             const assignmentCount = building ? getBuildingAssignmentCount(building.id) : 0
 
             if (building) {
-              try {
-                console.log('[HexGridSystem] building badge state', {
+              console.log('[HexGridSystem] building badge state', JSON.stringify({
                   buildingId: building.id,
                   buildingTitle: building.title,
                   zoneId: building.zone_id,
                   hasMentions,
                   assignmentCount,
-                  buildingNotifications: JSON.parse(JSON.stringify(buildingNotifications ?? null)),
-                  tickets: JSON.parse(JSON.stringify(ticketsByZoneObject[building.id] || []))
-                })
-              } catch (err) {
-                console.log('[HexGridSystem] building badge state (serialization failed)', {
-                  buildingId: building.id,
-                  error: err instanceof Error ? err.message : err
-                })
-              }
+                  buildingNotifications: buildingNotifications ?? null,
+                  tickets: ticketsByZoneObject[building.id] || []
+                }, null, 2))
             }
             
             // Debug mentions for zone centers
