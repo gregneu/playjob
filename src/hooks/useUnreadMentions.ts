@@ -96,6 +96,7 @@ export function useUnreadMentions(
         userEmail,
         userDisplayName,
         mentionTokens: normalizedTokens,
+        extraAliases,
         ticketCount: tickets.length
       })
       
@@ -137,9 +138,11 @@ export function useUnreadMentions(
         
         const unreadMentionComments = comments.filter((comment: any) => {
           const text = (comment.text || '').toString()
+          const normalizedText = text.toLowerCase()
           const isUnread = !readCommentIds.has(comment.id)
 
           const directMentionMatch = mentionRegexes.some((regex) => regex.test(text))
+          const simpleMentionMatch = normalizedTokens.some((token) => normalizedText.includes(`@${token}`))
           const list = resolveMentionList(comment.mentions || comment.mention_ids || comment.mentionIds)
           const listMentionMatch = list.some((value) => normalizedTokens.includes(value))
 
@@ -149,13 +152,17 @@ export function useUnreadMentions(
               commentId: comment.id,
               text,
               directMentionMatch,
+              simpleMentionMatch,
               listMentionMatch,
+              mentionRegexes: mentionRegexes.map((regex) => regex.toString()),
+              normalizedTokens,
+              list,
               isUnread,
               readCommentIds: Array.from(readCommentIds)
             })
           }
 
-          return isUnread && (directMentionMatch || listMentionMatch)
+          return isUnread && (directMentionMatch || simpleMentionMatch || listMentionMatch)
         })
         
         if (unreadMentionComments.length > 0) {

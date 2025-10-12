@@ -4495,6 +4495,18 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
               ? buildingHasUnreadMentions(building.id, ticketsByZoneObject[building.id] || [])
               : false)
             const assignmentCount = building ? getBuildingAssignmentCount(building.id) : 0
+
+            if (building) {
+              console.log('[HexGridSystem] building badge state', {
+                buildingId: building.id,
+                buildingTitle: building.title,
+                zoneId: building.zone_id,
+                hasMentions,
+                assignmentCount,
+                buildingNotifications,
+                tickets: ticketsByZoneObject[building.id]?.map((t) => ({ id: t.id, title: t.title }))
+              })
+            }
             
             // Debug mentions for zone centers
             if (isZoneCenterCell && building) {

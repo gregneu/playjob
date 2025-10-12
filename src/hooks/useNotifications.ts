@@ -32,7 +32,7 @@ export function useNotifications({
 
     const loadProfileAliases = async () => {
       try {
-        const { data, error } = await supabase
+    const { data, error } = await supabase
           .from('profiles')
           .select('display_name, full_name, username, handle, email, slug')
           .eq('id', userId)
@@ -60,6 +60,7 @@ export function useNotifications({
             addAlias((data as any).email)
           }
 
+          console.log('[useNotifications] profile aliases', { userId, aliases })
           setProfileAliases(aliases)
         }
       } catch (profileErr) {
@@ -177,9 +178,12 @@ export function useNotifications({
     // - Status changes
     // - Priority changes
     // - Checklist updates
-
     return result
   }, [tickets, unreadMentions, hasUnreadMentions, userId])
+
+  useEffect(() => {
+    console.log('[useNotifications] notifications snapshot', { notificationsByBuilding, userId })
+  }, [notificationsByBuilding, userId])
 
   // Check if a specific building has any unread notifications
   const buildingHasNotifications = useCallback((buildingId: string): boolean => {
