@@ -111,6 +111,11 @@ export function useNotifications({
       return result[buildingId]
     }
 
+    console.log('[useNotifications] tickets snapshot', JSON.stringify({
+      total: tickets.length,
+      ticketIds: tickets.map((t) => t?.id ?? null)
+    }, null, 2))
+
     // Process comment mentions
     tickets.forEach(ticket => {
       console.log('[useNotifications] processing ticket', JSON.stringify({
