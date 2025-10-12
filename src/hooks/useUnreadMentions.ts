@@ -171,6 +171,7 @@ export function useUnreadMentions(
         }
       })
       
+      console.log('📬 useUnreadMentions: unread map computed', JSON.parse(JSON.stringify(unreadMap)))
       setUnreadMentions(unreadMap)
     } catch (err) {
       console.error('❌ Exception loading unread mentions:', err)

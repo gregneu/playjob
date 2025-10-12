@@ -34,7 +34,7 @@ export function useNotifications({
       try {
     const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, full_name, username, handle, email, slug')
+          .select('*')
           .eq('id', userId)
           .maybeSingle()
 
@@ -44,20 +44,22 @@ export function useNotifications({
 
         if (!cancelled) {
           const aliases: string[] = []
-          const addAlias = (value?: string | null) => {
-            if (!value) return
-            const trimmed = value.toString().trim()
+          const addAlias = (value?: unknown) => {
+            if (typeof value !== 'string') return
+            const trimmed = value.trim()
             if (!trimmed) return
             aliases.push(trimmed)
           }
 
           if (data) {
-            addAlias((data as any).handle)
-            addAlias((data as any).username)
-            addAlias((data as any).display_name)
-            addAlias((data as any).full_name)
-            addAlias((data as any).slug)
-            addAlias((data as any).email)
+            const record = data as Record<string, unknown>
+            addAlias(record.handle)
+            addAlias(record.username)
+            addAlias(record.display_name)
+            addAlias(record.full_name)
+            addAlias(record.slug)
+            addAlias(record.email)
+            addAlias(record.name)
           }
 
           console.log('[useNotifications] profile aliases', { userId, aliases })
@@ -182,7 +184,17 @@ export function useNotifications({
   }, [tickets, unreadMentions, hasUnreadMentions, userId])
 
   useEffect(() => {
-    console.log('[useNotifications] notifications snapshot', { notificationsByBuilding, userId })
+    try {
+      console.log('[useNotifications] notifications snapshot', {
+        userId,
+        notificationsByBuilding: JSON.parse(JSON.stringify(notificationsByBuilding))
+      })
+    } catch (err) {
+      console.log('[useNotifications] notifications snapshot (serialization failed)', {
+        userId,
+        error: err instanceof Error ? err.message : err
+      })
+    }
   }, [notificationsByBuilding, userId])
 
   // Check if a specific building has any unread notifications
