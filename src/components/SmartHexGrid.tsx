@@ -36,6 +36,7 @@ interface HexGridProps {
   }>
   ticketsByZoneObject?: Record<string, any[]>
   notificationsByBuilding?: Record<string, BuildingNotifications>
+  buildingHasUnreadMentions?: (buildingId: string, ticketsByBuilding: any[]) => boolean
   // Новые пропсы для интерактивности
   isZoneMode?: boolean
   hoveredCell?: [number, number] | null
@@ -62,6 +63,7 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
   zoneCellData = [],
   ticketsByZoneObject = {},
   notificationsByBuilding = {},
+  buildingHasUnreadMentions,
   isZoneMode = false, 
   hoveredCell, 
   hoveredCellType, 
@@ -315,6 +317,9 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
         const badgeAnim = buildingId && badgeAnimationMap ? badgeAnimationMap[buildingId] : undefined
         const buildingNotifications = buildingId ? notificationsByBuilding[buildingId] ?? null : null
         const buildingTickets = buildingId ? (ticketsByZoneObject[buildingId] || []) : []
+        const mentionNotificationCount = Array.isArray(buildingNotifications?.notifications)
+          ? buildingNotifications.notifications.filter((notification) => notification.type === 'comment_mention').length
+          : 0
         const commentCountFromTickets = buildingTickets.reduce((count, ticket) => {
           if (!ticket) return count
           if (Array.isArray(ticket?.comments)) {
@@ -334,7 +339,19 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
           : 0
         const totalCommentCount = commentCountFromTickets > 0
           ? commentCountFromTickets
-          : commentCountFromNotifications
+          : (commentCountFromNotifications > 0 ? commentCountFromNotifications : mentionNotificationCount)
+        const hasUnreadMentions = buildingId && buildingTickets.length > 0 && buildingHasUnreadMentions
+          ? buildingHasUnreadMentions(buildingId, buildingTickets)
+          : false
+        const hasMentions = Boolean(
+          typeof buildingNotifications?.hasCommentMentions === 'boolean'
+            ? buildingNotifications.hasCommentMentions
+            : mentionNotificationCount > 0
+        ) || hasUnreadMentions || totalCommentCount > 0
+        const assignmentCount = buildingNotifications?.assignmentCount ??
+          (Array.isArray(buildingNotifications?.notifications)
+            ? buildingNotifications.notifications.filter((notification) => notification.type === 'assignment').length
+            : 0)
 
         return (
           <group key={`smart-${cell.q}-${cell.r}-${cell.state}-${cell.cellType}`}>
@@ -375,6 +392,8 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
               zoneName={showZoneNames ? (building?.title || zone?.name) : undefined}
               ticketCount={zoneTicketCount}
               commentCount={totalCommentCount}
+              hasMentions={hasMentions}
+              assignmentCount={assignmentCount}
               showStone={finalShouldShowStone}
               stoneSeed={stoneSeed}
               stoneCount={stoneCount}
