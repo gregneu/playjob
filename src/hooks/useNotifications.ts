@@ -122,7 +122,8 @@ export function useNotifications({
         ticketId: ticket?.id ?? null,
         zoneObjectId: ticket?.zone_object_id ?? null,
         title: ticket?.title ?? null,
-        hasComments: Array.isArray(ticket?.comments) ? ticket.comments.length : undefined
+        hasComments: Array.isArray(ticket?.comments) ? ticket.comments.length : undefined,
+        hasUnread: hasUnreadMentions(ticket?.id)
       }, null, 2))
       const buildingId = ticket.zone_object_id
       if (!buildingId) return
