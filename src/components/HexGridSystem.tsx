@@ -166,6 +166,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Track all notifications (mentions, status changes, etc.)
   const { 
     notificationsByBuilding,
+    buildingHasUnreadMentions,
     reload: reloadNotifications 
   } = useNotifications({
     projectId,
@@ -4499,11 +4500,14 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
               return count + comments
             }, 0)
             const hasAnyComments = totalCommentCount > 0
+            const hasUnreadMentions = building && buildingTickets.length > 0
+              ? buildingHasUnreadMentions(building.id, buildingTickets)
+              : false
             const hasMentions = Boolean(
               typeof buildingNotifications?.hasCommentMentions === 'boolean'
                 ? buildingNotifications.hasCommentMentions
                 : mentionNotificationExists
-            ) || hasAnyComments
+            ) || hasUnreadMentions || hasAnyComments
             const assignmentCount = buildingNotifications?.assignmentCount ??
               (Array.isArray(buildingNotifications?.notifications)
                 ? buildingNotifications.notifications.filter((notification) => notification.type === 'assignment').length
