@@ -165,8 +165,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Track all notifications (mentions, status changes, etc.)
   const { 
-    getBuildingAssignmentCount,
-    buildingHasUnreadMentions, // Legacy compatibility
     notificationsByBuilding,
     reload: reloadNotifications 
   } = useNotifications({
@@ -4490,11 +4488,9 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             const zoneTicketCount = building ? (ticketsByZoneObject[building.id] || []).length : 0
 
             // Check notification data for this building
-            const buildingNotifications = building ? notificationsByBuilding[building.id] : null
-            const hasMentions = buildingNotifications?.hasCommentMentions ?? (building
-              ? buildingHasUnreadMentions(building.id, ticketsByZoneObject[building.id] || [])
-              : false)
-            const assignmentCount = building ? getBuildingAssignmentCount(building.id) : 0
+            const buildingNotifications = building ? notificationsByBuilding[building.id] ?? null : null
+            const hasMentions = Boolean(buildingNotifications?.hasCommentMentions)
+            const assignmentCount = buildingNotifications?.assignmentCount ?? 0
 
             if (building) {
               console.log('[HexGridSystem] building badge state', JSON.stringify({
