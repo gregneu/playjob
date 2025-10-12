@@ -113,6 +113,12 @@ export function useNotifications({
 
     // Process comment mentions
     tickets.forEach(ticket => {
+      console.log('[useNotifications] processing ticket', JSON.stringify({
+        ticketId: ticket?.id ?? null,
+        zoneObjectId: ticket?.zone_object_id ?? null,
+        title: ticket?.title ?? null,
+        hasComments: Array.isArray(ticket?.comments) ? ticket.comments.length : undefined
+      }, null, 2))
       const buildingId = ticket.zone_object_id
       if (!buildingId) return
 
