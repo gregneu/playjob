@@ -7,8 +7,6 @@ import { Html } from '@react-three/drei'
 import { Stones, getStoneColorTint } from './Stones'
 import { Trees, getTreeColorTint } from './Trees'
 import BuildingProgressBubble from './BuildingProgressBubble'
-import MentionBubble from './MentionBubble'
-import AssignmentBubble from './AssignmentBubble'
 
 export const HexCellState = {
   DEFAULT: 'default',
@@ -143,9 +141,31 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   }, [ticketBadgeAnimation])
   const badgeDomKey = ticketBadgeAnimationKey != null ? `badge-${ticketBadgeAnimationKey}` : 'badge-default'
   const showTicketBubble = ticketCount > 0
-  const showCommentBubble = commentCount > 0
-  const showMentionBubble = hasMentions
-  const showAssignmentBubble = assignmentCount > 0
+  const showCommentNotification = commentCount > 0
+  const showAssignmentNotification = (assignmentCount ?? 0) > 0
+  const notificationItems: Array<{ key: string; icon: string; count: number; showCount: boolean }> = useMemo(() => {
+    const items: Array<{ key: string; icon: string; count: number; showCount: boolean }> = []
+    if (showCommentNotification) {
+      const safeCount = typeof commentCount === 'number' ? commentCount : 0
+      items.push({
+        key: 'comments',
+        icon: '/icons/stash_comments-solid.svg',
+        count: safeCount,
+        showCount: safeCount > 1
+      })
+    }
+    if (showAssignmentNotification) {
+      const safeCount = typeof assignmentCount === 'number' ? assignmentCount : 0
+      items.push({
+        key: 'assignments',
+        icon: '/icons/my_new_ticket.svg',
+        count: safeCount,
+        showCount: safeCount > 1
+      })
+    }
+    return items
+  }, [showCommentNotification, showAssignmentNotification, commentCount, assignmentCount])
+  const showNotificationPanel = notificationItems.length > 0
 
   useEffect(() => {
     if (isZoneCenter) {
@@ -158,12 +178,25 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
         hasMentions,
         assignmentCount,
         showTicketBubble,
-        showCommentBubble,
-        showMentionBubble,
-        showAssignmentBubble
+        showCommentNotification,
+        showAssignmentNotification,
+        showNotificationPanel
       }, null, 2))
     }
-  }, [isZoneCenter, q, r, zoneObject?.id, ticketCount, commentCount, hasMentions, assignmentCount, showTicketBubble, showCommentBubble, showMentionBubble, showAssignmentBubble])
+  }, [
+    isZoneCenter,
+    q,
+    r,
+    zoneObject?.id,
+    ticketCount,
+    commentCount,
+    hasMentions,
+    assignmentCount,
+    showTicketBubble,
+    showCommentNotification,
+    showAssignmentNotification,
+    showNotificationPanel
+  ])
   
   // Регистрируем mesh для hover detection
   useEffect(() => {
@@ -640,7 +673,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
       )}
 
       {/* Bubble с уведомлениями и количеством тикетов - по центру здания */}
-      {isZoneCenter && !isSprintObject && (showTicketBubble || showMentionBubble || showAssignmentBubble) && (
+      {isZoneCenter && !isSprintObject && (showTicketBubble || showNotificationPanel) && (
         <Html key={badgeDomKey} position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div
             style={{
@@ -676,76 +709,96 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
                 {ticketCount}
               </div>
             )}
-            {showCommentBubble && (
+            {showNotificationPanel && (
               <div
-                className="ticket-badge comment-badge"
                 style={{
-                  background: '#F97316',
-                  color: 'white',
-                  borderRadius: '50%',
-                  minWidth: '20px',
-                  minHeight: '20px',
-                  padding: '0 4px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: '10px',
+                  padding: '3px 10px',
+                  borderRadius: '999px',
+                  background: 'rgba(27, 27, 36, 0.86)',
+                  color: '#FFFFFF',
                   fontSize: '10px',
-                  fontWeight: '600',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                  border: '2px solid white',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
                   pointerEvents: 'auto',
                   zIndex: 10,
-                  cursor: 'pointer',
-                  gap: '2px'
+                  height: '24px',
+                  lineHeight: 1
                 }}
-                title="Total comments in this building"
               >
-                <span role="img" aria-label="comments">💬</span>
-                {commentCount}
+                {notificationItems.map(item => (
+                  <div
+                    key={item.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: item.showCount ? 4 : 0
+                    }}
+                  >
+                    <img
+                      src={item.icon}
+                      alt={item.key}
+                      style={{ width: 14, height: 14 }}
+                    />
+                    {item.showCount && <span>{item.count}</span>}
+                  </div>
+                ))}
               </div>
             )}
-            {showAssignmentBubble && <AssignmentBubble count={assignmentCount} />}
-            {showMentionBubble && <MentionBubble hasMentions={hasMentions} />}
           </div>
         </Html>
       )}
 
-      {isZoneCenter && isSprintObject && ((sprintProgress && sprintProgress.total > 0) || showMentionBubble || showAssignmentBubble) && (
+      {isZoneCenter && isSprintObject && ((sprintProgress && sprintProgress.total > 0) || showNotificationPanel) && (
         <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {sprintProgress && sprintProgress.total > 0 && (
               <BuildingProgressBubble total={sprintProgress.total} done={sprintProgress.done} />
             )}
-            {showAssignmentBubble && <AssignmentBubble count={assignmentCount} />}
-            {showCommentBubble && (
+            {showNotificationPanel && (
               <div
-                className="ticket-badge comment-badge"
                 style={{
-                  background: '#F97316',
-                  color: 'white',
-                  borderRadius: '50%',
-                  minWidth: '20px',
-                  minHeight: '20px',
-                  padding: '0 4px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: '10px',
+                  padding: '3px 10px',
+                  borderRadius: '999px',
+                  background: 'rgba(27, 27, 36, 0.86)',
+                  color: '#FFFFFF',
                   fontSize: '10px',
-                  fontWeight: '600',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                  border: '2px solid white',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
                   pointerEvents: 'auto',
                   zIndex: 10,
-                  cursor: 'pointer',
-                  gap: '2px'
+                  height: '24px',
+                  lineHeight: 1
                 }}
-                title="Total comments in this building"
               >
-                <span role="img" aria-label="comments">💬</span>
-                {commentCount}
+                {notificationItems.map(item => (
+                  <div
+                    key={item.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: item.showCount ? 4 : 0
+                    }}
+                  >
+                    <img
+                      src={item.icon}
+                      alt={item.key}
+                      style={{ width: 14, height: 14 }}
+                    />
+                    {item.showCount && <span>{item.count}</span>}
+                  </div>
+                ))}
               </div>
             )}
-            {showMentionBubble && <MentionBubble hasMentions={hasMentions} />}
           </div>
         </Html>
       )}
