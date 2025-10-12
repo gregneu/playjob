@@ -196,10 +196,11 @@ export function useNotifications({
   }, [tickets, unreadMentions, hasUnreadMentions, userId])
 
   useEffect(() => {
+    console.log('[useNotifications] notifications snapshot raw', { userId, notificationsByBuilding })
     try {
-    console.log('[useNotifications] notifications snapshot', JSON.stringify({
+      console.log('[useNotifications] notifications snapshot', JSON.stringify({
         userId,
-        notificationsByBuilding: notificationsByBuilding
+        notificationsByBuilding
       }, null, 2))
     } catch (err) {
       console.log('[useNotifications] notifications snapshot (serialization failed)', {
