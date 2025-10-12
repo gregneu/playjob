@@ -32,6 +32,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
   }, [project.id])
   
   const { user } = useAuth()
+  const [notificationSummary, setNotificationSummary] = useState<{ unread: number; mentions: number; assignments: number }>({ unread: 0, mentions: 0, assignments: 0 })
 
   // Обновляем количество назначенных тикетов при изменении назначений
   React.useEffect(() => {
@@ -77,6 +78,17 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
     document.title = title
     console.log('📝 Updated page title:', title)
   }, [assignedTicketsCount, project.name])
+
+  React.useEffect(() => {
+    const listener = (event: Event) => {
+      const detail = (event as CustomEvent<{ unread: number; mentions: number; assignments: number }>).detail
+      if (!detail) return
+      setNotificationSummary(detail)
+    }
+
+    window.addEventListener('notifications-summary', listener as EventListener)
+    return () => window.removeEventListener('notifications-summary', listener as EventListener)
+  }, [])
 
   // Загружаем участников проекта и количество назначенных тикетов
   React.useEffect(() => {
@@ -241,7 +253,32 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
 
       {/* Centered user avatar in header */}
       <div style={{ position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)', zIndex: 110 }}>
-        <UserAvatar userId={user?.id} userName={user?.user_metadata?.full_name || user?.email} size={56} showName={false} />
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <UserAvatar userId={user?.id} userName={user?.user_metadata?.full_name || user?.email} size={56} showName={false} />
+          {notificationSummary.unread > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '-6px',
+                right: '-6px',
+                minWidth: '20px',
+                height: '20px',
+                padding: '0 6px',
+                borderRadius: '999px',
+                background: '#EF4444',
+                color: '#FFFFFF',
+                fontSize: '12px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
+              }}
+            >
+              {notificationSummary.unread > 99 ? '99+' : notificationSummary.unread}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Share Modal */}

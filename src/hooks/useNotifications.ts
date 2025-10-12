@@ -210,6 +210,26 @@ export function useNotifications({
         error: err instanceof Error ? err.message : err
       })
     }
+
+    try {
+      const totals = Object.values(notificationsByBuilding || {}).reduce(
+        (acc, entry) => {
+          const mentionCount = entry.notifications.filter((n) => n.type === 'comment_mention').length
+          const assignmentCount = entry.notifications.filter((n) => n.type === 'assignment').length
+          acc.unread += entry.unreadCount || 0
+          acc.mentions += mentionCount
+          acc.assignments += assignmentCount
+          return acc
+        },
+        { unread: 0, mentions: 0, assignments: 0 }
+      )
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('notifications-summary', { detail: totals }))
+      }
+    } catch (err) {
+      console.warn('[useNotifications] Failed to dispatch notifications summary', err)
+    }
   }, [notificationsByBuilding, userId])
 
   // Check if a specific building has any unread notifications
