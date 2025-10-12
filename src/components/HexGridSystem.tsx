@@ -4489,14 +4489,21 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
 
             // Check notification data for this building
             const buildingNotifications = building ? notificationsByBuilding[building.id] ?? null : null
-            const mentionNotificationExists = Array.isArray(buildingNotifications?.notifications)
-              ? buildingNotifications.notifications.some((notification) => notification.type === 'comment_mention')
-              : false
+            const buildingTickets = building ? (ticketsByZoneObject[building.id] || []) : []
+            const mentionNotificationCount = Array.isArray(buildingNotifications?.notifications)
+              ? buildingNotifications.notifications.filter((notification) => notification.type === 'comment_mention').length
+              : 0
+            const mentionNotificationExists = mentionNotificationCount > 0
+            const totalCommentCount = buildingTickets.reduce((count, ticket) => {
+              const comments = Array.isArray(ticket?.comments) ? ticket.comments.length : 0
+              return count + comments
+            }, 0)
+            const hasAnyComments = totalCommentCount > 0
             const hasMentions = Boolean(
               typeof buildingNotifications?.hasCommentMentions === 'boolean'
                 ? buildingNotifications.hasCommentMentions
                 : mentionNotificationExists
-            )
+            ) || hasAnyComments
             const assignmentCount = buildingNotifications?.assignmentCount ??
               (Array.isArray(buildingNotifications?.notifications)
                 ? buildingNotifications.notifications.filter((notification) => notification.type === 'assignment').length

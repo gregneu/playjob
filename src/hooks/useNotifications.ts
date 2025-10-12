@@ -192,24 +192,15 @@ export function useNotifications({
 
     Object.values(result).forEach((entry) => {
       const notifications = Array.isArray(entry.notifications) ? entry.notifications : []
+      const mentionCount = notifications.filter((notification) => notification.type === 'comment_mention').length
+      const assignmentCount = notifications.filter((notification) => notification.type === 'assignment').length
+      const unreadNotificationCount = notifications.filter((notification) => notification.read === false).length
 
-      if (typeof entry.hasCommentMentions !== 'boolean') {
-        entry.hasCommentMentions = notifications.some((notification) => notification.type === 'comment_mention')
-      }
-
-      if (typeof entry.hasAssignments !== 'boolean') {
-        entry.hasAssignments = notifications.some((notification) => notification.type === 'assignment')
-      }
-
-      if (entry.assignmentCount == null) {
-        entry.assignmentCount = notifications.filter((notification) => notification.type === 'assignment').length
-      }
-
-      if ((entry.unreadCount == null || entry.unreadCount === 0) && notifications.length > 0) {
-        const unreadNotificationCount = notifications.filter((notification) => notification.read === false).length
-        if (unreadNotificationCount > 0) {
-          entry.unreadCount = unreadNotificationCount
-        }
+      entry.hasCommentMentions = mentionCount > 0
+      entry.hasAssignments = assignmentCount > 0
+      entry.assignmentCount = assignmentCount
+      if (notifications.length > 0) {
+        entry.unreadCount = unreadNotificationCount
       }
     })
 
