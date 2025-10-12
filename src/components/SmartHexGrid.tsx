@@ -5,6 +5,7 @@ import * as THREE from 'three'
 // import { HexFillComponent } from './buildings/HexFillComponent'
 import { hexToWorldPosition } from '../lib/hex-utils'
 // import { useZoneHexFilling } from '../hooks/useZoneHexFilling'
+import type { BuildingNotifications } from '../types/notifications'
 
 interface HexGridProps {
   zones: Array<{
@@ -34,6 +35,7 @@ interface HexGridProps {
     r: number
   }>
   ticketsByZoneObject?: Record<string, any[]>
+  notificationsByBuilding?: Record<string, BuildingNotifications>
   // Новые пропсы для интерактивности
   isZoneMode?: boolean
   hoveredCell?: [number, number] | null
@@ -59,6 +61,7 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
   zoneData = [],
   zoneCellData = [],
   ticketsByZoneObject = {},
+  notificationsByBuilding = {},
   isZoneMode = false, 
   hoveredCell, 
   hoveredCellType, 
@@ -310,6 +313,28 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
         const buildingId = building?.id ?? null
         const pulse = buildingId && energyPulseMap ? energyPulseMap[buildingId] : undefined
         const badgeAnim = buildingId && badgeAnimationMap ? badgeAnimationMap[buildingId] : undefined
+        const buildingNotifications = buildingId ? notificationsByBuilding[buildingId] ?? null : null
+        const buildingTickets = buildingId ? (ticketsByZoneObject[buildingId] || []) : []
+        const commentCountFromTickets = buildingTickets.reduce((count, ticket) => {
+          if (!ticket) return count
+          if (Array.isArray(ticket?.comments)) {
+            return count + ticket.comments.length
+          }
+          const fallbackFields = [
+            (ticket as any)?.commentCount,
+            (ticket as any)?.comment_count,
+            (ticket as any)?.comments_count,
+            (ticket as any)?.comment_counts
+          ]
+          const fallbackValue = fallbackFields.find((value) => typeof value === 'number' && Number.isFinite(value))
+          return count + (fallbackValue ? Number(fallbackValue) : 0)
+        }, 0)
+        const commentCountFromNotifications = typeof buildingNotifications?.commentCount === 'number'
+          ? buildingNotifications.commentCount
+          : 0
+        const totalCommentCount = commentCountFromTickets > 0
+          ? commentCountFromTickets
+          : commentCountFromNotifications
 
         return (
           <group key={`smart-${cell.q}-${cell.r}-${cell.state}-${cell.cellType}`}>
@@ -349,7 +374,7 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
               } : null}
               zoneName={showZoneNames ? (building?.title || zone?.name) : undefined}
               ticketCount={zoneTicketCount}
-              commentCount={0}
+              commentCount={totalCommentCount}
               showStone={finalShouldShowStone}
               stoneSeed={stoneSeed}
               stoneCount={stoneCount}

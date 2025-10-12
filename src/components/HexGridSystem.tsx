@@ -4440,6 +4440,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             })}
             zoneObjects={zoneObjects}
             ticketsByZoneObject={ticketsByZoneObject}
+            notificationsByBuilding={notificationsByBuilding}
             isZoneMode={false}
             hoveredCell={hoveredCell}
             hoveredCellType={hoveredCellType}
