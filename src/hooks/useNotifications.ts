@@ -105,7 +105,8 @@ export function useNotifications({
           notifications: [],
           hasCommentMentions: false,
           hasAssignments: false,
-          assignmentCount: 0
+          assignmentCount: 0,
+          commentCount: 0
         }
       }
       return result[buildingId]
@@ -127,6 +128,8 @@ export function useNotifications({
       }, null, 2))
       const buildingId = ticket.zone_object_id
       if (!buildingId) return
+
+      const commentCount = Array.isArray(ticket?.comments) ? ticket.comments.length : 0
 
       const hasCommentMentions = hasUnreadMentions(ticket.id)
       
@@ -186,6 +189,11 @@ export function useNotifications({
           })
         }
       }
+
+      if (commentCount > 0) {
+        const entry = ensureEntry(buildingId)
+        entry.commentCount = (entry.commentCount ?? 0) + commentCount
+      }
     })
 
     console.log('[useNotifications] result keys', Object.keys(result))
@@ -199,6 +207,9 @@ export function useNotifications({
       entry.hasCommentMentions = mentionCount > 0
       entry.hasAssignments = assignmentCount > 0
       entry.assignmentCount = assignmentCount
+      if (entry.commentCount == null) {
+        entry.commentCount = 0
+      }
       if (notifications.length > 0) {
         entry.unreadCount = unreadNotificationCount
       }

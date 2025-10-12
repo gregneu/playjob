@@ -48,5 +48,6 @@ export interface BuildingNotifications {
   hasCommentMentions: boolean
   hasAssignments: boolean
   assignmentCount: number
+  commentCount?: number
   // Future: hasStatusChanges, hasAssignments, etc.
 }

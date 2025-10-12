@@ -4509,7 +4509,14 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
               const fallbackValue = fallbackFields.find((value) => typeof value === 'number' && Number.isFinite(value))
               return count + (fallbackValue ? Number(fallbackValue) : 0)
             }, 0)
-            const totalCommentCount = commentCountFromTickets > 0 ? commentCountFromTickets : mentionNotificationCount
+            const commentCountFromNotifications = typeof buildingNotifications?.commentCount === 'number'
+              ? buildingNotifications.commentCount
+              : 0
+            const totalCommentCount = (() => {
+              if (commentCountFromTickets > 0) return commentCountFromTickets
+              if (commentCountFromNotifications > 0) return commentCountFromNotifications
+              return mentionNotificationCount
+            })()
             const hasAnyComments = totalCommentCount > 0
             const hasUnreadMentions = building && buildingTickets.length > 0
               ? buildingHasUnreadMentions(building.id, buildingTickets)
@@ -4530,7 +4537,8 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
                 title: building.title,
                 hasMentions,
                 assignmentCount,
-                unreadCount: buildingNotifications.unreadCount
+                unreadCount: buildingNotifications.unreadCount,
+                commentCountFromNotifications
               })
             }
 
@@ -4541,6 +4549,9 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
                   zoneId: building.zone_id,
                   hasMentions,
                   assignmentCount,
+                  commentCountFromTickets,
+                  commentCountFromNotifications,
+                  totalCommentCount,
                   buildingNotifications: buildingNotifications ?? null,
                   tickets: ticketsByZoneObject[building.id] || []
                 }, null, 2))
