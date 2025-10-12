@@ -188,6 +188,8 @@ export function useNotifications({
       }
     })
 
+    console.log('[useNotifications] result keys', Object.keys(result))
+
     // Future: Process other notification types here
     // - Status changes
     // - Priority changes
