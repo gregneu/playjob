@@ -143,6 +143,22 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   const showTicketBubble = ticketCount > 0
   const showMentionBubble = hasMentions
   const showAssignmentBubble = assignmentCount > 0
+
+  useEffect(() => {
+    if (isZoneCenter) {
+      console.log('[UnifiedHexCell] badge flags', JSON.stringify({
+        q,
+        r,
+        zoneObjectId: zoneObject?.id ?? null,
+        ticketCount,
+        hasMentions,
+        assignmentCount,
+        showTicketBubble,
+        showMentionBubble,
+        showAssignmentBubble
+      }, null, 2))
+    }
+  }, [isZoneCenter, q, r, zoneObject?.id, ticketCount, hasMentions, assignmentCount, showTicketBubble, showMentionBubble, showAssignmentBubble])
   
   // Регистрируем mesh для hover detection
   useEffect(() => {
