@@ -179,6 +179,26 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       user?.email || null
   })
 
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
+
   // Current user id for user-scoped counters (теперь не используется, так как имена рендерятся в UnifiedHexCell)
   // const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   
@@ -1267,6 +1287,26 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       }
     })
 
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
+
     console.log(`Created ${initialCells.length} cells for display`)
     setGridCells(initialCells)
   }, [loading, hexCells, getBuildingForCell, getZoneForCell, localBuildings, localZones])
@@ -1553,6 +1593,26 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         assignee_id: objectData.assignee_id ?? null
       })
 
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
+
       if (ticket) {
         console.log('Ticket created:', ticket)
         // Ничего не перезагружаем — тикет уже добавлен в локальный state и сразу появится в сайдбаре
@@ -1715,6 +1775,26 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           q: centerQ,
           r: centerR
         })
+
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
 
         if (centerObject) {
           console.log('Created center object:', centerObject)
@@ -1984,6 +2064,26 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       return updatedZones
     })
 
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
+
     // Принудительно обновляем hover состояние для этой ячейки
     setHoveredCell(null)
     // setHoveredZoneColor(null)
@@ -2060,6 +2160,26 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       console.log('Updated local zones:', updatedZones)
       return updatedZones
     })
+
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
 
     // Принудительно перегенерируем сетку для полного перерендера
     const gridHexCells = generateHexGrid(12)
@@ -3165,6 +3285,26 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
         doneTicketIds: doneIds
       })
 
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
+
       if (activated) {
         setIsSprintStarted(true)
         setActiveSprintId(activated.id || activeSprintId)
@@ -3224,6 +3364,26 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
         doneTicketIds: doneIds,
         zoneObjectId: sprintObjectId
       })
+
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
 
       if (doneIds.length > 0) {
         try {
@@ -3538,6 +3698,26 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
       const [q, r] = cell.split(',').map(Number)
       return [q, r]
     })
+
+const selectedTicketNotifications = useMemo(() => {
+    if (!selectedZoneObject) return {} as Record<string, { commentCount: number; assignmentCount: number }>
+    const buildingNotif = notificationsByBuilding[selectedZoneObject.id] || null
+    if (!buildingNotif) return {}
+    const summary: Record<string, { commentCount: number; assignmentCount: number }> = {}
+    for (const notification of buildingNotif.notifications || []) {
+      const ticketId = notification.ticketId
+      if (!ticketId) continue
+      if (!summary[ticketId]) {
+        summary[ticketId] = { commentCount: 0, assignmentCount: 0 }
+      }
+      if (notification.type === 'comment_mention') {
+        summary[ticketId].commentCount += 1
+      } else if (notification.type === 'assignment') {
+        summary[ticketId].assignmentCount += 1
+      }
+    }
+    return summary
+  }, [selectedZoneObject?.id, notificationsByBuilding])
 
     const newZone: ZoneMarking = {
       id: `zone-${Date.now()}`,
@@ -5073,6 +5253,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
         sprintName={sprintName}
         sprintNames={activeSprintNames}
         sprintLabelByTicketId={plannedTicketNames}
+        ticketNotifications={selectedTicketNotifications}
         onSprintBadgeClick={(sprintId) => {
           console.log('HexGridSystem onSprintBadgeClick called with sprintId:', sprintId)
           

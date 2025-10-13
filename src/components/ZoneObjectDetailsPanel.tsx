@@ -54,7 +54,9 @@ interface ZoneObjectDetailsPanelProps {
   sprintLabelByTicketId?: Record<string, string>
   onSprintBadgeClick?: (sprintId: string) => void
   side?: 'left' | 'right'
+  ticketNotifications?: Record<string, { commentCount: number; assignmentCount: number }>
 }
+
 
 export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
   isOpen,
@@ -70,7 +72,8 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
   sprintNames,
   sprintLabelByTicketId,
   onSprintBadgeClick,
-  side = 'right'
+  side = 'right',
+  ticketNotifications = {}
 }) => {
   // const { user } = useAuth()
   
@@ -810,6 +813,8 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
                     assigneeId={t.assignee_id || t.created_by}
                     assigneeName={t.assignee}
                     draggable={true}
+                    unreadCommentCount={(ticketNotifications[t.id]?.commentCount) || 0}
+                    unseenAssignmentCount={(ticketNotifications[t.id]?.assignmentCount) || 0}
                     onClick={(e: React.MouseEvent<HTMLDivElement>) => {
                       if (onOpenTicket) {
                         // Получаем позицию тикета для smart анимации
