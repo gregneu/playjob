@@ -74,112 +74,115 @@ export const TicketCard: React.FC<TicketCardProps> = ({
 }) => {
   // ДОБАВЛЯЕМ ЛОГИРОВАНИЕ ПРИ РЕНДЕРЕ
   console.log('🎨 TicketCard: RENDERING ticket:', id, title, 'draggable:', draggable)
-  
 
-const hasCommentUpdate = (unreadCommentCount ?? 0) > 0
-const hasAssignmentUpdate = (unseenAssignmentCount ?? 0) > 0
-const hasUpdates = hasCommentUpdate || hasAssignmentUpdate
-const notificationStyleTag = useMemo(() => (
-  `<style>
-    .ticket-card { overflow: visible; position: relative; }
-    .ticket-card--updates::before,
-    .ticket-card--updates::after {
-      content: '';
-      position: absolute;
-      inset: -8px;
-      border-radius: 24px;
-      pointer-events: none;
-      opacity: 0;
-    }
-    .ticket-card--updates::before {
-      background: radial-gradient(circle, rgba(68, 132, 255, 0.32) 0%, rgba(68, 132, 255, 0) 70%);
-      animation: ticket-card-wave 2.6s ease-out infinite;
-    }
-    .ticket-card--updates::after {
-      border: 2px solid rgba(68, 132, 255, 0.4);
-      inset: -12px;
-      animation: ticket-card-wave 2.6s ease-out infinite;
-      animation-delay: 0.45s;
-    }
-    @keyframes ticket-card-wave {
-      0% { opacity: 0; transform: scale(0.92); }
-      18% { opacity: 0.55; transform: scale(1); }
-      60% { opacity: 0.2; transform: scale(1.1); }
-      100% { opacity: 0; transform: scale(1.18); }
-    }
-    .ticket-card-avatar {
-      flex: 1;
-      min-width: 0;
-    }
-    .ticket-card-avatar span {
-      max-width: 110px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: block;
-    }
-    .notification-icon {
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
-      transform-origin: center;
-    }
-    .notification-icon--comment {
-      animation: notification-comment-pulse 1.8s ease-in-out infinite;
-    }
-    .notification-icon--assignment {
-      animation: notification-assignment-pulse 1.8s ease-in-out infinite;
-      animation-delay: 0.4s;
-    }
-    @keyframes notification-comment-pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.32); opacity: 0.78; }
-    }
-    @keyframes notification-assignment-pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.32); opacity: 0.78; }
-    }
-  </style>`
-), [])
-
-const updateIndicators: React.ReactNode[] = []
-if (hasCommentUpdate) {
-  updateIndicators.push(
-    <div
-      key="comment"
-      style={{ display: 'flex', alignItems: 'center', gap: unreadCommentCount > 1 ? 4 : 0 }}
-    >
-      <img
-        src="/icons/stash_comments-solid.svg"
-        alt="comment updates"
-        style={{ width: 16, height: 16 }}
-        className="notification-icon notification-icon--comment"
-      />
-      {unreadCommentCount > 1 && (
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}>{unreadCommentCount}</span>
-      )}
-    </div>
-  )
-}
-if (hasAssignmentUpdate) {
-  updateIndicators.push(
-    <div
-      key="assignment"
-      style={{ display: 'flex', alignItems: 'center', gap: unseenAssignmentCount > 1 ? 4 : 0 }}
-    >
-      <img
-        src="/icons/my_new_ticket.svg"
-        alt="assignment updates"
-        style={{ width: 16, height: 16 }}
-        className="notification-icon notification-icon--assignment"
-      />
-      {unseenAssignmentCount > 1 && (
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}>{unseenAssignmentCount}</span>
-      )}
-    </div>
-  )
-}
-
-const cardClassName = hasUpdates ? 'ticket-card ticket-card--updates' : 'ticket-card'
   const priorityLabel = getPriorityLabel(priority)
+  const hasCommentUpdate = (unreadCommentCount ?? 0) > 0
+  const hasAssignmentUpdate = (unseenAssignmentCount ?? 0) > 0
+  const hasUpdates = hasCommentUpdate || hasAssignmentUpdate
+
+  const notificationStyleTag = useMemo(() => (
+    `<style>
+      .ticket-card { overflow: visible; position: relative; }
+      .ticket-card--updates::before,
+      .ticket-card--updates::after {
+        content: '';
+        position: absolute;
+        inset: -8px;
+        border-radius: 24px;
+        pointer-events: none;
+        opacity: 0;
+      }
+      .ticket-card--updates::before {
+        background: radial-gradient(circle, rgba(68, 132, 255, 0.32) 0%, rgba(68, 132, 255, 0) 70%);
+        animation: ticket-card-wave 2.6s ease-out infinite;
+      }
+      .ticket-card--updates::after {
+        border: 2px solid rgba(68, 132, 255, 0.4);
+        inset: -12px;
+        animation: ticket-card-wave 2.6s ease-out infinite;
+        animation-delay: 0.45s;
+      }
+      @keyframes ticket-card-wave {
+        0% { opacity: 0; transform: scale(0.92); }
+        18% { opacity: 0.55; transform: scale(1); }
+        60% { opacity: 0.2; transform: scale(1.1); }
+        100% { opacity: 0; transform: scale(1.18); }
+      }
+      .ticket-card-avatar {
+        flex: 1;
+        min-width: 0;
+      }
+      .ticket-card-avatar span {
+        max-width: 110px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+      }
+      .notification-icon {
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+        transform-origin: center;
+      }
+      .notification-icon--comment {
+        animation: notification-comment-pulse 1.8s ease-in-out infinite;
+      }
+      .notification-icon--assignment {
+        animation: notification-assignment-pulse 1.8s ease-in-out infinite;
+        animation-delay: 0.4s;
+      }
+      @keyframes notification-comment-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.32); opacity: 0.78; }
+      }
+      @keyframes notification-assignment-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.32); opacity: 0.78; }
+      }
+    </style>`
+  ), [])
+
+  const updateIndicators: React.ReactNode[] = useMemo(() => {
+    const indicators: React.ReactNode[] = []
+    if (hasCommentUpdate) {
+      indicators.push((
+        <div
+          key="comment"
+          style={{ display: 'flex', alignItems: 'center', gap: unreadCommentCount > 1 ? 4 : 0 }}
+        >
+          <img
+            src="/icons/stash_comments-solid.svg"
+            alt="comment updates"
+            style={{ width: 16, height: 16 }}
+            className="notification-icon notification-icon--comment"
+          />
+          {unreadCommentCount > 1 && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}>{unreadCommentCount}</span>
+          )}
+        </div>
+      ))
+    }
+    if (hasAssignmentUpdate) {
+      indicators.push((
+        <div
+          key="assignment"
+          style={{ display: 'flex', alignItems: 'center', gap: unseenAssignmentCount > 1 ? 4 : 0 }}
+        >
+          <img
+            src="/icons/my_new_ticket.svg"
+            alt="assignment updates"
+            style={{ width: 16, height: 16 }}
+            className="notification-icon notification-icon--assignment"
+          />
+          {unseenAssignmentCount > 1 && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}>{unseenAssignmentCount}</span>
+          )}
+        </div>
+      ))
+    }
+    return indicators
+  }, [hasCommentUpdate, hasAssignmentUpdate, unreadCommentCount, unseenAssignmentCount])
+
+  const cardClassName = hasUpdates ? 'ticket-card ticket-card--updates' : 'ticket-card'
   const cardRef = useRef<HTMLDivElement>(null)
   const [mouseHover, setMouseHover] = useState(false)
   const isClickable = Boolean(onClick)
@@ -378,7 +381,7 @@ const cardClassName = hasUpdates ? 'ticket-card ticket-card--updates' : 'ticket-
         willChange: 'transform'
       } as React.CSSProperties}
     >
-      <span dangerouslySetInnerHTML={{ __html: notificationStyleTag }} style={{ display: 'none' }} />
+      {hasUpdates && <span dangerouslySetInnerHTML={{ __html: notificationStyleTag }} style={{ display: 'none' }} />}
       {/* Done badge */}
       {isDone && !statusBadge && (
         <div style={{
@@ -487,9 +490,13 @@ const cardClassName = hasUpdates ? 'ticket-card ticket-card--updates' : 'ticket-
         }}>{title}</div>
       </div>
       {/* Footer: assignee */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ flex: 1, minWidth: 0 }}><UserAvatar userId={assigneeId || null} userName={assigneeName || undefined} size={28} showName={true} className="ticket-card-avatar" /></div>
-        <div />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex' }}><UserAvatar userId={assigneeId || null} userName={assigneeName || undefined} size={28} showName={true} className="ticket-card-avatar" /></div>
+        {updateIndicators.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {updateIndicators}
+          </div>
+        )}
       </div>
     </div>
   )
