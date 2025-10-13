@@ -1018,10 +1018,11 @@ export const sprintService = {
     const nowIso = new Date().toISOString()
 
     try {
+      const client = supabaseService ?? supabase
       let targetId = sprintId
 
       if (!targetId && projectId && zoneObjectId) {
-        const { data: existing, error: existingError } = await supabase
+        const { data: existing, error: existingError } = await client
           .from('sprints')
           .select('*')
           .eq('project_id', projectId)
@@ -1059,7 +1060,7 @@ export const sprintService = {
         }
         if (zoneObjectId) updates.zone_object_id = zoneObjectId
 
-        const { data, error } = await supabase
+        const { data, error } = await client
           .from('sprints')
           .update(updates)
           .eq('id', targetId)
@@ -1104,7 +1105,7 @@ export const sprintService = {
         updated_at: nowIso
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('sprints')
         .insert(insertPayload)
         .select('*')

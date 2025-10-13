@@ -3160,6 +3160,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         return
       }
 
+      if (isSprintTarget && isSprintStarted && dragData.isNewTicket) {
+        console.log('🚫 Sprint is active, ignoring new ticket drop into sprint')
+        return
+      }
+
       if (dragData.isSprintGhostRemoval && dragData.ticketId) {
         if (!isSprintTarget) {
           console.log('🧹 Removing rocket copy via ghost removal drop')
@@ -3174,6 +3179,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         let existing = rocketCopiesRef.current.find((copy) => copy.ticketId === ticketId)
 
         if (!existing && sprintZoneId) {
+          if (isSprintStarted) {
+            console.log('🚫 Sprint is active, skipping new ticket addition to sprint')
+            return
+          }
           const cached = getCachedRocketCopy(sprintZoneId, ticketId)
           if (cached) {
             existing = cached
@@ -3245,6 +3254,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           cell: dropTarget.cell as [number, number]
         })
       } else if (dragData.isExistingTicket) {
+        if (isSprintTarget && isSprintStarted) {
+          console.log('🚫 Sprint is active, ignoring new ticket drop from non-sprint source')
+          return
+        }
         console.log('🔄 Moving existing ticket:', dragData.ticketId, 'to zone center:', dropTarget.cell)
         if (dragData.fromZoneObjectId !== dropTarget.zoneObject.id) {
           moveTicket(dragData.ticketId, dragData.fromZoneObjectId, dropTarget.zoneObject.id)
