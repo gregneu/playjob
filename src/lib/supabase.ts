@@ -965,6 +965,16 @@ export const ticketService = {
 // Sprint service
 type SprintStatus = 'draft' | 'active' | 'completed'
 
+export class SaveSprintStateError extends Error {
+  readonly reason: 'rls_denied' | 'not_found' | 'missing_zone' | 'unknown'
+
+  constructor(reason: 'rls_denied' | 'not_found' | 'missing_zone' | 'unknown', message: string) {
+    super(message)
+    this.name = 'SaveSprintStateError'
+    this.reason = reason
+  }
+}
+
 interface SaveSprintStateParams {
   sprintId?: string | null
   projectId?: string
@@ -977,6 +987,16 @@ interface SaveSprintStateParams {
   startedAt?: string | null
   finishedAt?: string | null
 }
+
+const isRlsDeniedError = (error: { code?: string | null; message?: string | null } | null | undefined): boolean => {
+  if (!error) return false
+  if ((error.code ?? '') === '42501') return true
+  const message = (error.message ?? '').toLowerCase()
+  return message.includes('row-level security')
+}
+
+const buildSprintPermissionError = () =>
+  new SaveSprintStateError('rls_denied', 'You do not have permission to plan sprints in this project.')
 
 const syncSprintZoneObjectName = async (zoneObjectId: string | null | undefined, name?: string) => {
   if (!zoneObjectId || !name || !isSupabaseConfigured()) return
@@ -1032,7 +1052,7 @@ export const sprintService = {
 
     if (!sprintId && (!projectId || !zoneObjectId)) {
       console.warn('saveSprintState requires sprintId or (projectId and zoneObjectId)')
-      return null
+      throw new SaveSprintStateError('missing_zone', 'A sprint must be linked to a sprint zone in this project.')
     }
 
     const nowIso = new Date().toISOString()
@@ -1054,8 +1074,12 @@ export const sprintService = {
 
         if (existingError) {
           console.error('saveSprintState lookup error', existingError)
-          if (allowFallback && (existingError.code === '42501' || (existingError.message ?? '').toLowerCase().includes('row-level security'))) {
-            return await sprintService.invokeSaveSprintStateFunction(params)
+          if (allowFallback && isRlsDeniedError(existingError)) {
+            const fallback = await sprintService.invokeSaveSprintStateFunction(params)
+            if (fallback) return fallback
+          }
+          if (isRlsDeniedError(existingError)) {
+            throw buildSprintPermissionError()
           }
           return null
         }
@@ -1093,8 +1117,15 @@ export const sprintService = {
 
         if (error) {
           console.error('saveSprintState update error', error)
-          if (allowFallback && (error.code === '42501' || (error.message ?? '').toLowerCase().includes('row-level security'))) {
-            return await sprintService.invokeSaveSprintStateFunction(params)
+          if (allowFallback && isRlsDeniedError(error)) {
+            const fallback = await sprintService.invokeSaveSprintStateFunction(params)
+            if (fallback) return fallback
+          }
+          if (isRlsDeniedError(error)) {
+            throw buildSprintPermissionError()
+          }
+          if (error.code === 'PGRST116') {
+            throw new SaveSprintStateError('not_found', 'Sprint record is no longer available.')
           }
           return null
         }
@@ -1108,7 +1139,7 @@ export const sprintService = {
 
       if (!projectId) {
         console.warn('saveSprintState: projectId is required to insert a sprint record')
-        return null
+        throw new SaveSprintStateError('missing_zone', 'Cannot create sprint without a project context.')
       }
 
       const { data: { user } } = await supabase.auth.getUser()
@@ -1140,8 +1171,12 @@ export const sprintService = {
 
       if (error) {
         console.error('saveSprintState insert error', error)
-        if (allowFallback && (error.code === '42501' || (error.message ?? '').toLowerCase().includes('row-level security'))) {
-          return await sprintService.invokeSaveSprintStateFunction(params)
+        if (allowFallback && isRlsDeniedError(error)) {
+          const fallback = await sprintService.invokeSaveSprintStateFunction(params)
+          if (fallback) return fallback
+        }
+        if (isRlsDeniedError(error)) {
+          throw buildSprintPermissionError()
         }
         return null
       }
@@ -1156,7 +1191,14 @@ export const sprintService = {
       const allowFallback = !supabaseService
       const message = err instanceof Error ? err.message.toLowerCase() : ''
       if (allowFallback && (message.includes('row-level security') || message.includes('42501'))) {
-        return await sprintService.invokeSaveSprintStateFunction(params)
+        const fallback = await sprintService.invokeSaveSprintStateFunction(params)
+        if (fallback) return fallback
+      }
+      if (err instanceof SaveSprintStateError) {
+        throw err
+      }
+      if (message.includes('row-level security') || message.includes('42501')) {
+        throw buildSprintPermissionError()
       }
       return null
     }
@@ -1164,7 +1206,7 @@ export const sprintService = {
 
   async createSprint(
     projectId: string,
-    zoneObjectId: string | null,
+    zoneObjectId: string,
     name: string,
     weeks: number,
     plannedTicketIds: string[] = [],

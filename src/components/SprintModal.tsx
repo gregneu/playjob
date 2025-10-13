@@ -25,17 +25,24 @@ export const SprintModal: React.FC<SprintModalProps> = ({ isOpen, onClose, leftT
 
   const startSprint = React.useCallback(async () => {
     if (isStarted) return
-    setIsStarted(true)
-    const started = new Date()
-    setStartAt(started)
-    setTotalPlannedAtStart(leftList.length)
-    // Try creating sprint in DB; project_id is inferred later by caller through HexGridSystem if needed. For now pass null for zone.
     try {
       const projectId = (window as any).currentProject?.id as string | undefined
-      const created = projectId ? await sprintService.createSprint(projectId, null, sprintName, weeks) : null
+      if (!projectId || !sprintZoneObjectId) {
+        console.warn('SprintModal: missing project or sprint zone to create sprint')
+        return
+      }
+      setIsStarted(true)
+      const started = new Date()
+      setStartAt(started)
+      setTotalPlannedAtStart(leftList.length)
+      const created = await sprintService.createSprint(projectId, sprintZoneObjectId, sprintName, weeks)
       if (created?.id) setSprintId(created.id)
-    } catch {}
-  }, [isStarted])
+    } catch (err) {
+      console.error('SprintModal: failed to create sprint', err)
+      setIsStarted(false)
+      setStartAt(null)
+    }
+  }, [isStarted, sprintZoneObjectId, sprintName, weeks, leftList.length])
 
   const formatDate = (d: Date) => `${d.getDate()}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`
   const dateRange = React.useMemo(() => {
@@ -225,5 +232,3 @@ export const SprintModal: React.FC<SprintModalProps> = ({ isOpen, onClose, leftT
 }
 
 export default SprintModal
-
-

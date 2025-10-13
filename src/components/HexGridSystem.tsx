@@ -259,6 +259,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [sprintName, setSprintName] = useState<string>('Sprint')
   const [sprintTickets, setSprintTickets] = useState<Array<{ id: string; title: string; priority?: any; assignee_id?: string | null; zone_object_id?: string | null; sprint_id?: string | null; board_column?: string | null }>>([])
   const [activeSprintNames, setActiveSprintNames] = useState<Record<string, string>>({})
+  const [sprintPersistError, setSprintPersistError] = useState<'permission' | 'missing' | null>(null)
   // Global planned info across all sprint buildings, hydrated from Supabase metadata
   const [globalPlannedTicketIds, setGlobalPlannedTicketIds] = useState<Set<string>>(() => new Set())
   const [plannedTicketNames, setPlannedTicketNames] = useState<Record<string, string>>({})
@@ -293,6 +294,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   useEffect(() => {
     if (!sprintObjectId || !isSprintStateLoaded) return
+    if (sprintPersistError === 'permission') return
 
     const plannedIds = rocketTicketCopies.filter((copy) => copy.status === 'planned').map((copy) => copy.ticketId)
     const doneIds = rocketTicketCopies.filter((copy) => copy.status === 'done').map((copy) => copy.ticketId)
@@ -312,8 +314,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
     const timer = setTimeout(() => {
       ;(async () => {
+        const supabaseModule = await import('../lib/supabase')
+        const { sprintService, SaveSprintStateError } = supabaseModule
         try {
-          const { sprintService } = await import('../lib/supabase')
           const result = await sprintService.saveSprintState({
             sprintId: activeSprintId,
             projectId,
@@ -325,12 +328,32 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             status: isSprintStarted ? 'active' : 'draft',
             startedAt: isSprintStarted ? (sprintStartedAt ? sprintStartedAt.toISOString() : null) : null
           })
+          setSprintPersistError(null)
           if (!activeSprintId && result && result.id) {
             setActiveSprintId(result.id)
           }
           bumpSprintMetadata()
         } catch (error) {
-          console.error('Failed to persist sprint state to Supabase', error)
+          if (error instanceof SaveSprintStateError) {
+            if (error.reason === 'rls_denied') {
+              if (sprintPersistError !== 'permission') {
+                setSprintPersistError('permission')
+                setNotification({
+                  message: 'You need edit access to plan sprints in this project.',
+                  type: 'error'
+                })
+                setTimeout(() => setNotification(null), 4000)
+              }
+            } else if (error.reason === 'not_found') {
+              setSprintPersistError('missing')
+              setActiveSprintId(null)
+            } else if (error.reason === 'missing_zone') {
+              setSprintPersistError('missing')
+              console.error('Unable to persist sprint state because zone reference is missing')
+            }
+          } else {
+            console.error('Failed to persist sprint state to Supabase', error)
+          }
         }
       })()
     }, 350)
@@ -346,6 +369,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     sprintStartedAt,
     activeSprintId,
     isSprintStateLoaded,
+    sprintPersistError,
     bumpSprintMetadata
   ])
 
@@ -2660,24 +2684,25 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
     const resetSprintState = () => {
       if (cancelled) return
-    setRocketTicketCopies([])
-    setPlannedTickets(new Set())
-    setActiveSprintId(null)
-    setIsSprintStarted(false)
-    setSprintStartedAt(null)
-    setPlannedCountAtStart(null)
-    if (sprintObjectId) {
-      setActiveSprintNames(prev => {
-        const next = { ...prev }
-        delete next[sprintObjectId]
-        return next
-      })
-    }
-    if (sprintObjectId) {
-      setSprintProgressByObject(prev => ({
-        ...prev,
-        [sprintObjectId]: { total: 0, done: 0 }
-      }))
+      setSprintPersistError(null)
+      setRocketTicketCopies([])
+      setPlannedTickets(new Set())
+      setActiveSprintId(null)
+      setIsSprintStarted(false)
+      setSprintStartedAt(null)
+      setPlannedCountAtStart(null)
+      if (sprintObjectId) {
+        setActiveSprintNames(prev => {
+          const next = { ...prev }
+          delete next[sprintObjectId]
+          return next
+        })
+      }
+      if (sprintObjectId) {
+        setSprintProgressByObject(prev => ({
+          ...prev,
+          [sprintObjectId]: { total: 0, done: 0 }
+        }))
       }
     }
 
@@ -2941,8 +2966,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     const name = value.trim() || 'Sprint'
     setSprintName(name)
     if (!sprintObjectId) return
+    const supabaseModule = await import('../lib/supabase')
+    const { sprintService, SaveSprintStateError } = supabaseModule
     try {
-      const { sprintService } = await import('../lib/supabase')
       const result = await sprintService.saveSprintState({
         sprintId: activeSprintId,
         projectId,
@@ -2951,6 +2977,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         status: isSprintStarted ? 'active' : 'draft',
         startedAt: isSprintStarted ? (sprintStartedAt ? sprintStartedAt.toISOString() : null) : undefined
       })
+      setSprintPersistError(null)
       if (result && result.id && result.id !== activeSprintId) {
         setActiveSprintId(result.id)
       }
@@ -2960,6 +2987,18 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       }))
       bumpSprintMetadata()
     } catch (error) {
+      if (error instanceof SaveSprintStateError) {
+        if (error.reason === 'rls_denied') {
+          setSprintPersistError('permission')
+          setNotification({ message: 'You need edit access to rename the sprint.', type: 'error' })
+          setTimeout(() => setNotification(null), 4000)
+          return
+        }
+        if (error.reason === 'missing_zone') {
+          console.error('Cannot rename sprint without associated sprint zone')
+          return
+        }
+      }
       console.error('Failed to update sprint name', error)
     }
   }, [activeSprintId, projectId, sprintObjectId, isSprintStarted, sprintStartedAt, bumpSprintMetadata])
@@ -2981,8 +3020,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     const nameToPersist = (sprintName || 'Sprint').trim() || 'Sprint'
 
     setIsSprintActionLoading(true)
+    const supabaseModule = await import('../lib/supabase')
+    const { sprintService, SaveSprintStateError } = supabaseModule
     try {
-      const { sprintService } = await import('../lib/supabase')
       const activated = await sprintService.activateSprint({
         sprintId: activeSprintId,
         projectId,
@@ -2994,6 +3034,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       })
 
       if (activated) {
+        setSprintPersistError(null)
         setIsSprintStarted(true)
         setActiveSprintId(activated.id || activeSprintId)
         const started = activated.started_at ? new Date(activated.started_at) : new Date()
@@ -3017,9 +3058,25 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         bumpSprintMetadata()
       }
     } catch (error) {
-      console.error('Sprint start error', error)
-      setNotification({ message: 'Failed to start sprint', type: 'error' })
-      setTimeout(() => setNotification(null), 2000)
+      if (error instanceof SaveSprintStateError) {
+        if (error.reason === 'rls_denied') {
+          setSprintPersistError('permission')
+          setNotification({ message: 'You need edit access to start sprints in this project.', type: 'error' })
+          setTimeout(() => setNotification(null), 4000)
+        } else if (error.reason === 'missing_zone') {
+          console.error('Cannot start sprint without an associated sprint zone', error)
+          setNotification({ message: 'Sprint zone is missing, reopen the sprint object and try again.', type: 'error' })
+          setTimeout(() => setNotification(null), 4000)
+        } else {
+          console.error('Sprint start error', error)
+          setNotification({ message: 'Failed to start sprint', type: 'error' })
+          setTimeout(() => setNotification(null), 2000)
+        }
+      } else {
+        console.error('Sprint start error', error)
+        setNotification({ message: 'Failed to start sprint', type: 'error' })
+        setTimeout(() => setNotification(null), 2000)
+      }
     } finally {
       setIsSprintActionLoading(false)
     }
@@ -3041,8 +3098,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     if (isSprintActionLoading || !isSprintStarted || !activeSprintId) return
 
     setIsSprintActionLoading(true)
+    const supabaseModule = await import('../lib/supabase')
+    const { sprintService, ticketService, SaveSprintStateError } = supabaseModule
     try {
-      const { sprintService, ticketService } = await import('../lib/supabase')
       const plannedIds = plannedSprintTickets.map((ticket) => ticket.id)
       const doneIds = doneSprintTickets.map((ticket) => ticket.id)
       const remainingIds = plannedIds.filter((id) => !doneIds.includes(id))
@@ -3052,6 +3110,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         doneTicketIds: doneIds,
         zoneObjectId: sprintObjectId
       })
+      setSprintPersistError(null)
 
       if (doneIds.length > 0) {
         try {
@@ -3087,9 +3146,25 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       setNotification({ message: `Sprint finished, closed ${doneIds.length} tickets`, type: 'info' })
       setTimeout(() => setNotification(null), 2000)
     } catch (error) {
-      console.error('Sprint stop error', error)
-      setNotification({ message: 'Failed to stop sprint', type: 'error' })
-      setTimeout(() => setNotification(null), 2000)
+      if (error instanceof SaveSprintStateError) {
+        if (error.reason === 'rls_denied') {
+          setSprintPersistError('permission')
+          setNotification({ message: 'You need edit access to finish sprints in this project.', type: 'error' })
+          setTimeout(() => setNotification(null), 4000)
+        } else if (error.reason === 'missing_zone') {
+          console.error('Cannot finish sprint because sprint zone reference is missing', error)
+          setNotification({ message: 'Sprint zone is missing, reopen the sprint object and try again.', type: 'error' })
+          setTimeout(() => setNotification(null), 4000)
+        } else {
+          console.error('Sprint stop error', error)
+          setNotification({ message: 'Failed to stop sprint', type: 'error' })
+          setTimeout(() => setNotification(null), 2000)
+        }
+      } else {
+        console.error('Sprint stop error', error)
+        setNotification({ message: 'Failed to stop sprint', type: 'error' })
+        setTimeout(() => setNotification(null), 2000)
+      }
     } finally {
       setIsSprintActionLoading(false)
     }
