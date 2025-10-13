@@ -143,15 +143,16 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   const showTicketBubble = ticketCount > 0
   const showCommentNotification = commentCount > 0
   const showAssignmentNotification = (assignmentCount ?? 0) > 0
-  const notificationItems: Array<{ key: string; icon: string; count: number; showCount: boolean }> = useMemo(() => {
-    const items: Array<{ key: string; icon: string; count: number; showCount: boolean }> = []
+  const notificationItems: Array<{ key: string; icon: string; count: number; showCount: boolean; animationClass: string }> = useMemo(() => {
+    const items: Array<{ key: string; icon: string; count: number; showCount: boolean; animationClass: string }> = []
     if (showCommentNotification) {
       const safeCount = typeof commentCount === 'number' ? commentCount : 0
       items.push({
         key: 'comments',
         icon: '/icons/stash_comments-solid.svg',
         count: safeCount,
-        showCount: safeCount > 1
+        showCount: safeCount > 1,
+        animationClass: 'notification-icon--comment'
       })
     }
     if (showAssignmentNotification) {
@@ -160,12 +161,36 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
         key: 'assignments',
         icon: '/icons/my_new_ticket.svg',
         count: safeCount,
-        showCount: safeCount > 1
+        showCount: safeCount > 1,
+        animationClass: 'notification-icon--assignment'
       })
     }
     return items
   }, [showCommentNotification, showAssignmentNotification, commentCount, assignmentCount])
   const showNotificationPanel = notificationItems.length > 0
+
+  const notificationStyleTag = useMemo(() => (
+    `<style>
+      .notification-icon {
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+      }
+      .notification-icon--comment {
+        animation: notification-comment-pulse 2.4s ease-in-out infinite;
+      }
+      .notification-icon--assignment {
+        animation: notification-assignment-pulse 2.4s ease-in-out infinite;
+        animation-delay: 0.3s;
+      }
+      @keyframes notification-comment-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.18); opacity: 0.85; }
+      }
+      @keyframes notification-assignment-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.18); opacity: 0.85; }
+      }
+    </style>`
+  ), [])
 
   useEffect(() => {
     if (isZoneCenter) {
@@ -710,44 +735,51 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
               </div>
             )}
             {showNotificationPanel && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '3px 10px',
-                  borderRadius: '999px',
-                  background: 'rgba(27, 27, 36, 0.86)',
-                  color: '#FFFFFF',
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  pointerEvents: 'auto',
-                  zIndex: 10,
-                  height: '24px',
-                  lineHeight: 1
-                }}
-              >
-                {notificationItems.map(item => (
-                  <div
-                    key={item.key}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: item.showCount ? 4 : 0
-                    }}
-                  >
-                    <img
-                      src={item.icon}
-                      alt={item.key}
-                      style={{ width: 14, height: 14 }}
-                    />
-                    {item.showCount && <span>{item.count}</span>}
-                  </div>
-                ))}
-              </div>
+              <>
+                <span
+                  dangerouslySetInnerHTML={{ __html: notificationStyleTag }}
+                  style={{ display: 'none' }}
+                />
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '3px 10px',
+                    borderRadius: '999px',
+                    background: 'rgba(27, 27, 36, 0.86)',
+                    color: '#FFFFFF',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    pointerEvents: 'auto',
+                    zIndex: 10,
+                    height: '24px',
+                    lineHeight: 1
+                  }}
+                >
+                  {notificationItems.map(item => (
+                    <div
+                      key={item.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: item.showCount ? 4 : 0
+                      }}
+                    >
+                      <img
+                        src={item.icon}
+                        alt={item.key}
+                        style={{ width: 14, height: 14 }}
+                        className={`notification-icon ${item.animationClass}`}
+                      />
+                      {item.showCount && <span>{item.count}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </Html>
@@ -760,44 +792,51 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
               <BuildingProgressBubble total={sprintProgress.total} done={sprintProgress.done} />
             )}
             {showNotificationPanel && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '3px 10px',
-                  borderRadius: '999px',
-                  background: 'rgba(27, 27, 36, 0.86)',
-                  color: '#FFFFFF',
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  pointerEvents: 'auto',
-                  zIndex: 10,
-                  height: '24px',
-                  lineHeight: 1
-                }}
-              >
-                {notificationItems.map(item => (
-                  <div
-                    key={item.key}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: item.showCount ? 4 : 0
-                    }}
-                  >
-                    <img
-                      src={item.icon}
-                      alt={item.key}
-                      style={{ width: 14, height: 14 }}
-                    />
-                    {item.showCount && <span>{item.count}</span>}
-                  </div>
-                ))}
-              </div>
+              <>
+                <span
+                  dangerouslySetInnerHTML={{ __html: notificationStyleTag }}
+                  style={{ display: 'none' }}
+                />
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '3px 10px',
+                    borderRadius: '999px',
+                    background: 'rgba(27, 27, 36, 0.86)',
+                    color: '#FFFFFF',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    pointerEvents: 'auto',
+                    zIndex: 10,
+                    height: '24px',
+                    lineHeight: 1
+                  }}
+                >
+                  {notificationItems.map(item => (
+                    <div
+                      key={item.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: item.showCount ? 4 : 0
+                      }}
+                    >
+                      <img
+                        src={item.icon}
+                        alt={item.key}
+                        style={{ width: 14, height: 14 }}
+                        className={`notification-icon ${item.animationClass}`}
+                      />
+                      {item.showCount && <span>{item.count}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </Html>
