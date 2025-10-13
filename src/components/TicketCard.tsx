@@ -381,7 +381,6 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         willChange: 'transform'
       } as React.CSSProperties}
     >
-      {hasUpdates && <span dangerouslySetInnerHTML={{ __html: notificationStyleTag }} style={{ display: 'none' }} />}
       {/* Done badge */}
       {isDone && !statusBadge && (
         <div style={{
