@@ -172,22 +172,52 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   const notificationStyleTag = useMemo(() => (
     `<style>
       .notification-icon {
-        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+        transform-origin: center;
       }
       .notification-icon--comment {
-        animation: notification-comment-pulse 2.4s ease-in-out infinite;
+        animation: notification-comment-pulse 1.8s ease-in-out infinite;
       }
       .notification-icon--assignment {
-        animation: notification-assignment-pulse 2.4s ease-in-out infinite;
-        animation-delay: 0.3s;
+        animation: notification-assignment-pulse 1.8s ease-in-out infinite;
+        animation-delay: 0.4s;
       }
       @keyframes notification-comment-pulse {
         0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.18); opacity: 0.85; }
+        50% { transform: scale(1.32); opacity: 0.78; }
       }
       @keyframes notification-assignment-pulse {
         0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.18); opacity: 0.85; }
+        50% { transform: scale(1.32); opacity: 0.78; }
+      }
+      .notification-panel {
+        position: relative;
+        overflow: visible;
+      }
+      .notification-panel::before {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border-radius: 40px;
+        background: radial-gradient(circle, rgba(68, 132, 255, 0.35) 0%, rgba(68, 132, 255, 0) 70%);
+        opacity: 0;
+        animation: notification-panel-wave 2.4s ease-out infinite;
+      }
+      .notification-panel::after {
+        content: '';
+        position: absolute;
+        inset: -9px;
+        border-radius: 44px;
+        border: 2px solid rgba(68, 132, 255, 0.35);
+        opacity: 0;
+        animation: notification-panel-wave 2.4s ease-out infinite;
+        animation-delay: 0.4s;
+      }
+      @keyframes notification-panel-wave {
+        0% { opacity: 0; transform: scale(0.9); }
+        20% { opacity: 0.55; transform: scale(1); }
+        60% { opacity: 0.15; transform: scale(1.12); }
+        100% { opacity: 0; transform: scale(1.18); }
       }
     </style>`
   ), [])
@@ -741,6 +771,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
                   style={{ display: 'none' }}
                 />
                 <div
+                  className="notification-panel"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -798,6 +829,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
                   style={{ display: 'none' }}
                 />
                 <div
+                  className="notification-panel"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
