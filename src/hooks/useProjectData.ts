@@ -22,7 +22,7 @@ export const useProjectData = (projectId: string) => {
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null)
   const realtimeReadyRef = useRef(false)
   const ticketsByZoneObjectRef = useRef<Record<string, ZoneObjectTicket[]>>({})
-  const pendingTicketBroadcastsRef = useRef<Array<{ reason: string; context?: Record<string, unknown> }>>([])
+  const pendingBroadcastsRef = useRef<Array<{ event: 'tickets:refresh' | 'sprint:refresh'; reason: string; context?: Record<string, unknown> }>>([])
   const realtimeClientIdRef = useRef<string>('')
 
   if (!realtimeClientIdRef.current) {
@@ -165,8 +165,8 @@ export const useProjectData = (projectId: string) => {
     }
   }, [projectId])
 
-  const sendTicketBroadcast = useCallback(
-    async (reason: string, context?: Record<string, unknown>) => {
+  const sendBroadcast = useCallback(
+    async (eventName: 'tickets:refresh' | 'sprint:refresh', reason: string, context?: Record<string, unknown>) => {
       const channel = realtimeChannelRef.current
       if (!projectId || !channel) {
         return
@@ -175,7 +175,7 @@ export const useProjectData = (projectId: string) => {
       try {
         const result = await channel.send({
           type: 'broadcast',
-          event: 'tickets:refresh',
+          event: eventName,
           payload: {
             projectId,
             reason,
@@ -186,10 +186,10 @@ export const useProjectData = (projectId: string) => {
         })
 
         if (result !== 'ok') {
-          console.warn('[useProjectData] Ticket sync broadcast ack timeout', { reason, result })
+          console.warn('[useProjectData] Broadcast ack timeout', { eventName, reason, result })
         }
       } catch (err) {
-        console.warn('[useProjectData] Ticket sync broadcast failed', { reason, err })
+        console.warn('[useProjectData] Broadcast failed', { eventName, reason, err })
       }
     },
     [projectId]
@@ -204,16 +204,37 @@ export const useProjectData = (projectId: string) => {
           hasChannel: Boolean(realtimeChannelRef.current),
           projectId
         })
-        pendingTicketBroadcastsRef.current = [
-          ...pendingTicketBroadcastsRef.current,
-          { reason, context }
+        pendingBroadcastsRef.current = [
+          ...pendingBroadcastsRef.current,
+          { event: 'tickets:refresh', reason, context }
         ]
         return
       }
 
-      await sendTicketBroadcast(reason, context)
+      await sendBroadcast('tickets:refresh', reason, context)
     },
-    [projectId, sendTicketBroadcast]
+    [projectId, sendBroadcast]
+  )
+
+  const notifySprintSync = useCallback(
+    async (reason: string, context?: Record<string, unknown>) => {
+      if (!realtimeReadyRef.current || !realtimeChannelRef.current) {
+        console.log('[useProjectData] Queueing sprint sync broadcast', {
+          reason,
+          ready: realtimeReadyRef.current,
+          hasChannel: Boolean(realtimeChannelRef.current),
+          projectId
+        })
+        pendingBroadcastsRef.current = [
+          ...pendingBroadcastsRef.current,
+          { event: 'sprint:refresh', reason, context }
+        ]
+        return
+      }
+
+      await sendBroadcast('sprint:refresh', reason, context)
+    },
+    [projectId, sendBroadcast]
   )
 
   const handleZoneChange = useCallback((payload: RealtimePostgresChangesPayload<Zone>) => {
@@ -1238,6 +1259,29 @@ export const useProjectData = (projectId: string) => {
       void loadProjectData({ silent: true })
     })
 
+    channel.on('broadcast', { event: 'sprint:refresh' }, (event) => {
+      const payload = (event?.payload ?? null) as {
+        projectId?: string
+        source?: string
+        emittedAt?: number
+        reason?: string
+        context?: Record<string, unknown>
+      } | null
+
+      if (!payload) return
+      if (payload.projectId !== projectId) return
+      if (payload.source && payload.source === realtimeClientIdRef.current) {
+        return
+      }
+
+      console.log('[useProjectData] sprint:refresh broadcast received', payload)
+      try {
+        window.dispatchEvent(new CustomEvent('sprint-refresh', { detail: payload }))
+      } catch (err) {
+        console.warn('[useProjectData] Failed to dispatch sprint-refresh event', err)
+      }
+    })
+
     channel.on('system', { event: 'CHANNEL_ERROR' }, (event) => {
       if (event?.status === 'ok') {
         console.log('[useProjectData] realtime channel ack', event)
@@ -1263,11 +1307,11 @@ export const useProjectData = (projectId: string) => {
       if (status === 'SUBSCRIBED') {
         console.log('[useProjectData] realtime channel subscribed', { projectId })
         realtimeReadyRef.current = true
-        if (pendingTicketBroadcastsRef.current.length > 0) {
-          const pending = [...pendingTicketBroadcastsRef.current]
-          pendingTicketBroadcastsRef.current = []
+        if (pendingBroadcastsRef.current.length > 0) {
+          const pending = [...pendingBroadcastsRef.current]
+          pendingBroadcastsRef.current = []
           for (const item of pending) {
-            void sendTicketBroadcast(item.reason, item.context)
+            void sendBroadcast(item.event, item.reason, item.context)
           }
         }
       } else {
@@ -1300,7 +1344,7 @@ export const useProjectData = (projectId: string) => {
     handleTicketChange,
     handleLinkChange,
     loadProjectData,
-    sendTicketBroadcast,
+    sendBroadcast,
     zoneIds,
     zoneObjectIds
   ])
@@ -1339,7 +1383,9 @@ export const useProjectData = (projectId: string) => {
     getZoneForCell,
     getBuildingForCell,
     getZoneObjectForCell,
-    reloadData: loadProjectData
+    reloadData: loadProjectData,
+    notifyTicketSync,
+    notifySprintSync
   }
 
   // Remove archived tickets from in-memory state when moved to archive

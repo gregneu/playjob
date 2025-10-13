@@ -153,6 +153,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     getZoneObjectForCell,
     reloadData,
     ticketsByZoneObject,
+    notifySprintSync,
     createTicketForZoneObject,
     updateTicket,
     moveTicket
@@ -297,6 +298,18 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   }, [rocketTicketCopies])
 
   useEffect(() => {
+    const handleSprintRefresh = (event: CustomEvent<{ projectId?: string }>) => {
+      const targetProjectId = typeof event?.detail?.projectId === 'string' ? event.detail.projectId : null
+      if (targetProjectId && projectId && targetProjectId !== projectId) {
+        return
+      }
+      bumpSprintMetadata()
+    }
+    window.addEventListener('sprint-refresh', handleSprintRefresh as EventListener)
+    return () => window.removeEventListener('sprint-refresh', handleSprintRefresh as EventListener)
+  }, [projectId, bumpSprintMetadata])
+
+  useEffect(() => {
     if (!sprintObjectId) return
     const total = rocketTicketCopies.length
     const done = rocketTicketCopies.filter((copy) => copy.status === 'done').length
@@ -347,6 +360,14 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           if (!activeSprintId && result && result.id) {
             setActiveSprintId(result.id)
           }
+          const sprintIdForBroadcast = (result && (result as any).id) ? (result as any).id : activeSprintId
+          void notifySprintSync('sprint-state-updated', {
+            zoneObjectId: sprintObjectId,
+            sprintId: sprintIdForBroadcast,
+            status: isSprintStarted ? 'active' : 'draft',
+            plannedCount: plannedIds.length,
+            doneCount: doneIds.length
+          })
           bumpSprintMetadata()
         } catch (error) {
           if (error instanceof SaveSprintStateError) {
@@ -383,6 +404,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     activeSprintId,
     isSprintStateLoaded,
     hasPermissionPersistError,
+    notifySprintSync,
     bumpSprintMetadata
   ])
 
