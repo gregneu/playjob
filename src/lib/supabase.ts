@@ -995,6 +995,26 @@ const syncSprintZoneObjectName = async (zoneObjectId: string | null | undefined,
 }
 
 export const sprintService = {
+  async invokeSaveSprintStateFunction(params: SaveSprintStateParams): Promise<any | null> {
+    if (!isSupabaseConfigured()) return null
+    try {
+      const { data, error } = await supabase.functions.invoke('save-sprint-state', {
+        body: { params }
+      })
+
+      if (error) {
+        console.error('saveSprintState function error', error)
+        return null
+      }
+
+      const payload = (data as { data?: any } | null) ?? null
+      return payload?.data ?? payload
+    } catch (err) {
+      console.error('saveSprintState function exception', err)
+      return null
+    }
+  },
+
   async saveSprintState(params: SaveSprintStateParams): Promise<any | null> {
     if (!isSupabaseConfigured()) return null
     const {
@@ -1019,6 +1039,7 @@ export const sprintService = {
 
     try {
       const client = supabaseService ?? supabase
+      const allowFallback = !supabaseService
       let targetId = sprintId
 
       if (!targetId && projectId && zoneObjectId) {
@@ -1033,6 +1054,9 @@ export const sprintService = {
 
         if (existingError) {
           console.error('saveSprintState lookup error', existingError)
+          if (allowFallback && (existingError.code === '42501' || (existingError.message ?? '').toLowerCase().includes('row-level security'))) {
+            return await sprintService.invokeSaveSprintStateFunction(params)
+          }
           return null
         }
 
@@ -1069,6 +1093,9 @@ export const sprintService = {
 
         if (error) {
           console.error('saveSprintState update error', error)
+          if (allowFallback && (error.code === '42501' || (error.message ?? '').toLowerCase().includes('row-level security'))) {
+            return await sprintService.invokeSaveSprintStateFunction(params)
+          }
           return null
         }
 
@@ -1113,6 +1140,9 @@ export const sprintService = {
 
       if (error) {
         console.error('saveSprintState insert error', error)
+        if (allowFallback && (error.code === '42501' || (error.message ?? '').toLowerCase().includes('row-level security'))) {
+          return await sprintService.invokeSaveSprintStateFunction(params)
+        }
         return null
       }
 
@@ -1123,6 +1153,11 @@ export const sprintService = {
       return data
     } catch (err) {
       console.error('saveSprintState exception', err)
+      const allowFallback = !supabaseService
+      const message = err instanceof Error ? err.message.toLowerCase() : ''
+      if (allowFallback && (message.includes('row-level security') || message.includes('42501'))) {
+        return await sprintService.invokeSaveSprintStateFunction(params)
+      }
       return null
     }
   },

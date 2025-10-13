@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { getBrowserClient } from '@/lib/supabase-browser'
+import { supabase as supabaseClient } from '@/lib/supabase'
 import { UserAvatar } from '../UserAvatar'
 
 type Role = 'viewer' | 'editor' | 'admin' | 'owner'
@@ -57,7 +57,7 @@ const OWNER_BADGE_STYLE: React.CSSProperties = {
 }
 
 export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareModalProps) {
-  const supabase = useMemo(() => getBrowserClient(), [])
+  const supabase = useMemo(() => supabaseClient, [])
   const [members, setMembers] = useState<MemberRow[]>([])
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>('viewer')
