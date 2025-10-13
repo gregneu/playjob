@@ -240,6 +240,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const hoverTargetsRef = useRef<Map<string, THREE.Object3D>>(new Map())
   const rocketCopiesRef = useRef<RocketTicketCopy[]>([])
+  const sprintZoneIdsRef = useRef<Set<string>>(new Set())
   
   // Функции для регистрации hover targets
   const registerHoverTarget = useCallback((key: string, mesh: THREE.Object3D) => {
@@ -258,44 +259,19 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [sprintName, setSprintName] = useState<string>('Sprint')
   const [sprintTickets, setSprintTickets] = useState<Array<{ id: string; title: string; priority?: any; assignee_id?: string | null; zone_object_id?: string | null; sprint_id?: string | null; board_column?: string | null }>>([])
   const [activeSprintNames, setActiveSprintNames] = useState<Record<string, string>>({})
-  // Global planned info across all sprint buildings, loaded from localStorage (does NOT require sidebar to be open)
+  // Global planned info across all sprint buildings, hydrated from Supabase metadata
   const [globalPlannedTicketIds, setGlobalPlannedTicketIds] = useState<Set<string>>(() => new Set())
   const [plannedTicketNames, setPlannedTicketNames] = useState<Record<string, string>>({})
   const [plannedCountAtStart, setPlannedCountAtStart] = useState<number | null>(null)
+  const [sprintMetadataVersion, setSprintMetadataVersion] = useState(0)
   const [sprintProgressByObject, setSprintProgressByObject] = useState<Record<string, { total: number; done: number }>>({})
   // useEffect(() => {
   //   supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null)).catch(() => setCurrentUserId(null))
   // }, [])
 
-  // Save planned tickets to localStorage for the current Sprint building
-  useEffect(() => {
-    try {
-      if (!sprintObjectId) return
-      localStorage.setItem(`planned_tickets_${projectId}_${sprintObjectId}`, JSON.stringify(Array.from(plannedTickets)))
-    } catch {}
-  }, [plannedTickets, projectId, sprintObjectId])
-
-  useEffect(() => {
-    try {
-      if (!sprintObjectId) return
-      localStorage.setItem(`rocket_copies_${projectId}_${sprintObjectId}`, JSON.stringify(rocketTicketCopies))
-    } catch {}
-  }, [rocketTicketCopies, projectId, sprintObjectId])
-
-  // Save planned tickets to localStorage for the current Sprint building
-  useEffect(() => {
-    try {
-      if (!sprintObjectId) return
-      localStorage.setItem(`planned_tickets_${projectId}_${sprintObjectId}`, JSON.stringify(Array.from(plannedTickets)))
-    } catch {}
-  }, [plannedTickets, projectId, sprintObjectId])
-
-  useEffect(() => {
-    try {
-      if (!sprintObjectId) return
-      localStorage.setItem(`rocket_copies_${projectId}_${sprintObjectId}`, JSON.stringify(rocketTicketCopies))
-    } catch {}
-  }, [rocketTicketCopies, projectId, sprintObjectId])
+  const bumpSprintMetadata = useCallback(() => {
+    setSprintMetadataVersion((version) => version + 1)
+  }, [])
 
   useEffect(() => {
     setPlannedTickets(new Set(rocketTicketCopies.filter(copy => copy.status === 'planned').map(copy => copy.ticketId)))
@@ -352,6 +328,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           if (!activeSprintId && result && result.id) {
             setActiveSprintId(result.id)
           }
+          bumpSprintMetadata()
         } catch (error) {
           console.error('Failed to persist sprint state to Supabase', error)
         }
@@ -368,141 +345,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     isSprintStarted,
     sprintStartedAt,
     activeSprintId,
-    isSprintStateLoaded
+    isSprintStateLoaded,
+    bumpSprintMetadata
   ])
-
-  useEffect(() => {
-    try {
-      if (!sprintObjectId) return
-      localStorage.setItem(`sprint_name_${projectId}_${sprintObjectId}`, sprintName)
-    } catch {}
-  }, [sprintName, projectId, sprintObjectId])
-
-  // Load map of active sprint names to show planned state without opening Sprint
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        console.log('=== LOADING ACTIVE SPRINT NAMES ===')
-        console.log('Project ID:', projectId)
-        
-        const { supabase } = await import('../lib/supabase')
-        const { data, error } = await supabase
-          .from('sprints')
-          .select('id,name,status,zone_object_id,planned_ticket_ids,done_ticket_ids')
-          .eq('project_id', projectId)
-          .neq('status', 'completed')
-
-        console.log('Active sprints query result:', { data, error })
-
-        if (error) {
-          console.error('Active sprints query error:', error)
-          return
-        }
-        
-        if (!cancelled) {
-          const map: Record<string, string> = {}
-          const progress: Record<string, { total: number; done: number }> = {}
-          if (Array.isArray(data)) {
-            for (const s of data as any[]) { 
-              if (s && s.id) {
-                map[s.id] = s.name || 'Sprint'
-                console.log(`Sprint ${s.id}: ${s.name || 'Sprint'}`)
-                const zoneId = s.zone_object_id
-                if (zoneId) {
-                  const planned = Array.isArray(s.planned_ticket_ids) ? s.planned_ticket_ids.length : 0
-                  const done = Array.isArray(s.done_ticket_ids) ? s.done_ticket_ids.length : 0
-                  progress[zoneId] = {
-                    total: planned + done,
-                    done
-                  }
-                }
-              }
-            }
-          }
-          console.log('Active sprint names map:', map)
-          setActiveSprintNames(map)
-          if (Object.keys(progress).length > 0) {
-            setSprintProgressByObject(prev => ({ ...prev, ...progress }))
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load active sprint names:', err)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [projectId])
-
-  // Build global set of planned ticket ids and names across ALL sprint buildings for this project
-  const recomputeGlobalPlanned = useCallback(() => {
-    try {
-      const allIds = new Set<string>()
-      const idToName: Record<string, string> = {}
-      const progressMap: Record<string, { total: number; done: number }> = {}
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (!key) continue
-        if (key.startsWith(`planned_tickets_${projectId}_`)) {
-          const objId = key.split(`planned_tickets_${projectId}_`)[1]
-          const raw = localStorage.getItem(key)
-          if (raw) {
-            try {
-              const ids = JSON.parse(raw) as string[]
-              if (Array.isArray(ids)) {
-                const name = localStorage.getItem(`sprint_name_${projectId}_${objId}`) || 'Sprint'
-                for (const tid of ids) {
-                  allIds.add(tid)
-                  if (name) idToName[tid] = name
-                }
-                if (!progressMap[objId]) {
-                  progressMap[objId] = { total: ids.length, done: 0 }
-                }
-              }
-            } catch {}
-          }
-        }
-        if (key.startsWith(`rocket_copies_${projectId}_`)) {
-          const objId = key.split(`rocket_copies_${projectId}_`)[1]
-          const raw = localStorage.getItem(key)
-          if (raw) {
-            try {
-              const copies = JSON.parse(raw)
-              if (Array.isArray(copies)) {
-                const total = copies.length
-                const done = copies.filter((item: any) => String(item?.status || '').toLowerCase() === 'done').length
-                progressMap[objId] = { total, done }
-              }
-            } catch {}
-          }
-        }
-      }
-      setGlobalPlannedTicketIds(allIds)
-      setPlannedTicketNames(idToName)
-      if (Object.keys(progressMap).length > 0) {
-        setSprintProgressByObject(prev => ({ ...prev, ...progressMap }))
-      }
-    } catch {}
-  }, [projectId])
-
-  // Initial compute and on project switch
-  useEffect(() => { recomputeGlobalPlanned() }, [recomputeGlobalPlanned])
-
-  // Recompute on storage updates from other tabs/windows
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key) return
-      if (e.key.startsWith(`planned_tickets_${projectId}_`) || e.key.startsWith(`sprint_name_${projectId}_`)) {
-        recomputeGlobalPlanned()
-      }
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [projectId, recomputeGlobalPlanned])
-
-  // Keep global set in sync when local sprint's plannedTickets change
-  useEffect(() => {
-    recomputeGlobalPlanned()
-  }, [plannedTickets, sprintName, sprintObjectId, recomputeGlobalPlanned])
 
   // Global listener for opening Sprint modal
 
@@ -2631,59 +2476,16 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     return null
   }, [ticketsByZoneObject])
 
-const getZoneObjectById = useCallback((zoneObjectId: string | null | undefined) => {
-  if (!zoneObjectId) return null
-  return zoneObjects.find((obj) => obj && obj.id === zoneObjectId) || null
-}, [zoneObjects])
+  const getZoneObjectById = useCallback((zoneObjectId: string | null | undefined) => {
+    if (!zoneObjectId) return null
+    return zoneObjects.find((obj) => obj && obj.id === zoneObjectId) || null
+  }, [zoneObjects])
 
-const normalizeRocketCopyRecord = (
-  raw: any,
-  fallback: Partial<RocketTicketCopy>,
-  findDetails: () => any
-): RocketTicketCopy => {
-  const details = findDetails()
-  return {
-    ticketId: fallback.ticketId || raw?.ticketId || raw?.id,
-    status: String(raw?.status).toLowerCase() === 'done' ? 'done' : 'planned',
-    title: raw?.title || fallback.title || details?.title || 'Ticket',
-    ticketType: (raw?.ticketType || raw?.type || fallback.ticketType || details?.type || 'task') as RocketTicketCopy['ticketType'],
-    priority: (raw?.priority ?? fallback.priority ?? details?.priority ?? null) as RocketTicketCopy['priority'],
-    assigneeId: raw?.assigneeId ?? raw?.assignee_id ?? fallback.assigneeId ?? details?.assignee_id ?? null,
-    assigneeName: raw?.assigneeName ?? raw?.assignee ?? fallback.assigneeName ?? (details as any)?.assignee ?? (details as any)?.assignee_name ?? null,
-    originZoneObjectId: raw?.originZoneObjectId ?? raw?.locationObjectId ?? fallback.originZoneObjectId ?? details?.zone_object_id ?? null
-  }
-}
-
-const useCachedRocketCopy = (
-  projectId: string,
-  findTicketDetails: (ticketId: string) => any
-) => {
-  return useCallback((zoneObjectId: string, ticketId: string): RocketTicketCopy | null => {
-    try {
-      const key = `rocket_copies_${projectId}_${zoneObjectId}`
-      const raw = localStorage.getItem(key)
-      if (!raw) return null
-      const parsed = JSON.parse(raw)
-      if (!Array.isArray(parsed)) return null
-      const entry = parsed.find((item: any) => {
-        const id = typeof item?.ticketId === 'string' ? item.ticketId : item?.id
-        return id === ticketId
-      })
-      if (!entry) return null
-      const hydrate = () => findTicketDetails(ticketId)
-      return normalizeRocketCopyRecord(entry, { ticketId }, hydrate)
-    } catch (err) {
-      console.error('Failed to read cached rocket copy', err)
-      return null
-    }
-  }, [projectId, findTicketDetails])
-}
-
-const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
-  if (!zoneObject) return false
-  const rawType = (zoneObject as any).object_type ?? (zoneObject as any).type
-  const type = String(rawType || '').toLowerCase()
-  return type === 'sprint' || type === 'mountain'
+  const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
+    if (!zoneObject) return false
+    const rawType = (zoneObject as any).object_type ?? (zoneObject as any).type
+    const type = String(rawType || '').toLowerCase()
+    return type === 'sprint' || type === 'mountain'
   }, [])
 
   const ensureSprintContext = useCallback((zoneObject: any | null | undefined) => {
@@ -2695,7 +2497,92 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
     return zoneId
   }, [sprintObjectId])
 
-  const getCachedRocketCopy = useCachedRocketCopy(projectId, findTicketDetails)
+  const getCachedRocketCopy = useCallback((_zoneObjectId: string, _ticketId: string): RocketTicketCopy | null => null, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { supabase } = await import('../lib/supabase')
+        const { data, error } = await supabase
+          .from('sprints')
+          .select('id,name,status,zone_object_id,planned_ticket_ids,done_ticket_ids')
+          .eq('project_id', projectId)
+          .neq('status', 'completed')
+
+        if (error) {
+          console.error('Active sprints query error:', error)
+          return
+        }
+
+        if (cancelled) return
+
+        const namesBySprint: Record<string, string> = {}
+        const ticketNameMap: Record<string, string> = {}
+        const plannedIdsSet = new Set<string>()
+        const progressByZone: Record<string, { total: number; done: number }> = {}
+        const nextZoneIds = new Set<string>()
+
+        if (Array.isArray(data)) {
+          for (const sprint of data as any[]) {
+            if (!sprint || !sprint.id) continue
+            const sprintId: string = sprint.id
+            const sprintName = sprint.name || 'Sprint'
+            namesBySprint[sprintId] = sprintName
+
+            const plannedIds: string[] = Array.isArray(sprint.planned_ticket_ids)
+              ? sprint.planned_ticket_ids.filter((id: any): id is string => typeof id === 'string')
+              : []
+            const doneIds: string[] = Array.isArray(sprint.done_ticket_ids)
+              ? sprint.done_ticket_ids.filter((id: any): id is string => typeof id === 'string')
+              : []
+
+            plannedIds.forEach((ticketId) => {
+              plannedIdsSet.add(ticketId)
+              ticketNameMap[ticketId] = sprintName
+            })
+
+            doneIds.forEach((ticketId) => {
+              ticketNameMap[ticketId] = sprintName
+            })
+
+            const zoneId: string | null | undefined = sprint.zone_object_id
+            if (zoneId) {
+              nextZoneIds.add(zoneId)
+              progressByZone[zoneId] = {
+                total: plannedIds.length + doneIds.length,
+                done: doneIds.length
+              }
+            }
+          }
+        }
+
+        setActiveSprintNames(namesBySprint)
+        setPlannedTicketNames(ticketNameMap)
+        setGlobalPlannedTicketIds(new Set(plannedIdsSet))
+
+        const previousZoneIds = sprintZoneIdsRef.current
+        sprintZoneIdsRef.current = nextZoneIds
+
+        setSprintProgressByObject((prev) => {
+          const next = { ...prev }
+          previousZoneIds.forEach((zoneId) => {
+            if (!nextZoneIds.has(zoneId)) {
+              delete next[zoneId]
+            }
+          })
+          for (const [zoneId, value] of Object.entries(progressByZone)) {
+            next[zoneId] = value
+          }
+          return next
+        })
+      } catch (err) {
+        console.error('Failed to load sprint metadata:', err)
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [projectId, sprintMetadataVersion])
 
   useEffect(() => {
     const onOpen = (e: any) => {
@@ -2761,7 +2648,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
     setRocketTicketCopies((prev) => prev.filter((copy) => copy.ticketId !== ticketId))
   }, [])
 
-  // Load sprint state (planned/done ghosts, metadata) from Supabase / local fallback
+  // Load sprint state (planned/done ghosts, metadata) from Supabase
   useEffect(() => {
     let cancelled = false
 
@@ -2773,17 +2660,24 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
 
     const resetSprintState = () => {
       if (cancelled) return
-      setRocketTicketCopies([])
-      setPlannedTickets(new Set())
-      setActiveSprintId(null)
-      setIsSprintStarted(false)
-      setSprintStartedAt(null)
-      setPlannedCountAtStart(null)
-      if (sprintObjectId) {
-        setSprintProgressByObject(prev => ({
-          ...prev,
-          [sprintObjectId]: { total: 0, done: 0 }
-        }))
+    setRocketTicketCopies([])
+    setPlannedTickets(new Set())
+    setActiveSprintId(null)
+    setIsSprintStarted(false)
+    setSprintStartedAt(null)
+    setPlannedCountAtStart(null)
+    if (sprintObjectId) {
+      setActiveSprintNames(prev => {
+        const next = { ...prev }
+        delete next[sprintObjectId]
+        return next
+      })
+    }
+    if (sprintObjectId) {
+      setSprintProgressByObject(prev => ({
+        ...prev,
+        [sprintObjectId]: { total: 0, done: 0 }
+      }))
       }
     }
 
@@ -2840,110 +2734,18 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             }
           }))
           setIsSprintStateLoaded(true)
-          return true
+          return
         }
       } catch (error) {
         console.error('Failed to load sprint state from Supabase', error)
       }
-      return false
-    }
-
-    const loadFromLocalStorage = () => {
-      try {
-        const plannedKey = `planned_tickets_${projectId}_${sprintObjectId}`
-        const copiesKey = `rocket_copies_${projectId}_${sprintObjectId}`
-        const nameKey = `sprint_name_${projectId}_${sprintObjectId}`
-
-        const storedCopiesRaw = localStorage.getItem(copiesKey)
-        if (storedCopiesRaw) {
-          try {
-            const parsed = JSON.parse(storedCopiesRaw)
-            if (Array.isArray(parsed)) {
-              const normalized = parsed
-                .map((item: any): RocketTicketCopy | null => {
-                  if (!item) return null
-                  const ticketId = item.ticketId || item.id
-                  const status = item.status === 'done' ? 'done' : 'planned'
-                  if (!ticketId) return null
-                  return {
-                    ticketId,
-                    status,
-                    title: item.title || 'Ticket',
-                    ticketType: item.ticketType || item.type || 'task',
-                    priority: item.priority ?? null,
-                    assigneeId: item.assigneeId ?? item.assignee_id ?? null,
-                    originZoneObjectId: item.originZoneObjectId ?? item.locationObjectId ?? null
-                  }
-                })
-                .filter((x): x is RocketTicketCopy => Boolean(x))
-              setRocketTicketCopies(normalized)
-              setPlannedTickets(new Set(normalized.filter(copy => copy.status === 'planned').map(copy => copy.ticketId)))
-              setSprintProgressByObject(prev => ({
-                ...prev,
-                [sprintObjectId]: {
-                  total: normalized.length,
-                  done: normalized.filter(copy => copy.status === 'done').length
-                }
-              }))
-            } else {
-              resetSprintState()
-            }
-          } catch {
-            resetSprintState()
-          }
-        } else {
-          const saved = localStorage.getItem(plannedKey)
-          if (saved) {
-            try {
-              const ids = JSON.parse(saved)
-              if (Array.isArray(ids)) {
-                const fallbackCopies: RocketTicketCopy[] = ids
-                  .filter((id): id is string => typeof id === 'string')
-                  .map((ticketId) => buildRocketCopy(ticketId, 'planned', null))
-                setRocketTicketCopies(fallbackCopies)
-                setPlannedTickets(new Set(ids.filter((id): id is string => typeof id === 'string')))
-                setSprintProgressByObject(prev => ({
-                  ...prev,
-                  [sprintObjectId]: {
-                    total: fallbackCopies.length,
-                    done: fallbackCopies.filter(copy => copy.status === 'done').length
-                  }
-                }))
-              } else {
-                resetSprintState()
-              }
-            } catch {
-              resetSprintState()
-            }
-          } else {
-            resetSprintState()
-          }
-        }
-
-        const savedName = localStorage.getItem(nameKey)
-        if (savedName) {
-          setSprintName(savedName)
-          setActiveSprintNames(prev => ({
-            ...prev,
-            [sprintObjectId]: savedName
-          }))
-        } else {
-          setSprintName('Sprint')
-        }
-      } catch (error) {
-        console.error('Failed to load sprint state from localStorage', error)
-        resetSprintState()
-      }
-
+      resetSprintState()
+      setSprintName('Sprint')
+      setSprintWeeks(2)
       setIsSprintStateLoaded(true)
     }
 
-    (async () => {
-      const loaded = await loadFromSupabase()
-      if (!loaded && !cancelled) {
-        loadFromLocalStorage()
-      }
-    })()
+    loadFromSupabase()
 
     return () => { cancelled = true }
   }, [projectId, sprintObjectId, buildRocketCopy, setActiveSprintNames])
@@ -3156,10 +2958,11 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
         ...prev,
         [sprintObjectId]: name
       }))
+      bumpSprintMetadata()
     } catch (error) {
       console.error('Failed to update sprint name', error)
     }
-  }, [activeSprintId, projectId, sprintObjectId, isSprintStarted, sprintStartedAt])
+  }, [activeSprintId, projectId, sprintObjectId, isSprintStarted, sprintStartedAt, bumpSprintMetadata])
 
   const handleSprintDurationChange = useCallback((weeks: number) => {
     setSprintWeeks(weeks)
@@ -3211,9 +3014,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             console.error('Failed to attach tickets to sprint', err)
           }
         }
-        if (activated.id) {
-          try { localStorage.setItem(`sprint_planned_${activated.id}`, String(plannedIds.length)) } catch {}
-        }
+        bumpSprintMetadata()
       }
     } catch (error) {
       console.error('Sprint start error', error)
@@ -3232,7 +3033,8 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
     activeSprintId,
     projectId,
     sprintName,
-    sprintWeeks
+    sprintWeeks,
+    bumpSprintMetadata
   ])
 
   const handleSprintStop = useCallback(async () => {
@@ -3243,6 +3045,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
       const { sprintService, ticketService } = await import('../lib/supabase')
       const plannedIds = plannedSprintTickets.map((ticket) => ticket.id)
       const doneIds = doneSprintTickets.map((ticket) => ticket.id)
+      const remainingIds = plannedIds.filter((id) => !doneIds.includes(id))
 
       await sprintService.finishSprint(activeSprintId, {
         plannedTicketIds: plannedIds,
@@ -3263,7 +3066,14 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
         }
       }
 
-      const archivedCount = await sprintService.archiveSprintTickets(projectId, activeSprintId, null)
+      if (remainingIds.length > 0) {
+        try {
+          await ticketService.removeTicketsFromSprint(remainingIds)
+        } catch (err) {
+          console.error('Failed to unassign remaining sprint tickets', err)
+        }
+      }
+
       setIsSprintStarted(false)
       setActiveSprintId(null)
       setSprintStartedAt(null)
@@ -3271,14 +3081,10 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
       setRocketTicketCopies([])
       setPlannedTickets(new Set())
       setPlannedCountAtStart(null)
-      try { localStorage.removeItem(`sprint_planned_${activeSprintId}`) } catch {}
-      if (sprintObjectId) {
-        try { localStorage.removeItem(`planned_tickets_${projectId}_${sprintObjectId}`) } catch {}
-        try { localStorage.removeItem(`rocket_copies_${projectId}_${sprintObjectId}`) } catch {}
-      }
+      bumpSprintMetadata()
       try { await reloadData() } catch (err) { console.error('Failed to reload data after sprint stop', err) }
       try { window.dispatchEvent(new Event('sprint-completed')) } catch {}
-      setNotification({ message: `Sprint finished, archived ${archivedCount} tickets`, type: 'info' })
+      setNotification({ message: `Sprint finished, closed ${doneIds.length} tickets`, type: 'info' })
       setTimeout(() => setNotification(null), 2000)
     } catch (error) {
       console.error('Sprint stop error', error)
@@ -3295,7 +3101,8 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
     sprintObjectId,
     reloadData,
     plannedSprintTickets,
-    doneSprintTickets
+    doneSprintTickets,
+    bumpSprintMetadata
   ])
 
   const sprintStartDisabled = isSprintActionLoading || isSprintStarted || plannedSprintTickets.length === 0 || !sprintObjectId || !isSprintStateLoaded
@@ -4014,21 +3821,11 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
     }
   }, [isSprintStarted, activeSprintId])
 
-  // Keep planned count snapshot in localStorage for persistence across reloads during active sprint
+  // Maintain planned ticket snapshot during active sprint
   useEffect(() => {
-    try {
-      if (isSprintStarted && activeSprintId) {
-        const key = `sprint_planned_${activeSprintId}`
-        const raw = localStorage.getItem(key)
-        if (raw && !plannedCountAtStart) {
-          const num = parseInt(raw, 10)
-          if (!Number.isNaN(num)) setPlannedCountAtStart(num)
-        }
-      } else {
-        // reset when no active sprint
-        setPlannedCountAtStart(null)
-      }
-    } catch {}
+    if (!isSprintStarted || !activeSprintId) {
+      setPlannedCountAtStart(null)
+    }
   }, [isSprintStarted, activeSprintId])
 
   // Fallback: if tickets are loaded and snapshot not set yet, take current length as snapshot
@@ -4037,7 +3834,6 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
     if (plannedCountAtStart == null) {
       const total = Array.isArray(sprintTickets) ? sprintTickets.length : 0
       setPlannedCountAtStart(total)
-      try { localStorage.setItem(`sprint_planned_${activeSprintId}`, String(total)) } catch {}
     }
   }, [isSprintStarted, activeSprintId, sprintTickets, plannedCountAtStart])
 
@@ -5245,4 +5041,4 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
 
     </>
   )
-} 
+}

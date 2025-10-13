@@ -253,32 +253,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
 
       {/* Centered user avatar in header */}
       <div style={{ position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)', zIndex: 110 }}>
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-          <UserAvatar userId={user?.id} userName={user?.user_metadata?.full_name || user?.email} size={56} showName={false} />
-          {notificationSummary.unread > 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '-6px',
-                right: '-6px',
-                minWidth: '20px',
-                height: '20px',
-                padding: '0 6px',
-                borderRadius: '999px',
-                background: '#EF4444',
-                color: '#FFFFFF',
-                fontSize: '12px',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
-              }}
-            >
-              {notificationSummary.unread > 99 ? '99+' : notificationSummary.unread}
-            </div>
-          )}
-        </div>
+        <UserAvatar userId={user?.id} userName={user?.user_metadata?.full_name || user?.email} size={56} showName={false} />
       </div>
 
       {/* Share Modal */}

@@ -90,26 +90,30 @@ export const TicketCard: React.FC<TicketCardProps> = ({
       .ticket-card--updates::after {
         content: '';
         position: absolute;
-        inset: -8px;
-        border-radius: 24px;
+        inset: -4px;
+        border-radius: 22px;
         pointer-events: none;
-        opacity: 0;
+        transform-origin: center;
       }
       .ticket-card--updates::before {
-        background: radial-gradient(circle, rgba(68, 132, 255, 0.32) 0%, rgba(68, 132, 255, 0) 70%);
-        animation: ticket-card-wave 2.6s ease-out infinite;
+        border: 2px solid rgba(60, 140, 255, 0.85);
+        box-shadow:
+          0 0 0 1px rgba(60, 140, 255, 0.45),
+          0 0 18px rgba(60, 140, 255, 0.45);
+        opacity: 1;
       }
       .ticket-card--updates::after {
-        border: 2px solid rgba(68, 132, 255, 0.4);
-        inset: -12px;
-        animation: ticket-card-wave 2.6s ease-out infinite;
-        animation-delay: 0.45s;
+        inset: -6px;
+        border-radius: 24px;
+        border: 2px solid rgba(60, 140, 255, 0.45);
+        box-shadow: 0 0 20px rgba(60, 140, 255, 0.35);
+        animation: ticket-card-wave 2.2s ease-out infinite;
       }
       @keyframes ticket-card-wave {
-        0% { opacity: 0; transform: scale(0.92); }
-        18% { opacity: 0.55; transform: scale(1); }
-        60% { opacity: 0.2; transform: scale(1.1); }
-        100% { opacity: 0; transform: scale(1.18); }
+        0% { opacity: 0.55; transform: scale(0.98); }
+        35% { opacity: 0.85; transform: scale(1.02); }
+        65% { opacity: 0.45; transform: scale(1.05); }
+        100% { opacity: 0; transform: scale(1.08); }
       }
       .ticket-card .notification-icon {
         filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
