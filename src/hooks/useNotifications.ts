@@ -1,6 +1,6 @@
 // Unified notification management hook
 // Handles all notification types with extensible architecture
-import { useMemo, useCallback, useEffect, useState } from 'react'
+import { useMemo, useCallback, useEffect, useState, useRef } from 'react'
 import { useUnreadMentions } from './useUnreadMentions'
 import type { BuildingNotifications, NotificationType } from '../types/notifications'
 import { supabase } from '../lib/supabase'
@@ -21,6 +21,8 @@ export function useNotifications({
   userDisplayName
 }: UseNotificationsProps) {
   const [profileAliases, setProfileAliases] = useState<string[]>([])
+  const seenAssignmentTicketsRef = useRef<Set<string>>(new Set())
+  const [assignmentSeenVersion, setAssignmentSeenVersion] = useState(0)
 
   useEffect(() => {
     if (!userId) {
@@ -118,6 +120,8 @@ export function useNotifications({
     }, null, 2))
 
     // Process comment mentions
+    const seenAssignments = seenAssignmentTicketsRef.current
+
     tickets.forEach(ticket => {
       console.log('[useNotifications] processing ticket', JSON.stringify({
         ticketId: ticket?.id ?? null,
@@ -164,7 +168,7 @@ export function useNotifications({
       }
 
       // Process assignments for current user
-      if (userId && ticket.assignee_id && ticket.assignee_id === userId) {
+      if (userId && ticket.assignee_id && ticket.assignee_id === userId && !seenAssignments.has(ticket.id)) {
         const isArchived = typeof ticket.board_column === 'string' && ticket.board_column === 'archived'
         const isDone = typeof ticket.status === 'string' && ticket.status.toLowerCase() === 'done'
         if (!isArchived && !isDone) {
@@ -215,7 +219,7 @@ export function useNotifications({
     // - Priority changes
     // - Checklist updates
     return result
-  }, [tickets, unreadMentions, hasUnreadMentions, userId])
+  }, [tickets, unreadMentions, hasUnreadMentions, userId, assignmentSeenVersion])
 
   useEffect(() => {
     console.log('[useNotifications] notifications snapshot raw', { userId, notificationsByBuilding })
@@ -278,6 +282,21 @@ export function useNotifications({
     await reloadMentions()
   }, [reloadMentions])
 
+  const markAssignmentsAsSeen = useCallback((ticketIds: string[]) => {
+    if (!Array.isArray(ticketIds) || ticketIds.length === 0) return
+    const set = seenAssignmentTicketsRef.current
+    let changed = false
+    ticketIds.forEach((ticketId) => {
+      if (typeof ticketId === 'string' && ticketId && !set.has(ticketId)) {
+        set.add(ticketId)
+        changed = true
+      }
+    })
+    if (changed) {
+      setAssignmentSeenVersion((version) => version + 1)
+    }
+  }, [])
+
   // Reload all notifications
   const reload = useCallback(() => {
     reloadMentions()
@@ -292,6 +311,7 @@ export function useNotifications({
     getBuildingAssignmentCount,
     buildingHasUnreadMentions, // Legacy compatibility
     markBuildingAsRead,
+    markAssignmentsAsSeen,
     reload,
     isLoading: mentionsLoading
   }

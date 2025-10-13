@@ -32,9 +32,10 @@ interface TicketDetailsModalProps {
   onSave: (updates: Partial<{ title: string; description: string; status: TicketStatus; priority: TicketPriority; assignee_id?: string | null; checklist: any; links: any; comments: any; attachments: any }>) => void
   onSaveToDatabase?: (ticketId: string, updates: any) => Promise<boolean>
   ticketPosition?: { x: number; y: number; width: number; height: number } | null
+  markAssignmentsAsSeen?: (ticketIds: string[]) => void
 }
 
-export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, onClose, projectId, ticket, onSave, onSaveToDatabase, ticketPosition }) => {
+export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, onClose, projectId, ticket, onSave, onSaveToDatabase, ticketPosition, markAssignmentsAsSeen }) => {
   const { user } = useAuth()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -66,6 +67,7 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
   const prevProgressRef = useRef(progress)
   const [isProgressAnimating, setIsProgressAnimating] = useState(false)
   // isProgressAnimating is used in setIsProgressAnimating calls
+  const lastMarkedTicketRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!ticket) return
@@ -263,6 +265,33 @@ export const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({ isOpen, 
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!isOpen) {
+      lastMarkedTicketRef.current = null
+      return
+    }
+    if (!ticket || !user?.id) return
+    if (lastMarkedTicketRef.current === ticket.id) return
+
+    lastMarkedTicketRef.current = ticket.id
+
+    const commentIds = Array.isArray(ticket.comments)
+      ? ticket.comments
+          .map((comment) => (comment && typeof comment.id === 'string' ? comment.id : null))
+          .filter((id): id is string => Boolean(id))
+      : []
+
+    if (commentIds.length > 0) {
+      void markAllCommentsAsRead(ticket.id, commentIds, user.id).catch((error) => {
+        console.warn('⚠️ Failed to mark comments as read', error)
+      })
+    }
+
+    if (ticket.assignee_id && ticket.assignee_id === user.id && markAssignmentsAsSeen) {
+      markAssignmentsAsSeen([ticket.id])
+    }
+  }, [isOpen, ticket?.id, ticket?.comments, ticket?.assignee_id, user?.id, markAssignmentsAsSeen])
 
   if (!isOpen || !ticket) return null
 

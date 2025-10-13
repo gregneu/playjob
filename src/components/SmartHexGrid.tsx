@@ -320,26 +320,12 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
         const mentionNotificationCount = Array.isArray(buildingNotifications?.notifications)
           ? buildingNotifications.notifications.filter((notification) => notification.type === 'comment_mention').length
           : 0
-        const commentCountFromTickets = buildingTickets.reduce((count, ticket) => {
-          if (!ticket) return count
-          if (Array.isArray(ticket?.comments)) {
-            return count + ticket.comments.length
-          }
-          const fallbackFields = [
-            (ticket as any)?.commentCount,
-            (ticket as any)?.comment_count,
-            (ticket as any)?.comments_count,
-            (ticket as any)?.comment_counts
-          ]
-          const fallbackValue = fallbackFields.find((value) => typeof value === 'number' && Number.isFinite(value))
-          return count + (fallbackValue ? Number(fallbackValue) : 0)
-        }, 0)
         const commentCountFromNotifications = typeof buildingNotifications?.commentCount === 'number'
           ? buildingNotifications.commentCount
           : 0
-        const totalCommentCount = commentCountFromTickets > 0
-          ? commentCountFromTickets
-          : (commentCountFromNotifications > 0 ? commentCountFromNotifications : mentionNotificationCount)
+        const totalCommentCount = commentCountFromNotifications > 0
+          ? commentCountFromNotifications
+          : mentionNotificationCount
         const hasUnreadMentions = buildingId && buildingTickets.length > 0 && buildingHasUnreadMentions
           ? buildingHasUnreadMentions(buildingId, buildingTickets)
           : false

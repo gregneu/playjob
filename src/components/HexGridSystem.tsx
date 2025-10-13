@@ -167,6 +167,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const { 
     notificationsByBuilding,
     buildingHasUnreadMentions,
+    markAssignmentsAsSeen,
     reload: reloadNotifications 
   } = useNotifications({
     projectId,
@@ -5185,6 +5186,7 @@ const isSprintZoneObject = useCallback((zoneObject: any | null | undefined) => {
             return false
           }
         }}
+        markAssignmentsAsSeen={markAssignmentsAsSeen}
       />
 
       {/* Уведомления */}
