@@ -21,8 +21,39 @@ export function useNotifications({
   userDisplayName
 }: UseNotificationsProps) {
   const [profileAliases, setProfileAliases] = useState<string[]>([])
+  const STORAGE_KEY = useMemo(() => userId ? `pj-assignments-seen-${userId}` : null, [userId])
+
   const seenAssignmentTicketsRef = useRef<Set<string>>(new Set())
   const [assignmentSeenVersion, setAssignmentSeenVersion] = useState(0)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!STORAGE_KEY) {
+      if (seenAssignmentTicketsRef.current.size > 0) {
+        seenAssignmentTicketsRef.current = new Set()
+        setAssignmentSeenVersion((version) => version + 1)
+      }
+      return
+    }
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          seenAssignmentTicketsRef.current = new Set(parsed.filter((id: unknown) => typeof id === 'string'))
+          setAssignmentSeenVersion((version) => version + 1)
+        } else {
+          seenAssignmentTicketsRef.current = new Set()
+        }
+      } else {
+        seenAssignmentTicketsRef.current = new Set()
+      }
+    } catch (err) {
+      console.warn('[useNotifications] Failed to load assignment seen cache', err)
+      seenAssignmentTicketsRef.current = new Set()
+    }
+  }, [STORAGE_KEY])
 
   useEffect(() => {
     if (!userId) {
@@ -294,8 +325,15 @@ export function useNotifications({
     })
     if (changed) {
       setAssignmentSeenVersion((version) => version + 1)
+      if (STORAGE_KEY && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)))
+        } catch (err) {
+          console.warn('[useNotifications] Failed to persist assignment seen cache', err)
+        }
+      }
     }
-  }, [])
+  }, [STORAGE_KEY])
 
   // Reload all notifications
   const reload = useCallback(() => {
