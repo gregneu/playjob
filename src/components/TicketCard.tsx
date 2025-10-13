@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { UserAvatar } from './UserAvatar'
 
 type TicketPriority = 'v-low' | 'low' | 'medium' | 'high' | 'veryhigh'
@@ -72,7 +72,6 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   unreadCommentCount = 0,
   unseenAssignmentCount = 0
 }) => {
-  // ДОБАВЛЯЕМ ЛОГИРОВАНИЕ ПРИ РЕНДЕРЕ
   console.log('🎨 TicketCard: RENDERING ticket:', id, title, 'draggable:', draggable)
 
   const priorityLabel = getPriorityLabel(priority)
@@ -80,8 +79,12 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   const hasAssignmentUpdate = (unseenAssignmentCount ?? 0) > 0
   const hasUpdates = hasCommentUpdate || hasAssignmentUpdate
 
-  const notificationStyleTag = useMemo(() => (
-    `<style>
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    if (document.head.querySelector('style[data-ticket-card-notifications]')) return
+    const style = document.createElement('style')
+    style.setAttribute('data-ticket-card-notifications', 'true')
+    style.innerHTML = `
       .ticket-card { overflow: visible; position: relative; }
       .ticket-card--updates::before,
       .ticket-card--updates::after {
@@ -108,25 +111,14 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         60% { opacity: 0.2; transform: scale(1.1); }
         100% { opacity: 0; transform: scale(1.18); }
       }
-      .ticket-card-avatar {
-        flex: 1;
-        min-width: 0;
-      }
-      .ticket-card-avatar span {
-        max-width: 110px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: block;
-      }
-      .notification-icon {
+      .ticket-card .notification-icon {
         filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
         transform-origin: center;
       }
-      .notification-icon--comment {
+      .ticket-card .notification-icon--comment {
         animation: notification-comment-pulse 1.8s ease-in-out infinite;
       }
-      .notification-icon--assignment {
+      .ticket-card .notification-icon--assignment {
         animation: notification-assignment-pulse 1.8s ease-in-out infinite;
         animation-delay: 0.4s;
       }
@@ -138,13 +130,21 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         0%, 100% { transform: scale(1); opacity: 1; }
         50% { transform: scale(1.32); opacity: 0.78; }
       }
-    </style>`
-  ), [])
+      .ticket-card-avatar-name {
+        max-width: 110px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+      }
+    `
+    document.head.appendChild(style)
+  }, [])
 
-  const updateIndicators: React.ReactNode[] = useMemo(() => {
+  const updateIndicators = useMemo(() => {
     const indicators: React.ReactNode[] = []
     if (hasCommentUpdate) {
-      indicators.push((
+      indicators.push(
         <div
           key="comment"
           style={{ display: 'flex', alignItems: 'center', gap: unreadCommentCount > 1 ? 4 : 0 }}
@@ -159,10 +159,10 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             <span style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}>{unreadCommentCount}</span>
           )}
         </div>
-      ))
+      )
     }
     if (hasAssignmentUpdate) {
-      indicators.push((
+      indicators.push(
         <div
           key="assignment"
           style={{ display: 'flex', alignItems: 'center', gap: unseenAssignmentCount > 1 ? 4 : 0 }}
@@ -177,7 +177,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             <span style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF' }}>{unseenAssignmentCount}</span>
           )}
         </div>
-      ))
+      )
     }
     return indicators
   }, [hasCommentUpdate, hasAssignmentUpdate, unreadCommentCount, unseenAssignmentCount])
