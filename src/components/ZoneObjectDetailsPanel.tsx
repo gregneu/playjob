@@ -177,7 +177,7 @@ export const ZoneObjectDetailsPanel: React.FC<ZoneObjectDetailsPanelProps> = ({
       
       // Get project_id from zone_object
       if (!zoneObject?.zone_id) {
-        console.warn('⚠️ No zone_id available for zoneObject')
+        console.debug('ZoneObjectDetailsPanel: zone_id missing, skipping team load')
         setTeamMembers([])
         setIsLoadingTeam(false)
         return

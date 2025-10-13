@@ -240,6 +240,20 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const hoverTargetsRef = useRef<Map<string, THREE.Object3D>>(new Map())
   const rocketCopiesRef = useRef<RocketTicketCopy[]>([])
+  const pendingSprintDropRef = useRef<{
+    ticketId: string
+    originZoneObjectId: string | null
+    status: RocketTicketGhostStatus
+    sprintZoneObjectId: string | null
+  } | null>(null)
+  const queuePendingSprintDrop = useCallback((ticketId: string, status: RocketTicketGhostStatus, originZoneObjectId: string | null, sprintZoneObjectId: string | null) => {
+    pendingSprintDropRef.current = {
+      ticketId,
+      originZoneObjectId,
+      status,
+      sprintZoneObjectId
+    }
+  }, [])
   const sprintZoneIdsRef = useRef<Set<string>>(new Set())
   
   // Функции для регистрации hover targets
@@ -292,9 +306,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     }))
   }, [rocketTicketCopies, sprintObjectId])
 
+  const hasPermissionPersistError = sprintPersistError === 'permission'
+
   useEffect(() => {
-    if (!sprintObjectId || !isSprintStateLoaded) return
-    if (sprintPersistError === 'permission') return
+    if (!sprintObjectId || !isSprintStateLoaded || hasPermissionPersistError) return
 
     const plannedIds = rocketTicketCopies.filter((copy) => copy.status === 'planned').map((copy) => copy.ticketId)
     const doneIds = rocketTicketCopies.filter((copy) => copy.status === 'done').map((copy) => copy.ticketId)
@@ -336,14 +351,12 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         } catch (error) {
           if (error instanceof SaveSprintStateError) {
             if (error.reason === 'rls_denied') {
-              if (sprintPersistError !== 'permission') {
-                setSprintPersistError('permission')
-                setNotification({
-                  message: 'You need edit access to plan sprints in this project.',
-                  type: 'error'
-                })
-                setTimeout(() => setNotification(null), 4000)
-              }
+              setSprintPersistError('permission')
+              setNotification({
+                message: 'You need edit access to plan sprints in this project.',
+                type: 'error'
+              })
+              setTimeout(() => setNotification(null), 4000)
             } else if (error.reason === 'not_found') {
               setSprintPersistError('missing')
               setActiveSprintId(null)
@@ -369,7 +382,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     sprintStartedAt,
     activeSprintId,
     isSprintStateLoaded,
-    sprintPersistError,
+    hasPermissionPersistError,
     bumpSprintMetadata
   ])
 
@@ -2672,42 +2685,55 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     setRocketTicketCopies((prev) => prev.filter((copy) => copy.ticketId !== ticketId))
   }, [])
 
+  const processPendingSprintDrop = useCallback(() => {
+    const pending = pendingSprintDropRef.current
+    if (!pending) return
+    if (pending.sprintZoneObjectId && pending.sprintZoneObjectId !== sprintObjectId) {
+      return
+    }
+    pendingSprintDropRef.current = null
+    upsertRocketCopy(pending.ticketId, pending.status, pending.originZoneObjectId)
+    if (pending.status === 'done' && isSprintStarted && pending.sprintZoneObjectId) {
+      const currentFrom = pending.originZoneObjectId
+        || findTicketDetails(pending.ticketId)?.zone_object_id
+        || null
+
+      if (currentFrom && currentFrom !== pending.sprintZoneObjectId) {
+        moveTicket(pending.ticketId, currentFrom, pending.sprintZoneObjectId)
+      }
+
+      if (activeSprintId) {
+        void (async () => {
+          try {
+            const { ticketService } = await import('../lib/supabase')
+            await ticketService.assignTicketsToSprint([pending.ticketId], activeSprintId, { boardColumn: 'in_sprint' })
+          } catch (err) {
+            console.error('Failed to assign ticket to sprint after processing pending drop', err)
+          }
+        })()
+      }
+    }
+  }, [sprintObjectId, upsertRocketCopy, isSprintStarted, findTicketDetails, moveTicket, activeSprintId])
+
+  useEffect(() => {
+    if (!isSprintStateLoaded) return
+    processPendingSprintDrop()
+  }, [isSprintStateLoaded, sprintObjectId, processPendingSprintDrop])
+
   // Load sprint state (planned/done ghosts, metadata) from Supabase
   useEffect(() => {
     let cancelled = false
 
     setIsSprintStateLoaded(false)
-    setActiveSprintId(null)
+    setSprintPersistError(null)
     setPlannedCountAtStart(null)
-    setIsSprintStarted(false)
-    setSprintStartedAt(null)
 
-    const resetSprintState = () => {
-      if (cancelled) return
-      setSprintPersistError(null)
-      setRocketTicketCopies([])
-      setPlannedTickets(new Set())
+    if (!sprintObjectId) {
       setActiveSprintId(null)
       setIsSprintStarted(false)
       setSprintStartedAt(null)
-      setPlannedCountAtStart(null)
-      if (sprintObjectId) {
-        setActiveSprintNames(prev => {
-          const next = { ...prev }
-          delete next[sprintObjectId]
-          return next
-        })
-      }
-      if (sprintObjectId) {
-        setSprintProgressByObject(prev => ({
-          ...prev,
-          [sprintObjectId]: { total: 0, done: 0 }
-        }))
-      }
-    }
-
-    if (!sprintObjectId) {
-      resetSprintState()
+      setRocketTicketCopies([])
+      setPlannedTickets(new Set())
       setSprintName('Sprint')
       setSprintWeeks(2)
       setIsSprintStateLoaded(true)
@@ -2718,7 +2744,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       try {
         const { sprintService } = await import('../lib/supabase')
         const remote = await sprintService.getCurrentSprintForObject(projectId, sprintObjectId)
-        if (cancelled) return false
+        if (cancelled) return
 
         if (remote) {
           setActiveSprintId(remote.id || null)
@@ -2738,36 +2764,60 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           }
 
           const plannedIds = Array.isArray(remote.planned_ticket_ids)
-            ? remote.planned_ticket_ids.filter((id: any) => typeof id === 'string')
+            ? remote.planned_ticket_ids.filter((id): id is string => typeof id === 'string')
             : []
           const doneIds = Array.isArray(remote.done_ticket_ids)
-            ? remote.done_ticket_ids.filter((id: any) => typeof id === 'string')
+            ? remote.done_ticket_ids.filter((id): id is string => typeof id === 'string')
             : []
 
           const remoteCopies: RocketTicketCopy[] = []
           plannedIds.forEach((id) => { remoteCopies.push(buildRocketCopy(id, 'planned', null)) })
           doneIds.forEach((id) => { remoteCopies.push(buildRocketCopy(id, 'done', null)) })
 
-          setRocketTicketCopies(remoteCopies)
-          setPlannedTickets(new Set(plannedIds))
-          setPlannedCountAtStart(plannedIds.length)
-          setSprintProgressByObject(prev => ({
-            ...prev,
-            [sprintObjectId]: {
-              total: plannedIds.length + doneIds.length,
-              done: doneIds.length
-            }
-          }))
-          setIsSprintStateLoaded(true)
-          return
+          const hadLocalCopies = rocketCopiesRef.current.length > 0
+          const remoteHasCopies = remoteCopies.length > 0
+
+          if (remoteHasCopies || !hadLocalCopies) {
+            setRocketTicketCopies(remoteCopies)
+            setPlannedTickets(new Set(plannedIds))
+            setPlannedCountAtStart(plannedIds.length)
+            setSprintProgressByObject(prev => ({
+              ...prev,
+              [sprintObjectId]: {
+                total: plannedIds.length + doneIds.length,
+                done: doneIds.length
+              }
+            }))
+          } else {
+            // Keep local copies; just sync auxiliary state from them.
+            const localCopies = rocketCopiesRef.current
+            const localPlannedIds = localCopies
+              .filter((copy) => copy.status === 'planned')
+              .map((copy) => copy.ticketId)
+            const localDoneCount = localCopies.filter((copy) => copy.status === 'done').length
+
+            setPlannedTickets(new Set(localPlannedIds))
+            setPlannedCountAtStart((prev) => (prev === null ? localPlannedIds.length : prev))
+            setSprintProgressByObject(prev => ({
+              ...prev,
+              [sprintObjectId]: {
+                total: localCopies.length,
+                done: localDoneCount
+              }
+            }))
+          }
+        } else {
+          setActiveSprintId(null)
+          setIsSprintStarted(false)
+          setSprintStartedAt(null)
         }
       } catch (error) {
         console.error('Failed to load sprint state from Supabase', error)
+      } finally {
+        if (!cancelled) {
+          setIsSprintStateLoaded(true)
+        }
       }
-      resetSprintState()
-      setSprintName('Sprint')
-      setSprintWeeks(2)
-      setIsSprintStateLoaded(true)
     }
 
     loadFromSupabase()
@@ -2785,6 +2835,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
       if (!isSprintStarted) {
         if (to === sprintObjectId) {
+          if (!isSprintStateLoaded) {
+            upsertRocketCopy(ticketId, 'planned', from || null)
+            queuePendingSprintDrop(ticketId, 'planned', from || null, sprintObjectId)
+            return
+          }
           upsertRocketCopy(ticketId, 'planned', from || null)
           return
         }
@@ -2809,7 +2864,13 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       if (to === sprintObjectId) {
         const existing = rocketCopiesRef.current.find((copy) => copy.ticketId === ticketId)
         if (existing) {
-          upsertRocketCopy(ticketId, 'done', from || existing.originZoneObjectId || null)
+          const origin = from || existing.originZoneObjectId || null
+          if (!isSprintStateLoaded) {
+            upsertRocketCopy(ticketId, 'done', origin)
+            queuePendingSprintDrop(ticketId, 'done', origin, sprintObjectId)
+            return
+          }
+          upsertRocketCopy(ticketId, 'done', origin)
           if (activeSprintId) {
             void (async () => {
               try {
@@ -2826,7 +2887,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
     window.addEventListener('ticket-moved' as any, onMoved as any, true)
     return () => window.removeEventListener('ticket-moved' as any, onMoved as any, true)
-  }, [isSprintStarted, sprintObjectId, upsertRocketCopy, removeRocketCopy, activeSprintId])
+  }, [isSprintStarted, sprintObjectId, upsertRocketCopy, removeRocketCopy, activeSprintId, isSprintStateLoaded, queuePendingSprintDrop])
 
   useEffect(() => {
     if (rocketTicketCopies.length === 0) return
@@ -3225,6 +3286,12 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         ? ensureSprintContext(targetZoneObject)
         : sprintObjectId
 
+      if (dragData.isSprintGhostRemoval && dragData.ticketId && !isSprintStarted) {
+        console.log('🧹 Removing rocket copy via free drop (sprint not started)')
+        removeRocketCopy(dragData.ticketId)
+        return
+      }
+
       if (!dropTarget) {
         if (dragData.isSprintGhostRemoval && dragData.ticketId) {
           console.log('🧹 Removing rocket copy after drop outside sprint')
@@ -3290,6 +3357,14 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }
 
         if (nextStatus === 'planned' && existing && existing.status === 'planned' && !isSprintStarted) {
+          return
+        }
+
+        const targetSprintZoneId = sprintZoneId ?? sprintObjectId ?? null
+        const switchingSprintContext = Boolean(targetSprintZoneId && targetSprintZoneId !== sprintObjectId)
+        if (switchingSprintContext || !isSprintStateLoaded) {
+          upsertRocketCopy(ticketId, nextStatus, origin ?? null)
+          queuePendingSprintDrop(ticketId, nextStatus, origin ?? null, targetSprintZoneId)
           return
         }
 
@@ -3361,6 +3436,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     ensureSprintContext,
     findTicketDetails,
     isSprintStarted,
+    isSprintStateLoaded,
+    queuePendingSprintDrop,
     sprintObjectId,
     activeSprintId,
     getCachedRocketCopy
@@ -4024,7 +4101,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           Loading error: {error}
           <br />
           <button 
-            onClick={reloadData}
+            onClick={() => { void reloadData() }}
             style={{
               marginTop: '10px',
               padding: '8px 16px',
@@ -4055,6 +4132,25 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           e.preventDefault()
           e.stopPropagation()
 
+          const removalPayload = e.dataTransfer?.getData('application/x-remove-from-sprint')
+          if (removalPayload) {
+            try {
+              const parsed = JSON.parse(removalPayload)
+              const ticketId = typeof parsed?.ticketId === 'string' ? parsed.ticketId : null
+              if (ticketId) {
+                if (!isSprintStarted) {
+                  console.log('🧹 Removing rocket copy via simple drop (sprint not started)')
+                  removeRocketCopy(ticketId)
+                } else {
+                  console.log('🚫 Sprint active, ignoring simple drop removal for ticket', ticketId)
+                }
+                return
+              }
+            } catch (error) {
+              console.error('Failed to parse sprint removal payload in simple drop', error)
+            }
+          }
+
           const existingTicketPayload = e.dataTransfer?.getData('application/x-existing-ticket')
           if (existingTicketPayload) {
             console.log('🎯 Existing ticket drop detected:', existingTicketPayload)
@@ -4082,10 +4178,17 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
               const targetZoneObject = dropTarget.zoneObject
               if (isSprintZoneObject(targetZoneObject)) {
                 ensureSprintContext(targetZoneObject)
+                const sprintZoneId = (targetZoneObject as any)?.id || sprintObjectId || null
                 const existing = rocketCopiesRef.current.find((copy) => copy.ticketId === ticketId)
-                const nextStatus: RocketTicketGhostStatus = existing
-                  ? (existing.status === 'planned' ? 'done' : existing.status)
-                  : 'planned'
+              const nextStatus: RocketTicketGhostStatus = existing
+                ? (existing.status === 'planned' ? 'done' : existing.status)
+                : 'planned'
+              const switchingSprintContext = Boolean(sprintZoneId && sprintZoneId !== sprintObjectId)
+              if (switchingSprintContext || !isSprintStateLoaded) {
+                upsertRocketCopy(ticketId, nextStatus, fromZoneObjectId)
+                queuePendingSprintDrop(ticketId, nextStatus, fromZoneObjectId, sprintZoneId)
+                return
+              }
                 console.log('🚀 Updating rocket copy via fallback drop handler', { ticketId, nextStatus })
                 upsertRocketCopy(ticketId, nextStatus, fromZoneObjectId)
                 return
