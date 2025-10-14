@@ -2859,20 +2859,24 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         if (to === sprintObjectId) {
           if (!isSprintStateLoaded) {
             upsertRocketCopy(ticketId, 'planned', from || null)
+            scheduleBadgeAnimation(sprintObjectId, 'gain')
             queuePendingSprintDrop(ticketId, 'planned', from || null, sprintObjectId)
             return
           }
           upsertRocketCopy(ticketId, 'planned', from || null)
+          scheduleBadgeAnimation(sprintObjectId, 'gain')
           return
         }
         if (from === sprintObjectId) {
           removeRocketCopy(ticketId)
+          scheduleBadgeAnimation(sprintObjectId, 'lose')
         }
         return
       }
 
       if (from === sprintObjectId && to && to !== sprintObjectId) {
         upsertRocketCopy(ticketId, 'planned', to || null)
+        scheduleBadgeAnimation(sprintObjectId, 'gain')
         void (async () => {
           try {
             const { ticketService } = await import('../lib/supabase')
@@ -2893,6 +2897,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             return
           }
           upsertRocketCopy(ticketId, 'done', origin)
+          scheduleBadgeAnimation(sprintObjectId, 'gain')
           if (activeSprintId) {
             void (async () => {
               try {
@@ -3392,6 +3397,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
         console.log('🚀 Updating rocket copy for ticket:', ticketId, 'status:', nextStatus)
         upsertRocketCopy(ticketId, nextStatus, origin)
+        if (!isSprintStarted && nextStatus === 'planned') {
+          scheduleBadgeAnimation(sprintZoneId ?? sprintObjectId ?? null, 'gain')
+        }
 
         if (nextStatus === 'done' && isSprintStarted && sprintZoneId) {
           const currentFrom = dragData.fromZoneObjectId
@@ -3455,6 +3463,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     moveTicket,
     removeRocketCopy,
     upsertRocketCopy,
+    scheduleBadgeAnimation,
     ensureSprintContext,
     findTicketDetails,
     isSprintStarted,
@@ -4200,19 +4209,22 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
               const targetZoneObject = dropTarget.zoneObject
               if (isSprintZoneObject(targetZoneObject)) {
                 ensureSprintContext(targetZoneObject)
-                const sprintZoneId = (targetZoneObject as any)?.id || sprintObjectId || null
-                const existing = rocketCopiesRef.current.find((copy) => copy.ticketId === ticketId)
-              const nextStatus: RocketTicketGhostStatus = existing
-                ? (existing.status === 'planned' ? 'done' : existing.status)
-                : 'planned'
-              const switchingSprintContext = Boolean(sprintZoneId && sprintZoneId !== sprintObjectId)
-              if (switchingSprintContext || !isSprintStateLoaded) {
-                upsertRocketCopy(ticketId, nextStatus, fromZoneObjectId)
+          const sprintZoneId = (targetZoneObject as any)?.id || sprintObjectId || null
+          const existing = rocketCopiesRef.current.find((copy) => copy.ticketId === ticketId)
+          const nextStatus: RocketTicketGhostStatus = existing
+            ? (existing.status === 'planned' ? 'done' : existing.status)
+            : 'planned'
+          const switchingSprintContext = Boolean(sprintZoneId && sprintZoneId !== sprintObjectId)
+          if (switchingSprintContext || !isSprintStateLoaded) {
+            upsertRocketCopy(ticketId, nextStatus, fromZoneObjectId)
                 queuePendingSprintDrop(ticketId, nextStatus, fromZoneObjectId, sprintZoneId)
                 return
               }
                 console.log('🚀 Updating rocket copy via fallback drop handler', { ticketId, nextStatus })
                 upsertRocketCopy(ticketId, nextStatus, fromZoneObjectId)
+                if (!isSprintStarted && nextStatus === 'planned') {
+                  scheduleBadgeAnimation(sprintZoneId ?? sprintObjectId ?? null, 'gain')
+                }
                 return
               }
 
@@ -4937,7 +4949,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           
           {/* DropHandler для обработки drop событий с доступом к Three.js */}
           <DropHandler />
-          
+
           </WindProvider>
         </Canvas>
         

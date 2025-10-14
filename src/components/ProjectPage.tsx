@@ -2,13 +2,13 @@ import React, { useState } from 'react'
 import { HexGridSystem } from './HexGridSystem'
 import { GlassPanel } from './GlassPanel'
 import { UserAvatar } from './UserAvatar'
-import { UserStats } from './UserStats'
 import { ShareModal } from './share/ShareModal'
 // import { Code2, Boxes, Hexagon, FlaskConical } from 'lucide-react'
 import { sprintService } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { supabase, getUserAssignedTicketsCount } from '../lib/supabase'
 import type { Project } from '../types/enhanced'
+import { useProjectStats } from '../hooks/useProjectStats'
 // AvatarCreatorModal removed
 
 interface ProjectPageProps {
@@ -47,6 +47,66 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
   // const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [assignedTicketsCount, setAssignedTicketsCount] = useState<number>(0)
   const [, setProjectMembers] = useState<Array<{ id: string; full_name: string | null; email: string | null; role: string }>>([])
+  const { stats } = useProjectStats({ projectId: project.id })
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const [projectIconLocal, setProjectIconLocal] = useState(project.icon || '')
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+
+  React.useEffect(() => {
+    setProjectIconLocal(project.icon || '')
+  }, [project.icon])
+
+  const handleLogoSelected = async (file: File) => {
+    try {
+      setIsUploadingLogo(true)
+      const arrayBuffer = await file.arrayBuffer()
+      const bytes = new Uint8Array(arrayBuffer)
+      let base64 = ''
+      if (typeof window !== 'undefined') {
+        let binary = ''
+        const chunk = 0x8000
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)))
+        }
+        base64 = btoa(binary)
+      } else if ((globalThis as any).Buffer) {
+        base64 = (globalThis as any).Buffer.from(bytes).toString('base64')
+      }
+      if (!base64) return
+      const dataUrl = `data:${file.type || 'image/png'};base64,${base64}`
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ icon: dataUrl, updated_at: new Date().toISOString() })
+        .eq('id', project.id)
+        .select()
+        .single()
+      if (error) throw error
+      setProjectState(prev => (data ? data : prev))
+      setProjectIconLocal(data?.icon || dataUrl)
+    } catch (err) {
+      console.error('Failed to update project logo', err)
+    } finally {
+      setIsUploadingLogo(false)
+    }
+  }
+
+  const handleLogoClick = () => {
+    if (isUploadingLogo) return
+    window.requestAnimationFrame(() => {
+      fileInputRef.current?.click()
+    })
+  }
+
+  const handleLogoInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files && event.target.files[0]
+    if (file) {
+      handleLogoSelected(file)
+    }
+    event.target.value = ''
+  }
+
+  const logoIsImage = typeof projectIconLocal === 'string' && (projectIconLocal.startsWith('data:') || projectIconLocal.startsWith('http'))
+const progressPercent = Math.min(100, Math.max(0, stats.totalTickets > 0 ? (stats.doneTickets / stats.totalTickets) * 100 : 0))
   
   // expose project globally for in-scene consumers like central flag text
   try { (window as any).currentProject = project } catch {}
@@ -154,6 +214,9 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
       width: '100vw',
       position: 'relative',
       overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,0.35)',
+              border: '1px solid rgba(255,255,255,0.35)',
+              border: '1px solid rgba(255,255,255,0.35)',
       background: 'radial-gradient(1000px 700px at 50% 40%, #FFFFFF 0%, #FFFFFF 20%, #EBECF7 70%, #EBECF7 100%)'
     } as React.CSSProperties}>
       {/* Full Screen Map */}
@@ -168,8 +231,16 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
         <HexGridSystem projectId={project.id} />
       </div>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleLogoInputChange}
+      />
+
       {/* Header Overlay */}
-      <div style={{
+      <div style={{ 
         position: 'absolute',
         top: '16px',
         left: '16px',
@@ -177,83 +248,177 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
         zIndex: 100,
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'flex-start'
+        alignItems: 'center',
+        gap: '16px',
+        pointerEvents: 'none'
       }}>
         <GlassPanel
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '16px',
-            padding: '8px 16px'
+            gap: '24px',
+            padding: '12px 24px',
+            pointerEvents: 'auto',
+            background: 'rgba(255,255,255,0.82)'
           }}
         >
           <button
             onClick={onBack}
             style={{
-              background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: 'white',
-              padding: '8px 32px',
-              borderRadius: '6px',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
               cursor: 'pointer',
-              fontSize: '14px',
-              transition: 'all 0.2s ease',
               display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
+              alignItems: 'center'
             }}
+            aria-label="Back to projects"
           >
-            ← Back
+            <img src="/icons/tabler-icon-arrow-left.svg" alt="" style={{ width: '20px', height: '20px' }} />
           </button>
 
-          {/* Share Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flex: 1 }}>
+            <div
+              onClick={handleLogoClick}
+              onKeyDown={(event) => { if (!isUploadingLogo && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); handleLogoClick() } }}
+              role="button"
+              tabIndex={0}
+              aria-label="Upload project logo"
+              style={{
+                padding: '6px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '95px',
+                height: '52px',
+                border: '1px solid rgba(255,255,255,0.35)',
+                borderRadius: '26px',
+                cursor: isUploadingLogo ? 'default' : 'pointer',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: 'inherit',
+                  background: 'radial-gradient(circle at 50% 35%, rgba(79,70,229,0.22), rgba(79,70,229,0))',
+                  pointerEvents: 'none'
+                }}
+              />
+              {isUploadingLogo ? (
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#4F46E5', letterSpacing: 0.4 }}>Uploading…</span>
+              ) : projectIconLocal ? (
+                projectIconLocal.startsWith('data:') || projectIconLocal.startsWith('http') ? (
+                  <img
+                    src={projectIconLocal}
+                    alt={project.name}
+                    style={{ maxWidth: '100%', maxHeight: '100%', width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                ) : (
+                  <span style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 700, color: '#4F46E5' }}>{projectIconLocal}</span>
+                )
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#4F46E5' }}>
+                  <img src="/icons/tabler-icon-upload.svg" alt="Upload" style={{ width: '22px', height: '22px', opacity: 0.7 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, letterSpacing: 0.4 }}>Upload logo</span>
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '18px',
+                padding: '9px 18px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <img
+                  src="/icons/tabler-icon-diamond-filled.svg"
+                  alt="Diamonds"
+                  style={{ width: '18px', height: '18px' }}
+                />
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#111827' }}>{stats.diamonds}</span>
+              </div>
+              <div style={{ width: '1px', height: '32px', background: 'rgba(148,163,184,0.35)' }} />
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 0.6 }}>nps</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#111827' }}>+{stats.nps ?? 12}</span>
+              </div>
+            </div>
+          </div>
+
           <button
             onClick={() => setShowShareModal((prev) => !prev)}
             style={{
-              background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: 'white',
-              padding: '6px',
-              borderRadius: '6px',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '32px',
-              height: '32px',
-              marginLeft: '16px'
-            } as React.CSSProperties}
-            title="Share project"
+              alignItems: 'center'
+            }}
+            aria-label="Share project"
           >
-            <img 
-              src="/icons/tabler-icon-world-share.svg" 
-              alt="Share" 
-              style={{ 
-                width: '16px', 
-                height: '16px',
-                filter: 'brightness(0) invert(1)' // Делаем иконку белой
-              } as React.CSSProperties} 
+            <img
+              src="/icons/tabler-icon-world-share.svg"
+              alt=""
+              style={{ width: '22px', height: '22px' }}
             />
           </button>
         </GlassPanel>
-        
-        {/* Statistics Panel - positioned in top right corner, vertically centered */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          right: '16px',
-          transform: 'translateY(-50%)',
-          zIndex: 110
-        }}>
-          <UserStats projectId={project.id} />
-        </div>
-        {/* Avatar editor removed */}
-      </div>
 
-      {/* Centered user avatar in header */}
-      <div style={{ position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)', zIndex: 110 }}>
-        <UserAvatar userId={user?.id} userName={user?.user_metadata?.full_name || user?.email} size={56} showName={false} />
+        <GlassPanel
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            padding: '12px 20px 16px',
+            pointerEvents: 'auto',
+            minWidth: '260px',
+            background: 'rgba(255,255,255,0.82)'
+          }}
+        >
+          <UserAvatar
+            userId={user?.id}
+            userName={user?.user_metadata?.full_name || user?.email}
+            size={54}
+            showName={false}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+            <div style={{
+              height: '6px',
+              width: '100%',
+              borderRadius: '999px',
+              background: 'rgba(148, 163, 184, 0.25)',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${progressPercent}%`,
+                background: 'linear-gradient(90deg, #4ade80 0%, #22d3ee 100%)',
+                borderRadius: '999px'
+              }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <img src="/icons/tabler-icon-diamond-filled.svg" alt="Diamonds" style={{ width: '16px', height: '16px' }} />
+                <span style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>{stats.diamonds}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <img src="/icons/tabler-icon-bookmark-filled.svg" alt="Tickets" style={{ width: '16px', height: '16px' }} />
+                <span style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>{assignedTicketsCount}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <img src="/icons/tabler-icon-beach.svg" alt="On break" style={{ width: '16px', height: '16px' }} />
+                <span style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>{stats.vacationUsers}</span>
+              </div>
+            </div>
+          </div>
+        </GlassPanel>
       </div>
 
       {/* Share Modal */}

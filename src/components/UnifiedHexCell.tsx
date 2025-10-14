@@ -199,7 +199,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
         position: absolute;
         inset: -4px;
         border-radius: 40px;
-        background: radial-gradient(circle, rgba(68, 132, 255, 0.35) 0%, rgba(68, 132, 255, 0) 70%);
+        background: radial-gradient(circle, rgba(68, 132, 255, 0.55) 0%, rgba(68, 132, 255, 0) 70%);
         opacity: 0;
         animation: notification-panel-wave 2.4s ease-out infinite;
       }
@@ -208,15 +208,15 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
         position: absolute;
         inset: -9px;
         border-radius: 44px;
-        border: 2px solid rgba(68, 132, 255, 0.35);
+        border: 2px solid rgba(68, 132, 255, 0.5);
         opacity: 0;
         animation: notification-panel-wave 2.4s ease-out infinite;
         animation-delay: 0.4s;
       }
       @keyframes notification-panel-wave {
         0% { opacity: 0; transform: scale(0.9); }
-        20% { opacity: 0.55; transform: scale(1); }
-        60% { opacity: 0.15; transform: scale(1.12); }
+        18% { opacity: 0.7; transform: scale(1); }
+        62% { opacity: 0.25; transform: scale(1.12); }
         100% { opacity: 0; transform: scale(1.18); }
       }
     </style>`
