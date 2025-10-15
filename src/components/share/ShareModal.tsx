@@ -191,7 +191,8 @@ export function ShareModal({ projectId, projectName, isOpen, onClose }: ShareMod
 
   const copyInviteLink = async () => {
     try {
-      await navigator.clipboard.writeText(`https://playjoob.com/invite/link?project=${projectId}`)
+      const baseUrl = import.meta.env.VITE_BASE_URL || window.location.origin
+      await navigator.clipboard.writeText(`${baseUrl}/invite/link?project=${projectId}`)
       setCopyState('copied')
       setTimeout(() => setCopyState('idle'), 1600)
     } catch (error) {

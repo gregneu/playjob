@@ -434,7 +434,7 @@ export const zoneObjectService = {
   // Создать объект зоны
   async createZoneObject(object: {
     zone_id: string
-    object_type: 'mountain' | 'castle' | 'house' | 'garden' | 'factory' | 'helipad' | 'story' | 'task' | 'bug' | 'test'
+    object_type: 'mountain' | 'castle' | 'house' | 'garden' | 'factory' | 'helipad' | 'story' | 'task' | 'bug' | 'test' | 'meet'
     title: string
     description?: string
     status?: string
@@ -463,9 +463,22 @@ export const zoneObjectService = {
       console.log('Status:', object.status)
       console.log('Priority:', object.priority)
       
+      // Generate unique Jitsi room ID for "meet" buildings
+      // Meet buildings can be created as 'house' type (from RadialMenu) or 'meet' type
+      const jitsiRoomId = (object.object_type === 'meet' || object.object_type === 'house') 
+        ? `playjoob-meet-${object.zone_id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        : null
+      
+      const insertData = {
+        ...object,
+        jitsi_room_id: jitsiRoomId
+      }
+      
+      console.log('Insert data with Jitsi room ID:', insertData)
+      
       const { data, error } = await supabase
         .from('zone_objects')
-        .insert(object)
+        .insert(insertData)
         .select()
         .single()
 

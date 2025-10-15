@@ -222,11 +222,18 @@ CREATE TRIGGER update_buildings_updated_at BEFORE UPDATE ON buildings
 ### ✅ **Шаг 3: Проверьте настройки аутентификации
 
 1. Откройте вкладку `Authentication → URL Configuration`.
-2. В поле **Site URL** укажите `https://playjoob.com`.
+2. В поле **Site URL** укажите ваш production URL (например, `https://playjoob.com`).
 3. В разделе **Redirect URLs** добавьте (каждую строку отдельно):
-   - `https://playjoob.com/auth/callback`
-   - `http://localhost:5173/auth/callback`
+   - `https://playjoob.com/auth/callback` (production)
+   - `http://localhost:5173/auth/callback` (development)
+   - `https://localhost:5173/auth/callback` (development with HTTPS)
 4. Сохраните изменения и перезапустите любое запущенное приложение, чтобы подтянуть новые настройки.
+
+**Примечание:** Для локальной разработки убедитесь, что в вашем `.env` файле установлены правильные значения:
+```
+VITE_BASE_URL=http://localhost:5173
+VITE_REDIRECT_URL=http://localhost:5173/auth/callback
+```
 
 ### ✅ **Шаг 4: Проверьте создание таблиц**
 

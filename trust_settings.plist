@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>trustList</key>
+	<dict>
+		<key>4122B18C67356EBAC84DAE499929D5A7C4EE2C57</key>
+		<dict>
+			<key>trustSettings</key>
+			<array>
+				<dict>
+					<key>kSecTrustSettingsPolicy</key>
+					<data>KoZIhvdMBQEFAQ==</data>
+					<key>kSecTrustSettingsResult</key>
+					<integer>1</integer>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+</dict>
+</plist>
