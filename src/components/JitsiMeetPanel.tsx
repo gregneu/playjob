@@ -147,10 +147,15 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
 
     try {
       const appId = 'vpaas-magic-cookie-2eae40794b2947ad92e0371e6c3d0bf4'
-      const domain = `${appId}.8x8.vc`
+      
+      // Use standard 8x8.vc domain for now to test basic connectivity
+      const domain = '8x8.vc'
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()
       const playjoobRoomId = `playjoob-meet-${cleanRoomId}`
-      const roomName = `${appId}/${playjoobRoomId}`
+      const roomName = playjoobRoomId
+      
+      console.log('🔧 Using standard 8x8.vc domain for testing')
+      console.log('🔧 Room name:', roomName)
       
       console.log('🎥 AppID:', appId)
       console.log('🎥 Domain:', domain)
@@ -203,27 +208,38 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
         return
       }
 
-      // Create connection with correct JaaS AppID-based domain
-      const newConnection = new JitsiMeetJS.JitsiConnection(null, jwt, {
+      // Create connection with standard 8x8.vc configuration
+      const connectionConfig = {
         hosts: {
-          domain,
-          muc: `conference.${domain}`
+          domain: '8x8.vc',
+          muc: 'conference.8x8.vc'
         },
-        serviceUrl: `wss://${domain}/xmpp-websocket`,
+        serviceUrl: 'wss://8x8.vc/xmpp-websocket',
         clientNode: 'http://jitsi.org/jitsimeet'
-      })
+      }
+      
+      console.log('🔗 JitsiMeetJS available:', !!JitsiMeetJS)
+      console.log('🔗 JitsiConnection available:', !!JitsiMeetJS.JitsiConnection)
+      
+      // Try connection without JWT first to test basic connectivity
+      console.log('🔗 Attempting connection without JWT...')
+      console.log('🔗 Connection config:', connectionConfig)
+      console.log('🔗 Room name:', roomName)
+      
+      const newConnection = new JitsiMeetJS.JitsiConnection(null, null, connectionConfig)
 
       console.log('🎥 Connection config:', {
         domain,
-        muc: `conference.${domain}`,
-        serviceUrl: `wss://${domain}/xmpp-websocket`,
+        muc: connectionConfig.hosts.muc,
+        serviceUrl: connectionConfig.serviceUrl,
         roomName,
-        jwtLength: jwt.length
+        usingJWT: false
       })
       
-      console.log('🌐 WebSocket URL being used:', `wss://${domain}/xmpp-websocket`)
-      console.log('🌐 Expected JaaS tenant domain:', domain)
-      console.log('🌐 Room name format:', roomName)
+      console.log('🌐 WebSocket URL:', connectionConfig.serviceUrl)
+      console.log('🌐 Domain:', domain)
+      console.log('🌐 Room name:', roomName)
+      console.log('🌐 MUC URL:', connectionConfig.hosts.muc)
 
       setConnection(newConnection)
 
@@ -244,6 +260,8 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
           code: error.code,
           type: error.type
         })
+        console.error('❌ Full error object:', error)
+        console.error('❌ Error stack:', error.stack)
         setIsLoading(false)
         setConnectionError(`Connection failed: ${error.message || 'Unknown error'}`)
       })
