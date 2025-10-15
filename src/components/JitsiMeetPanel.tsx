@@ -91,14 +91,24 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
     if (window.JitsiMeetJS) {
       console.log('🎥 JitsiMeetJS already loaded')
       setJitsiMeetJS(window.JitsiMeetJS)
+      
       // Initialize and connect
-      window.JitsiMeetJS.init()
+      try {
+        window.JitsiMeetJS.init()
+        console.log('🎥 JitsiMeetJS initialized')
+      } catch (initError) {
+        console.error('❌ JitsiMeetJS initialization failed:', initError)
+        setIsLoading(false)
+        setConnectionError('Failed to initialize Jitsi SDK')
+        return
+      }
+      
       connectToConference(window.JitsiMeetJS)
       return
     }
 
     const script = document.createElement('script')
-    script.src = 'https://8x8.vc/libs/lib-jitsi-meet.min.js'
+    script.src = 'https://meet.jit.si/libs/lib-jitsi-meet.min.js'
     script.async = true
     
     script.onload = () => {
@@ -107,16 +117,24 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
       setJitsiMeetJS(JitsiMeetJS)
       
       // Initialize JitsiMeetJS first
-      JitsiMeetJS.init()
-      console.log('🎥 JitsiMeetJS initialized')
+      try {
+        JitsiMeetJS.init()
+        console.log('🎥 JitsiMeetJS initialized')
+      } catch (initError) {
+        console.error('❌ JitsiMeetJS initialization failed:', initError)
+        setIsLoading(false)
+        setConnectionError('Failed to initialize Jitsi SDK')
+        return
+      }
       
       // Then connect to conference
       connectToConference(JitsiMeetJS)
     }
     
-    script.onerror = () => {
-      console.error('❌ Failed to load Jitsi Core SDK')
+    script.onerror = (error) => {
+      console.error('❌ Failed to load Jitsi Core SDK:', error)
       setIsLoading(false)
+      setConnectionError('Failed to load Jitsi SDK')
     }
     
     document.body.appendChild(script)
@@ -130,7 +148,12 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
   }, [isOpen])
 
   const connectToConference = useCallback(async (JitsiMeetJS: any) => {
-    if (!JitsiMeetJS) return
+    if (!JitsiMeetJS) {
+      console.error('❌ JitsiMeetJS is not available')
+      return
+    }
+    
+    console.log('🎥 Starting connection to Jitsi Meet...')
 
     // Check for secure context (HTTPS or localhost)
     const isSecureContext = window.isSecureContext || window.location.hostname === 'localhost'
@@ -141,147 +164,84 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
       return
     }
 
-    console.log('🎥 Connecting to JaaS conference...')
-    console.log('🔒 Secure context:', isSecureContext)
-    console.log('🌐 Current URL:', window.location.href)
+    console.log('🔒 Secure context confirmed')
 
     try {
       const appId = 'vpaas-magic-cookie-2eae40794b2947ad92e0371e6c3d0bf4'
       
-      // Use standard 8x8.vc domain for now to test basic connectivity
-      const domain = '8x8.vc'
+      // Use public Jitsi Meet for testing
+      const domain = 'meet.jit.si'
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()
       const playjoobRoomId = `playjoob-meet-${cleanRoomId}`
       const roomName = playjoobRoomId
       
-      console.log('🔧 Using standard 8x8.vc domain for testing')
+      console.log('🔧 Using public Jitsi Meet (meet.jit.si) for testing')
       console.log('🔧 Room name:', roomName)
       
-      console.log('🎥 AppID:', appId)
-      console.log('🎥 Domain:', domain)
       console.log('🎥 Room name:', roomName)
       console.log('🎥 User name:', userName)
-      console.log('🎥 User avatar:', userAvatar || 'No avatar')
-      console.log('🌐 Current origin:', window.location.origin)
-      console.log('🌐 Current hostname:', window.location.hostname)
 
       const jwt = "eyJraWQiOiJ2cGFhcy1tYWdpYy1jb29raWUtMmVhZTQwNzk0YjI5NDdhZDkyZTAzNzFlNmMzZDBiZjQvNTg4ZjBkLVNBTVBMRV9BUFAiLCJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJqaXRzaSIsImlzcyI6ImNoYXQiLCJpYXQiOjE3NjA1NDY4OTQsImV4cCI6MTc2MDU1NDA5NCwibmJmIjoxNzYwNTQ2ODg5LCJzdWIiOiJ2cGFhcy1tYWdpYy1jb29raWUtMmVhZTQwNzk0YjI5NDdhZDkyZTAzNzFlNmMzZDBiZjQiLCJjb250ZXh0Ijp7ImZlYXR1cmVzIjp7ImxpdmVzdHJlYW1pbmciOnRydWUsImZpbGUtdXBsb2FkIjp0cnVlLCJvdXRib3VuZC1jYWxsIjp0cnVlLCJzaXAtb3V0Ym91bmQtY2FsbCI6ZmFsc2UsInRyYW5zY3JpcHRpb24iOnRydWUsImxpc3QtdmlzaXRvcnMiOmZhbHNlLCJyZWNvcmRpbmciOnRydWUsImZsaXAiOmZhbHNlfSwidXNlciI6eyJoaWRkZW4tZnJvbS1yZWNvcmRlciI6ZmFsc2UsIm1vZGVyYXRvciI6dHJ1ZSwibmFtZSI6ImdyZWduZXUuZGUiLCJpZCI6Imdvb2dsZS1vYXV0aDJ8MTE3NjgxOTYwMTUwODAzOTUxMTkxIiwiYXZhdGFyIjoiIiwiZW1haWwiOiJncmVnbmV1LmRlQGdtYWlsLmNvbSJ9fSwicm9vbSI6IioifQ.TIm4HA2c4XXRyKufFDMxBctmF282zohiRHFX5hOTGz9QmCDsewVn9_za5iXGLawIggEWb0fuD6GP4659qCFwTNT_htMhdpac3WeNHFMgRzNbX8of1mh5Q8QtKH8E5heeeSBhpuYoTyL4gj9JqTXbdMD9UDZysAk0irzO4cstb3Tx3K--npV4w1XnPKshmv_BYrNWbKV0NMJGudyD56zu_c-9OvWex1ia3Ap5KHuZcPAST2BpWwtF9CrXX2rVpHp_rQTwUCb5gDTwZjirMJ123HPOwlWsGLi7g2MBS1kz4y0cFZbZnDW4vT8FBCs0x1RLhMmQkKWLvcQPRsTK-rXOmg"
 
-      // Validate JWT token
-      console.log('🔐 JWT Token length:', jwt.length)
-      console.log('🔐 JWT Token first 50 chars:', jwt.substring(0, 50))
-      try {
-        const jwtPayload = JSON.parse(atob(jwt.split('.')[1]))
-        console.log('🔐 JWT Payload:', jwtPayload)
-        console.log('🔐 JWT Subject (AppID):', jwtPayload.sub)
-        console.log('🔐 JWT Expires:', new Date(jwtPayload.exp * 1000).toISOString())
-        console.log('🔐 JWT Transcription field:', jwtPayload.context?.features?.transcription)
-        
-        // Check if JWT is expired
-        const now = Math.floor(Date.now() / 1000)
-        if (jwtPayload.exp < now) {
-          console.error('❌ JWT Token is EXPIRED!')
-          setConnectionError('JWT token has expired. Please generate a new one.')
-          setIsLoading(false)
-          return
-        } else {
-          console.log('✅ JWT Token is valid (not expired)')
-        }
-        
-        // Verify AppID matches
-        if (jwtPayload.sub !== appId) {
-          console.error('❌ JWT AppID mismatch!', {
-            jwtAppId: jwtPayload.sub,
-            expectedAppId: appId
-          })
-          setConnectionError('JWT AppID does not match expected AppID.')
-          setIsLoading(false)
-          return
-        } else {
-          console.log('✅ JWT AppID matches expected AppID')
-        }
-      } catch (jwtError) {
-        console.error('❌ Failed to decode JWT:', jwtError)
-        console.error('❌ JWT Error details:', jwtError.message)
-        setConnectionError('Invalid JWT token format.')
-        setIsLoading(false)
-        return
-      }
+      // Skip JWT validation for public Jitsi Meet
+      console.log('🔐 Using public Jitsi Meet (no JWT required)')
 
-      // Create connection with standard 8x8.vc configuration
+      // Create connection with public Jitsi Meet configuration
       const connectionConfig = {
         hosts: {
-          domain: '8x8.vc',
-          muc: 'conference.8x8.vc'
+          domain: 'meet.jit.si',
+          muc: 'conference.meet.jit.si'
         },
-        serviceUrl: 'wss://8x8.vc/xmpp-websocket',
+        serviceUrl: 'wss://meet.jit.si/xmpp-websocket',
         clientNode: 'http://jitsi.org/jitsimeet'
       }
       
-      console.log('🔗 JitsiMeetJS available:', !!JitsiMeetJS)
-      console.log('🔗 JitsiConnection available:', !!JitsiMeetJS.JitsiConnection)
-      
-      // Try connection without JWT first to test basic connectivity
-      console.log('🔗 Attempting connection without JWT...')
-      console.log('🔗 Connection config:', connectionConfig)
+      console.log('🔗 Attempting connection to public Jitsi Meet...')
       console.log('🔗 Room name:', roomName)
       
       const newConnection = new JitsiMeetJS.JitsiConnection(null, null, connectionConfig)
 
-      console.log('🎥 Connection config:', {
+      console.log('🎥 Connecting to:', {
         domain,
-        muc: connectionConfig.hosts.muc,
-        serviceUrl: connectionConfig.serviceUrl,
         roomName,
-        usingJWT: false
+        serviceUrl: connectionConfig.serviceUrl
       })
-      
-      console.log('🌐 WebSocket URL:', connectionConfig.serviceUrl)
-      console.log('🌐 Domain:', domain)
-      console.log('🌐 Room name:', roomName)
-      console.log('🌐 MUC URL:', connectionConfig.hosts.muc)
 
       setConnection(newConnection)
 
       // Set up connection event listeners
       newConnection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED, () => {
-        console.log('✅ Connected to JaaS successfully')
-        console.log('✅ WebSocket connection established')
+        console.log('✅ Connected to Jitsi Meet successfully')
         setIsConnected(true)
         joinConference(newConnection, roomName, JitsiMeetJS)
       })
 
       newConnection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, (error: any) => {
         console.error('❌ Connection failed:', error)
-        console.error('❌ WebSocket connection failed:', error)
-        console.error('❌ Error details:', {
-          message: error.message,
-          reason: error.reason,
-          code: error.code,
-          type: error.type
-        })
-        console.error('❌ Full error object:', error)
-        console.error('❌ Error stack:', error.stack)
         setIsLoading(false)
         setConnectionError(`Connection failed: ${error.message || 'Unknown error'}`)
       })
 
       newConnection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED, (error: any) => {
-        console.log('🔌 Disconnected from JaaS:', error)
-        if (error && error.reason) {
-          console.error('🔌 Disconnect reason:', error.reason)
-        }
+        console.log('🔌 Disconnected from Jitsi Meet:', error)
         setIsConnected(false)
-        onClose()
+        // Don't auto-close panel on disconnect - let user decide
+        // onClose()
       })
 
       // Connect
-      console.log('🎥 Attempting to connect to JaaS...')
-      console.log('🎥 WebSocket URL:', `wss://${domain}/xmpp-websocket`)
-      await newConnection.connect()
+      console.log('🎥 Attempting to connect...')
+      
+      try {
+        await newConnection.connect()
+        console.log('🎥 Connection attempt completed')
+      } catch (connectError) {
+        console.error('🎥 Connection attempt failed:', connectError)
+        throw connectError
+      }
 
     } catch (error) {
-      console.error('❌ Failed to connect to conference:', error)
+      console.error('❌ Failed to connect to Jitsi Meet:', error)
       setIsLoading(false)
       setConnectionError('Failed to initialize connection. Please try again.')
     }
@@ -315,13 +275,9 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
           resolution: 720
         }).then((tracks: JitsiTrack[]) => {
           tracks.forEach(track => {
-            if (track.getType() === 'video') {
-              newConference.addTrack(track)
-            } else if (track.getType() === 'audio') {
-              newConference.addTrack(track)
-            }
+            newConference.addTrack(track)
           })
-          console.log('✅ Local tracks added and enabled')
+          console.log('✅ Local tracks added:', tracks.length)
         }).catch((error: any) => {
           console.error('❌ Failed to create local tracks:', error)
         })
