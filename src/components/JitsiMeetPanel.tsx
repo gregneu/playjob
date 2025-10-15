@@ -160,15 +160,17 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
       console.log('🌐 Current origin:', window.location.origin)
       console.log('🌐 Current hostname:', window.location.hostname)
 
-      const jwt = "eyJraWQiOiJ2cGFhcy1tYWdpYy1jb29raWUtMmVhZTQwNzk0YjI5NDdhZDkyZTAzNzFlNmMzZDBiZjQvNTg4ZjBkLVNBTVBMRV9BUFAiLCJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJqaXRzaSIsImlzcyI6ImNoYXQiLCJpYXQiOjE3NjA1NDY4OTQsImV4cCI6MTc2MDU1NDA5NCwibmJmIjoxNzYwNTQ2ODg5LCJzdWIiOiJ2cGFhcy1tYWdpYy1jb29raWUtMmVhZTQwNzk0YjI5NDdhZDkyZTAzNzFlNmMzZDBiZjQiLCJjb250ZXh0Ijp7ImZlYXR1cmVzIjp7ImxpdmVzdHJlYW1pbmciOnRydWUsImZpbGUtdXBsb2FkIjp0cnVlLCJvdXRib3VuZC1jYWxsIjp0cnVlLCJzaXAtb3V0Ym91bmQtY2FsbCI6ZmFsc2UsInRyYW5zY3JpcHRpb24iOnJydWUsImxpc3QtdmlzaXRvcnMiOmZhbHNlLCJyZWNvcmRpbmciOnRydWUsImZsaXAiOmZhbHNlfSwidXNlciI6eyJoaWRkZW4tZnJvbS1yZWNvcmRlciI6ZmFsc2UsIm1vZGVyYXRvciI6dHJ1ZSwibmFtZSI6ImdyZWduZXUuZGUiLCJpZCI6Imdvb2dsZS1vYXV0aDJ8MTE3NjgxOTYwMTUwODAzOTUxMTkxIiwiYXZhdGFyIjoiIiwiZW1haWwiOiJncmVnbmV1LmRlQGdtYWlsLmNvbSJ9fSwicm9vbSI6IioifQ.TIm4HA2c4XXRyKufFDMxBctmF282zohiRHFX5hOTGz9QmCDsewVn9_za5iXGLawIggEWb0fuD6GP4659qCFwTNT_htMhdpac3WeNHFMgRzNbX8of1mh5Q8QtKH8E5heeeSBhpuYoTyL4gj9JqTXbdMD9UDZysAk0irzO4cstb3Tx3K--npV4w1XnPKshmv_BYrNWbKV0NMJGudyD56zu_c-9OvWex1ia3Ap5KHuZcPAST2BpWwtF9CrXX2rVpHp_rQTwUCb5gDTwZjirMJ123HPOwlWsGLi7g2MBS1kz4y0cFZbZnDW4vT8FBCs0x1RLhMmQkKWLvcQPRsTK-rXOmg"
+      const jwt = "eyJraWQiOiJ2cGFhcy1tYWdpYy1jb29raWUtMmVhZTQwNzk0YjI5NDdhZDkyZTAzNzFlNmMzZDBiZjQvNTg4ZjBkLVNBTVBMRV9BUFAiLCJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJqaXRzaSIsImlzcyI6ImNoYXQiLCJpYXQiOjE3NjA1NDY4OTQsImV4cCI6MTc2MDU1NDA5NCwibmJmIjoxNzYwNTQ2ODg5LCJzdWIiOiJ2cGFhcy1tYWdpYy1jb29raWUtMmVhZTQwNzk0YjI5NDdhZDkyZTAzNzFlNmMzZDBiZjQiLCJjb250ZXh0Ijp7ImZlYXR1cmVzIjp7ImxpdmVzdHJlYW1pbmciOnRydWUsImZpbGUtdXBsb2FkIjp0cnVlLCJvdXRib3VuZC1jYWxsIjp0cnVlLCJzaXAtb3V0Ym91bmQtY2FsbCI6ZmFsc2UsInRyYW5zY3JpcHRpb24iOnRydWUsImxpc3QtdmlzaXRvcnMiOmZhbHNlLCJyZWNvcmRpbmciOnRydWUsImZsaXAiOmZhbHNlfSwidXNlciI6eyJoaWRkZW4tZnJvbS1yZWNvcmRlciI6ZmFsc2UsIm1vZGVyYXRvciI6dHJ1ZSwibmFtZSI6ImdyZWduZXUuZGUiLCJpZCI6Imdvb2dsZS1vYXV0aDJ8MTE3NjgxOTYwMTUwODAzOTUxMTkxIiwiYXZhdGFyIjoiIiwiZW1haWwiOiJncmVnbmV1LmRlQGdtYWlsLmNvbSJ9fSwicm9vbSI6IioifQ.TIm4HA2c4XXRyKufFDMxBctmF282zohiRHFX5hOTGz9QmCDsewVn9_za5iXGLawIggEWb0fuD6GP4659qCFwTNT_htMhdpac3WeNHFMgRzNbX8of1mh5Q8QtKH8E5heeeSBhpuYoTyL4gj9JqTXbdMD9UDZysAk0irzO4cstb3Tx3K--npV4w1XnPKshmv_BYrNWbKV0NMJGudyD56zu_c-9OvWex1ia3Ap5KHuZcPAST2BpWwtF9CrXX2rVpHp_rQTwUCb5gDTwZjirMJ123HPOwlWsGLi7g2MBS1kz4y0cFZbZnDW4vT8FBCs0x1RLhMmQkKWLvcQPRsTK-rXOmg"
 
       // Validate JWT token
       console.log('🔐 JWT Token length:', jwt.length)
+      console.log('🔐 JWT Token first 50 chars:', jwt.substring(0, 50))
       try {
         const jwtPayload = JSON.parse(atob(jwt.split('.')[1]))
         console.log('🔐 JWT Payload:', jwtPayload)
         console.log('🔐 JWT Subject (AppID):', jwtPayload.sub)
         console.log('🔐 JWT Expires:', new Date(jwtPayload.exp * 1000).toISOString())
+        console.log('🔐 JWT Transcription field:', jwtPayload.context?.features?.transcription)
         
         // Check if JWT is expired
         const now = Math.floor(Date.now() / 1000)
@@ -195,6 +197,7 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
         }
       } catch (jwtError) {
         console.error('❌ Failed to decode JWT:', jwtError)
+        console.error('❌ JWT Error details:', jwtError.message)
         setConnectionError('Invalid JWT token format.')
         setIsLoading(false)
         return
