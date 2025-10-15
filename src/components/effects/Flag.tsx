@@ -17,7 +17,7 @@ export const Flag: React.FC<FlagProps> = ({
   text,
   position = [0, 0, 0],
   rotationY = 0,
-  poleHeight = 2.6,
+  poleHeight = 5.2,
   flagWidth = 1.8,
   flagHeight = 1.1,
   color = '#17162B'

@@ -23,7 +23,6 @@ import { BuildingType } from '../types/building'
 import { useAuth } from '../hooks/useAuth'
 import { useNotifications } from '../hooks/useNotifications'
 import { GlassPanel } from './GlassPanel'
-import { ObjectDetailsPanel } from './ObjectDetailsPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
 import { Vegetation } from './Vegetation'
@@ -648,7 +647,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Removed: states for building construction
   
   // State for details panel
-  const [isDetailsPanelOpen, setIsDetailsPanelOpen] = useState(false)
   
   // Единое состояние для модалки - БЕЗ множественных setState!
   const [modalConfig, setModalConfig] = useState<{
@@ -949,7 +947,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [radialMenuMousePosition, setRadialMenuMousePosition] = useState<[number, number] | null>(null)
   const setSelectedRadialOption = (_: string | null) => {}
   
-  const [selectedTask, setSelectedTask] = useState<any>(null)
   
   // State for camera hints
   
@@ -972,121 +969,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   }, [zoneObjects])
 
   // Function for saving task changes
-  const handleTaskSave = async (updatedTask: any) => {
-    console.log('=== SAVING TASK CHANGES ===')
-    console.log('Updated task object:', updatedTask)
-    console.log('Task ID:', updatedTask?.id)
-    console.log('Title:', updatedTask?.title)
-    console.log('Description:', updatedTask?.description)
-    console.log('Status:', updatedTask?.status)
-    console.log('Priority:', updatedTask?.priority)
-    console.log('Story Points:', updatedTask?.storyPoints)
-    
-    // Automatic saving to database
-    try {
-      if (updatedTask && updatedTask.id) {
-        // Ensure status is valid
-        const validStatuses = ['open', 'in_progress', 'done']
-        const status = validStatuses.includes(updatedTask.status) ? updatedTask.status : 'open'
-        
-        // Ensure priority is valid
-        const validPriorities = ['v-low', 'low', 'medium', 'high', 'veryhigh']
-        const priority = validPriorities.includes(updatedTask.priority) ? updatedTask.priority : 'medium'
-        
-        const updateData = {
-          title: updatedTask.title || '',
-          description: updatedTask.description || '',
-          status: status,
-          priority: priority,
-          story_points: updatedTask.storyPoints || 0
-        }
-        
-        console.log('=== SAVING TO DATABASE ===')
-        console.log('Original Status:', updatedTask.status)
-        console.log('Validated Status:', status)
-        console.log('Original Priority:', updatedTask.priority)
-        console.log('Validated Priority:', priority)
-        console.log('Story Points:', updatedTask.storyPoints)
-        console.log('Status type:', typeof status)
-        console.log('Status value:', status)
-        console.log('Priority type:', typeof priority)
-        console.log('Priority value:', priority)
-        
-        console.log('=== SENDING TO DATABASE ===')
-        console.log('Update data:', updateData)
-        
-        // Update object in zone_objects table
-        const result = await updateZoneObject(updatedTask.id, updateData)
-        
-        console.log('=== DATABASE RESULT ===')
-        console.log('Result from database:', result)
-        
-        if (result) {
-          console.log('Task saved successfully to database:', result)
-          console.log('Result status:', result.status)
-          console.log('Result status type:', typeof result.status)
-          
-          // Update local state with the result from database
-          setSelectedTask(result)
-          
-          // Show success notification
-          setNotification({
-            type: 'info',
-            message: 'Task updated successfully!'
-          })
-          
-          // Hide notification after 3 seconds
-          setTimeout(() => setNotification(null), 3000)
-        } else {
-          console.error('Database returned null/undefined result')
-          
-          // Show error notification
-          setNotification({
-            type: 'warning',
-            message: 'Failed to save task changes'
-          })
-          
-          // Hide notification after 5 seconds
-          setTimeout(() => setNotification(null), 5000)
-        }
-      } else {
-        console.warn('No task ID found for saving')
-        
-        // Show error notification
-        setNotification({
-          type: 'warning',
-          message: 'No task ID found for saving'
-        })
-        
-        // Hide notification after 5 seconds
-        setTimeout(() => setNotification(null), 5000)
-      }
-    } catch (error) {
-      console.error('Error saving task to database:', error)
-      
-      // Show error notification with more details
-      let errorMessage = 'Unknown error occurred'
-      if (error instanceof Error) {
-        errorMessage = error.message
-      } else if (typeof error === 'string') {
-        errorMessage = error
-      }
-      
-      console.log('=== ERROR DETAILS ===')
-      console.log('Error type:', typeof error)
-      console.log('Error message:', errorMessage)
-      console.log('Full error object:', error)
-      
-      setNotification({
-        type: 'warning',
-        message: `Failed to save task changes: ${errorMessage}`
-      })
-      
-      // Hide notification after 5 seconds
-      setTimeout(() => setNotification(null), 5000)
-    }
-  }
-
   // Removed test buildings creator
   
   // States for zone editing
@@ -2061,46 +1943,14 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   }
 
   // Функция для получения цвета зоны для ячейки
-  const getZoneColor = (q: number, r: number) => {
-    console.log(`🎨 getZoneColor called for cell [${q}, ${r}]`)
-    
-    // Сначала проверяем локальные зоны (они имеют приоритет)
-    for (const zone of localZones) {
-      if (zone && zone.cells && Array.isArray(zone.cells) && zone.cells.some(([cellQ, cellR]: [number, number]) => cellQ === q && cellR === r)) {
-        console.log(`🎨 Found zone color in localZones: ${zone.color} for zone ${zone.id}`)
-        return zone.color
-      }
-    }
-    
-    // Затем проверяем серверные зоны
+  const getZoneColor = useCallback((q: number, r: number) => {
+    console.log(`getZoneColor called for cell [${q}, ${r}]`)
     const zone = getZoneForCell(q, r)
-    if (zone) {
-      console.log(`🎨 Found zone color in server zones: ${zone.color} for zone ${zone.id}`)
-      // Проверяем, редактируется ли эта зона и есть ли ячейка в локальной версии
-      const editedZone = localZones.find(localZone => localZone && localZone.id === zone.id)
-      if (editedZone) {
-        // Зона редактируется - проверяем, есть ли ячейка в локальной версии
-        const isInEditedZone = editedZone.cells && Array.isArray(editedZone.cells) && 
-          editedZone.cells.some(([cellQ, cellR]: [number, number]) => cellQ === q && cellR === r)
-        if (isInEditedZone) {
-          // Ячейка есть в локальной версии - возвращаем цвет локальной зоны
-          console.log(`🎨 Returning edited zone color: ${editedZone.color}`)
-          return editedZone.color
-        } else {
-          // Ячейка удалена из локальной версии - не показываем цвет
-          console.log(`🎨 Cell [${q}, ${r}] was removed from edited zone ${zone.id}`)
-          return null
-        }
-      } else {
-        // Зона не редактируется - показываем серверный цвет
-        console.log(`🎨 Returning server zone color: ${zone.color}`)
-        return zone.color
-      }
-    }
-
-    console.log(`No zone color found for cell [${q}, ${r}]`)
-    return null
-  }
+    if (!zone) return null
+    const zoneColor = zone.color
+    if (!zoneColor) return null
+    return zoneColor
+  }, [getZoneForCell])
 
   const buildZoneObjectData = useCallback((zoneObject: any, q: number, r: number) => {
     return {
@@ -2235,108 +2085,32 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     
     // Если есть здание и это не правый клик - открываем детальную панель
     if ((localBuilding || serverBuilding) && !isRightClick) {
-      const building = (localBuilding || serverBuilding) as any
-      console.log('Found building:', building)
-      
-      // Создаем объект задачи на основе данных здания
-      const taskData = {
-        id: building?.id || `${q}-${r}`,
-        title: building?.task_name || building?.taskName || 'Untitled Task',
-        description: building?.description || 'This is a detailed description of the task. It contains all the necessary information about what needs to be done.',
-        status: (building?.status as any) || 'in_progress',
-        priority: (building?.priority === 1 ? 'low' : 
-                  building?.priority === 2 ? 'medium' : 
-                  building?.priority === 3 ? 'high' : 'veryhigh') as 'v-low' | 'low' | 'medium' | 'high' | 'veryhigh',
-        storyPoints: building?.storyPoints || Math.floor(Math.random() * 8) + 1,
-        checklist: [
-          { id: '1', text: 'Review requirements', completed: true },
-          { id: '2', text: 'Create wireframes', completed: true },
-          { id: '3', text: 'Implement UI components', completed: false },
-          { id: '4', text: 'Write tests', completed: false },
-          { id: '5', text: 'Deploy to staging', completed: false }
-        ],
-        attachments: [
-          { id: '1', name: 'design-mockup.fig', type: 'Figma', size: '2.4 MB' },
-          { id: '2', name: 'requirements.pdf', type: 'PDF', size: '1.2 MB' },
-          { id: '3', name: 'api-spec.json', type: 'JSON', size: '45 KB' }
-        ],
-        comments: [
-          { id: '1', author: 'John Doe', text: 'Great progress on the UI components!', timestamp: '2 hours ago' },
-          { id: '2', author: 'Jane Smith', text: 'Don\'t forget to update the documentation.', timestamp: '1 hour ago' },
-          { id: '3', author: 'Mike Johnson', text: 'The API integration looks good.', timestamp: '30 min ago' }
-        ]
-      }
-      setSelectedTask(taskData)
-      setIsDetailsPanelOpen(true)
       return
     }
-    
-
     
     // Если это центр проекта И на ячейке есть здание и не правый клик - открываем детальную панель проекта
     if (isProjectCenter && (localBuilding || serverBuilding) && !isRightClick) {
-      console.log('Found project center with building')
-      
-      const projectTaskData = {
-        id: 'project-center',
-        title: 'Project Center',
-        description: 'This is the central hub of your project. From here you can manage all aspects of your project including tasks, zones, and buildings.',
-        status: 'done' as const,
-        priority: 'high' as const,
-        storyPoints: 13,
-        checklist: [
-          { id: '1', text: 'Project initialized', completed: true },
-          { id: '2', text: 'Core systems setup', completed: true },
-          { id: '3', text: 'Development environment ready', completed: true },
-          { id: '4', text: 'Team collaboration enabled', completed: true }
-        ],
-        attachments: [
-          { id: '1', name: 'project-overview.pdf', type: 'PDF', size: '3.2 MB' },
-          { id: '2', name: 'team-structure.md', type: 'Markdown', size: '15 KB' },
-          { id: '3', name: 'development-guidelines.pdf', type: 'PDF', size: '1.8 MB' }
-        ],
-        comments: [
-          { id: '1', author: 'Project Manager', text: 'Project center is now fully operational!', timestamp: '1 day ago' },
-          { id: '2', author: 'Lead Developer', text: 'All core systems are running smoothly.', timestamp: '12 hours ago' },
-          { id: '3', author: 'Designer', text: 'UI/UX guidelines have been updated.', timestamp: '6 hours ago' }
-        ]
-      }
-      setSelectedTask(projectTaskData)
-      setIsDetailsPanelOpen(true)
       return
     }
-    
-    // Удалено: логика создания зданий и ландшафта
-    
-    // Если в режиме создания зоны и это второй клик - игнорируем, так как выделение уже фиксировано
-    if (isZoneMode && zoneSelectionMode !== 'idle' && firstClickCell && !isRightClick) {
-      console.log('Zone selection is fixed, ignoring additional clicks:', { q, r })
-      return
-    }
-    
-    // Если ячейка пустая и не в зоне - запускаем режим создания зоны (только если в режиме зон)
+
     if (!isRightClick && !localBuilding && !serverBuilding && !zoneInfo && !zoneColor && !isProjectCenter && isZoneMode) {
       console.log('Starting zone creation mode for empty cell:', { q, r })
       console.log('Current isZoneMode:', isZoneMode)
       console.log('Current zoneSelectionMode:', zoneSelectionMode)
       
-      // Если это первый клик в режиме зон
       if (zoneSelectionMode === 'idle') {
-        // Автоматически создаем зону из 7 ячеек (центральная + 6 соседних)
         const neighbors = getNeighbors(q, r)
         const zoneCells = [`${q},${r}`, ...neighbors.map(([nq, nr]) => `${nq},${nr}`)]
         
         setIsZoneMode(true)
-        // Keep as 'selecting' to satisfy union type
         setZoneSelectionMode('selecting')
         setFirstClickCell([q, r] as [number, number])
         setSelectedZoneCells(new Set(zoneCells))
-        setFixedZoneCells(new Set(zoneCells)) // Фиксируем выделение сразу
+        setFixedZoneCells(new Set(zoneCells))
         setSelectedZoneColor(getAvailableZoneColor())
         setExtendingZoneId(null)
-        setShowTopPanel(false) // Скрываем панель, так как создание происходит через радиальное меню
+        setShowTopPanel(false)
         
-        // Показываем радиальное меню для выбора объекта в центре
         const worldPos = hexToWorldPosition(q, r)
         console.log('=== RADIAL MENU POSITIONING ===')
         console.log('Cell coordinates:', [q, r])
@@ -2349,7 +2123,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         setRadialMenuWorldPosition(worldPos)
         setRadialMenuMousePosition(mousePosition || null)
         
-        // Обновляем время последнего клика для автофокуса при первом клике
         setLastExtendingClick(Date.now())
         
         console.log('Set isZoneMode to true')
@@ -2361,52 +2134,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         return
       }
     }
-    
-    // Если это центральная ячейка без здания - открываем панель проекта
-    if (isProjectCenter && !localBuilding && !serverBuilding && !isRightClick) {
-      console.log('🎯 Project center clicked without building - opening project panel')
-      console.log('🎯 isProjectCenter:', isProjectCenter)
-      console.log('🎯 localBuilding:', localBuilding)
-      console.log('🎯 serverBuilding:', serverBuilding)
-      console.log('🎯 Opening project panel')
-      
-      const projectTaskData = {
-        id: 'project-center',
-        title: 'Project Center',
-        description: 'This is the central hub of your project. From here you can manage all aspects of your project including tasks, zones, and buildings.',
-        status: 'done' as const,
-        priority: 'high' as const,
-        storyPoints: 13,
-        checklist: [
-          { id: '1', text: 'Project initialized', completed: true },
-          { id: '2', text: 'Core systems setup', completed: true },
-          { id: '3', text: 'Development environment ready', completed: true },
-          { id: '4', text: 'Team collaboration enabled', completed: true }
-        ],
-        attachments: [
-          { id: '1', name: 'project-overview.pdf', type: 'PDF', size: '3.2 MB' },
-          { id: '2', name: 'team-structure.md', type: 'Markdown', size: '15 KB' },
-          { id: '3', name: 'development-guidelines.pdf', type: 'PDF', size: '1.8 MB' }
-        ],
-        comments: [
-          { id: '1', author: 'Project Manager', text: 'Project center is now fully operational!', timestamp: '1 day ago' },
-          { id: '2', author: 'Lead Developer', text: 'All core systems are running smoothly.', timestamp: '12 hours ago' },
-          { id: '3', author: 'Designer', text: 'UI/UX guidelines have been updated.', timestamp: '6 hours ago' }
-        ]
-      }
-      console.log('🎯 Setting selectedTask and opening details panel')
-      setSelectedTask(projectTaskData)
-      setIsDetailsPanelOpen(true)
-      console.log('🎯 Project panel should be open now')
-      return
-    }
-    
-    // Если ячейка пустая и не в зоне, но не в режиме зон - ничего не делаем
-    if (!isRightClick && !localBuilding && !serverBuilding && !zoneInfo && !zoneColor && !isProjectCenter && !isZoneMode) {
-      console.log('Empty cell clicked, but zone mode not active:', { q, r })
-      return
-    }
-  }, [localBuildings, getBuildingForCell, getZoneInfo, getZoneColor, zones, setSelectedTask, setIsDetailsPanelOpen, getAvailableZoneColor, buildZoneObjectData, openSprintSidebar])
+  }, [localBuildings, getBuildingForCell, getZoneInfo, getZoneColor, zones, getAvailableZoneColor, buildZoneObjectData, openSprintSidebar])
 
   // Удалено: функции для выбора зданий
 
@@ -2971,7 +2699,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   const sprintSidebarTickets = useMemo<SprintSidebarTicket[]>(() => {
     const sprintZoneObject = sprintObjectId ? getZoneObjectById(sprintObjectId) : null
-
     return rocketTicketCopies.map((copy) => {
       const origin = getZoneObjectById(copy.originZoneObjectId)
       const details = findTicketDetails(copy.ticketId)
@@ -5033,17 +4760,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
         {/* Удалено: панель выбора зданий */}
 
-      {/* Детальная панель объекта */}
-      <ObjectDetailsPanel
-        isOpen={isDetailsPanelOpen}
-        onClose={() => {
-          setIsDetailsPanelOpen(false)
-          setSelectedTask(null)
-        }}
-        task={selectedTask}
-        onSave={handleTaskSave}
-      />
-
       {/* Модалка создания нового тикета */}
       {modalConfig.isOpen && (
         <ZoneObjectCreator
@@ -5068,7 +4784,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         zoneObject={selectedZoneObject as any}
         projectId={projectId}
         zoneColor={selectedZoneObject ? getZoneColor(selectedZoneObject.cellPosition[0], selectedZoneObject.cellPosition[1]) || undefined : undefined}
-        onSave={handleTaskSave}
         isDragging={isDraggingTicket}
         zoneTickets={(() => {
           console.log('🔍 ZoneObjectDetailsPanel tickets debug:')
@@ -5156,27 +4871,48 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           }}
           side="left"
         >
-          <SprintSidebar
-            sprintName={sprintName}
-            onSprintNameChange={handleSprintNameDraftChange}
-            onSprintNameCommit={handleSprintNameCommit}
-            durationWeeks={sprintWeeks}
-            onDurationChange={handleSprintDurationChange}
-            sprintStartedAt={sprintStartedAt}
-            isSprintStarted={isSprintStarted}
-            plannedTickets={plannedSprintTickets}
-            doneTickets={doneSprintTickets}
-            onClose={() => {
-              setIsSprintOpen(false)
-              setSprintObjectId(null)
-              setSelectedZoneObject(null)
-            }}
-            onStart={handleSprintStart}
-            onStop={handleSprintStop}
-            startDisabled={sprintStartDisabled}
-            stopDisabled={sprintStopDisabled}
-            isActionLoading={isSprintActionLoading}
-          />
+          {(() => {
+            let sprintZoneColor: string | null = null
+            if (sprintObjectId) {
+              const zoneObject = getZoneObjectById(sprintObjectId)
+              if (zoneObject) {
+                const q = typeof (zoneObject as any).q === 'number' ? (zoneObject as any).q : null
+                const r = typeof (zoneObject as any).r === 'number' ? (zoneObject as any).r : null
+                if (q !== null && r !== null) {
+                  sprintZoneColor = getZoneColor(q, r)
+                } else if (Array.isArray((zoneObject as any).cellPosition)) {
+                  const [cellQ, cellR] = (zoneObject as any).cellPosition as [number, number]
+                  sprintZoneColor = getZoneColor(cellQ, cellR)
+                }
+              }
+            }
+
+            return (
+              <SprintSidebar
+                sprintName={sprintName}
+                onSprintNameChange={handleSprintNameDraftChange}
+                onSprintNameCommit={handleSprintNameCommit}
+                durationWeeks={sprintWeeks}
+                onDurationChange={handleSprintDurationChange}
+                sprintStartedAt={sprintStartedAt}
+                isSprintStarted={isSprintStarted}
+                plannedTickets={plannedSprintTickets}
+                doneTickets={doneSprintTickets}
+                onClose={() => {
+                  setIsSprintOpen(false)
+                  setSprintObjectId(null)
+                  setSelectedZoneObject(null)
+                }}
+                onStart={handleSprintStart}
+                onStop={handleSprintStop}
+                startDisabled={sprintStartDisabled}
+                stopDisabled={sprintStopDisabled}
+                isActionLoading={isSprintActionLoading}
+                sprintObjectId={sprintObjectId}
+                sprintZoneColor={sprintZoneColor}
+              />
+            )
+          })()}
         </Sidebar>
       )}
 

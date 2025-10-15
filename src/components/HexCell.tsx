@@ -151,10 +151,10 @@ const HexCellComponent: React.FC<HexCellProps> = ({
 }) => {
   
   // Простая гексагональная плитка без GLB
-  const SimpleHexTile: React.FC<{ color: string; opacity: number; rotationYExtra?: number }> = ({ color, opacity, rotationYExtra = 0 }) => {
+  const SimpleHexTile: React.FC<{ color: string; opacity: number; rotationYExtra?: number; height?: number; offsetY?: number; radius?: number }> = ({ color, opacity, rotationYExtra = 0, height = 0.1, offsetY = 0, radius = 0.5 }) => {
     const geometry = useMemo(() => {
-      return new THREE.CylinderGeometry(0.5, 0.5, 0.1, 6)
-    }, [])
+      return new THREE.CylinderGeometry(radius, radius, height, 6)
+    }, [height, radius])
 
     const material = useMemo(() => {
       return new THREE.MeshStandardMaterial({
@@ -171,6 +171,7 @@ const HexCellComponent: React.FC<HexCellProps> = ({
         geometry={geometry}
         material={material}
         rotation={[0, rotationYExtra, 0]}
+        position={[0, offsetY, 0]}
         castShadow 
         receiveShadow 
       />
@@ -217,7 +218,6 @@ const HexCellComponent: React.FC<HexCellProps> = ({
     
     // Если это правый клик на ячейке зоны, запускаем режим редактирования
     if (isRightClick && zoneInfo && onZoneEdit) {
-      console.log('Right click on zone cell, starting edit mode')
       event.stopPropagation()
       onZoneEdit(zoneInfo.id)
       return
@@ -426,11 +426,21 @@ const HexCellComponent: React.FC<HexCellProps> = ({
       {/* Поворот к ближайшему корректному углу (30° + k*60°) */}
       <group rotation={[0, rotationY, 0]} scale={((visualState === 'hover') || (visualState === 'drag-hover')) && (buildingType) ? 1.1 : 1.0}>
         {/* Простая гексагональная плитка */}
-        {showBaseTile && (
+        <SimpleHexTile
+          color={baseMat.color}
+          opacity={baseMat.opacity}
+          rotationYExtra={rotationY}
+          height={(type === 'project-center' || isZoneCenter) ? 0.3 : 0.1}
+          offsetY={(type === 'project-center' || isZoneCenter) ? -0.1 : 0}
+        />
+        {(type === 'project-center' || isZoneCenter) && (
           <SimpleHexTile
-            color={baseMat.color}
-            opacity={baseMat.opacity}
-            rotationYExtra={!hasRoad && isGreenTile ? grassRotationExtra : 0}
+            color={darkenColor(zoneColor || '#CBD5F5', 0.4)}
+            opacity={0.95}
+            rotationYExtra={rotationY}
+            height={0.4}
+            radius={0.42}
+            offsetY={0.3 / 2 + 0.4 / 2 - 0.1}
           />
         )}
       </group>
@@ -524,7 +534,7 @@ const HexCellComponent: React.FC<HexCellProps> = ({
           text={(window as any)?.currentProject?.name || 'Project'}
           position={[0.0, 0.0, 0.0]}
           rotationY={0}
-          poleHeight={3.2}
+          poleHeight={6.0}
           flagWidth={2.2}
           flagHeight={1.3}
           color={'#18181B'}

@@ -51,6 +51,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ project, onBack }) => 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [projectIconLocal, setProjectIconLocal] = useState(project.icon || '')
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const placeholderLogoSrc = '/icons/Your_Logo.svg'
 
   React.useEffect(() => {
     setProjectIconLocal(project.icon || '')
@@ -309,21 +310,12 @@ const progressPercent = Math.min(100, Math.max(0, stats.totalTickets > 0 ? (stat
               />
               {isUploadingLogo ? (
                 <span style={{ fontSize: '13px', fontWeight: 600, color: '#4F46E5', letterSpacing: 0.4 }}>Uploading…</span>
-              ) : projectIconLocal ? (
-                projectIconLocal.startsWith('data:') || projectIconLocal.startsWith('http') ? (
-                  <img
-                    src={projectIconLocal}
-                    alt={project.name}
-                    style={{ maxWidth: '100%', maxHeight: '100%', width: '100%', height: '100%', objectFit: 'contain' }}
-                  />
-                ) : (
-                  <span style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 700, color: '#4F46E5' }}>{projectIconLocal}</span>
-                )
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#4F46E5' }}>
-                  <img src="/icons/tabler-icon-upload.svg" alt="Upload" style={{ width: '22px', height: '22px', opacity: 0.7 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 600, letterSpacing: 0.4 }}>Upload logo</span>
-                </div>
+                <img
+                  src={logoIsImage ? projectIconLocal : placeholderLogoSrc}
+                  alt={logoIsImage ? `${project.name} logo` : 'Default project logo'}
+                  style={{ maxWidth: '100%', maxHeight: '100%', width: '100%', height: '100%', objectFit: 'contain' }}
+                />
               )}
             </div>
 

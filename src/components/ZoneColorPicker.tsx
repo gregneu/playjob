@@ -59,26 +59,53 @@ export const ZoneColorPicker: React.FC<ZoneColorPickerProps> = ({
 
   if (!isOpen) return null
 
+  const panelWidth = 300
+  const panelHeight = 420
+  const viewport = typeof window !== 'undefined'
+    ? { width: window.innerWidth, height: window.innerHeight }
+    : { width: 1440, height: 900 }
+  const margin = 16
+  const offsetY = 24
+  const openToLeft = position.x > viewport.width / 2
+
+  let calculatedLeft = openToLeft
+    ? position.x - panelWidth - margin
+    : position.x + margin
+  let calculatedTop = position.y - panelHeight / 2 + offsetY
+
+  if (calculatedLeft + panelWidth + margin > viewport.width) {
+    calculatedLeft = viewport.width - panelWidth - margin
+  }
+  if (calculatedLeft < margin) {
+    calculatedLeft = margin
+  }
+  if (calculatedTop + panelHeight + margin > viewport.height) {
+    calculatedTop = viewport.height - panelHeight - margin
+  }
+  if (calculatedTop < margin) {
+    calculatedTop = margin
+  }
+
   return (
     <>
       {/* Panel */}
       <div style={{
         position: 'fixed',
-        top: position.y,
-        left: position.x - 336, // Открывается слева от позиции гексагона с отступом 16px от sidebar
-        width: '300px',
-        minHeight: '400px',
+        top: calculatedTop,
+        left: calculatedLeft,
+        width: `${panelWidth}px`,
+        minHeight: `${panelHeight}px`,
         background: 'rgb(0 0 0 / 64%)',
         border: 'none',
         borderRadius: '12px',
         padding: '20px',
         boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px',
         backdropFilter: 'blur(10px)',
-        zIndex: 9999,
+        zIndex: 12000,
         color: 'white',
         overflowY: 'auto',
         pointerEvents: 'auto',
-        transform: isVisible ? 'translateX(0)' : 'translateX(10%)',
+        transform: isVisible ? 'translateX(0)' : openToLeft ? 'translateX(-10%)' : 'translateX(10%)',
         opacity: isVisible ? 1 : 0,
         transition: 'transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
       } as any}>
