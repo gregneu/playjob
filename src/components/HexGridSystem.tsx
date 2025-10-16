@@ -24,6 +24,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useNotifications } from '../hooks/useNotifications'
 import { GlassPanel } from './GlassPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
+import { LiveKitPanel } from './LiveKitPanel'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
 import { Vegetation } from './Vegetation'
 import { DustBurst } from './effects/DustBurst'
@@ -180,6 +181,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   })
 
   const [selectedZoneObject, setSelectedZoneObject] = useState<any>(null)
+  const [isLiveKitPanelOpen, setIsLiveKitPanelOpen] = useState(false)
+  const [selectedMeetBuilding, setSelectedMeetBuilding] = useState<any>(null)
   
 
   const selectedTicketNotifications = useMemo(() => {
@@ -2048,6 +2051,22 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       })
       if (zoneObjectType === 'mountain' || zoneObjectType === 'sprint') {
         openSprintSidebar(zoneObject, q, r)
+        return
+      }
+      
+      // Special case: Meet buildings (mapped type 'house' but created from 'meet' selection) open LiveKit panel
+      const isMeetBuilding = zoneObjectType === 'house' && (
+        (zoneObject as any).title?.toLowerCase().includes('meet') ||
+        (zoneObject as any).description?.toLowerCase().includes('meet')
+      )
+      
+      if (isMeetBuilding) {
+        console.log('Opening LiveKit panel for Meet building:', zoneObject)
+        const meetBuildingData = buildZoneObjectData(zoneObject, q, r)
+        setSelectedMeetBuilding(meetBuildingData)
+        setIsLiveKitPanelOpen(true)
+        setIsZoneObjectDetailsOpen(false)
+        setIsSprintOpen(false)
         return
       }
       
@@ -4863,6 +4882,19 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }}
       />
 
+      {/* LiveKit Video Panel for Meet Buildings */}
+      <LiveKitPanel
+        isOpen={isLiveKitPanelOpen}
+        onClose={() => {
+          setIsLiveKitPanelOpen(false)
+          setSelectedMeetBuilding(null)
+        }}
+        roomId={selectedMeetBuilding ? `meet-${selectedMeetBuilding.id}` : 'default-room'}
+        buildingTitle={selectedMeetBuilding?.title || 'Meet Object'}
+        userName={user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email || 'Guest'}
+        userEmail={user?.email}
+        side="right"
+      />
 
       {isSprintOpen && (
         <Sidebar
