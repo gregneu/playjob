@@ -144,7 +144,12 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
       await room.localParticipant.enableCameraAndMicrophone()
       
       roomRef.current = room
-      updateParticipants()
+      
+      // Wait a moment for tracks to be ready, then update participants
+      setTimeout(() => {
+        console.log('🔄 Updating participants after connection...')
+        updateParticipants()
+      }, 1000)
 
     } catch (error) {
       console.error('❌ Failed to connect to LiveKit room:', error)
@@ -166,21 +171,35 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
 
     // Add local participant first
     const localParticipant = room.localParticipant
+    const localVideoTrack = Array.isArray(localParticipant.videoTrackPublications) 
+      ? localParticipant.videoTrackPublications.find(p => p.isSubscribed)?.track
+      : null
+    const localAudioTrack = Array.isArray(localParticipant.audioTrackPublications)
+      ? localParticipant.audioTrackPublications.find(p => p.isSubscribed)?.track
+      : null
+
     participantVideos.push({
       id: localParticipant.identity,
       name: localParticipant.identity,
-      videoTrack: localParticipant.videoTrackPublications.find(p => p.isSubscribed)?.track,
-      audioTrack: localParticipant.audioTrackPublications.find(p => p.isSubscribed)?.track,
+      videoTrack: localVideoTrack,
+      audioTrack: localAudioTrack,
       isLocal: true
     })
 
     // Add remote participants
     room.remoteParticipants.forEach((participant: RemoteParticipant) => {
+      const remoteVideoTrack = Array.isArray(participant.videoTrackPublications)
+        ? participant.videoTrackPublications.find(p => p.isSubscribed)?.track
+        : null
+      const remoteAudioTrack = Array.isArray(participant.audioTrackPublications)
+        ? participant.audioTrackPublications.find(p => p.isSubscribed)?.track
+        : null
+
       participantVideos.push({
         id: participant.identity,
         name: participant.identity,
-        videoTrack: participant.videoTrackPublications.find(p => p.isSubscribed)?.track,
-        audioTrack: participant.audioTrackPublications.find(p => p.isSubscribed)?.track,
+        videoTrack: remoteVideoTrack,
+        audioTrack: remoteAudioTrack,
         isLocal: false
       })
     })
