@@ -19,6 +19,85 @@ interface ParticipantVideo {
   isLocal: boolean
 }
 
+// Separate component for individual video tiles with proper track attachment
+const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ participant }) => {
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const videoElement = videoRef.current
+    if (!videoElement) return
+
+    if (participant.videoTrack) {
+      console.log('🎥 Attaching video track for participant:', participant.name)
+      participant.videoTrack.attach(videoElement)
+      
+      return () => {
+        console.log('🎥 Detaching video track for participant:', participant.name)
+        participant.videoTrack?.detach()
+      }
+    }
+  }, [participant.videoTrack, participant.name])
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        style={{
+          aspectRatio: '1',
+          background: '#F3F4F6',
+          borderRadius: '16px',
+          overflow: 'hidden',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          position: 'relative'
+        }}
+      >
+        {participant.videoTrack ? (
+          <video
+            ref={videoRef}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
+            }}
+            autoPlay
+            playsInline
+            muted={participant.isLocal}
+          />
+        ) : (
+          <div style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            fontSize: '24px',
+            fontWeight: 'bold'
+          }}>
+            {participant.name.charAt(0).toUpperCase()}
+          </div>
+        )}
+        
+        {/* Participant name overlay */}
+        <div style={{
+          position: 'absolute',
+          bottom: '8px',
+          left: '8px',
+          background: 'rgba(0,0,0,0.7)',
+          color: 'white',
+          padding: '4px 8px',
+          borderRadius: '6px',
+          fontSize: '12px',
+          fontWeight: '500'
+        }}>
+          {participant.name}
+          {participant.isLocal && ' (You)'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
   isOpen,
   onClose,
@@ -171,12 +250,15 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
 
     // Add local participant first
     const localParticipant = room.localParticipant
+    console.log('🔍 Local participant video tracks:', localParticipant.videoTrackPublications)
+    console.log('🔍 Local participant audio tracks:', localParticipant.audioTrackPublications)
+    
     const localVideoTrack = Array.isArray(localParticipant.videoTrackPublications) 
       ? localParticipant.videoTrackPublications.find(p => p.isSubscribed)?.track
-      : null
+      : localParticipant.videoTrackPublications?.track || null
     const localAudioTrack = Array.isArray(localParticipant.audioTrackPublications)
       ? localParticipant.audioTrackPublications.find(p => p.isSubscribed)?.track
-      : null
+      : localParticipant.audioTrackPublications?.track || null
 
     participantVideos.push({
       id: localParticipant.identity,
@@ -188,12 +270,14 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
 
     // Add remote participants
     room.remoteParticipants.forEach((participant: RemoteParticipant) => {
+      console.log('🔍 Remote participant video tracks:', participant.identity, participant.videoTrackPublications)
+      
       const remoteVideoTrack = Array.isArray(participant.videoTrackPublications)
         ? participant.videoTrackPublications.find(p => p.isSubscribed)?.track
-        : null
+        : participant.videoTrackPublications?.track || null
       const remoteAudioTrack = Array.isArray(participant.audioTrackPublications)
         ? participant.audioTrackPublications.find(p => p.isSubscribed)?.track
-        : null
+        : participant.audioTrackPublications?.track || null
 
       participantVideos.push({
         id: participant.identity,
@@ -344,66 +428,10 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
         {!isConnecting && !connectionError && (
           <div className="grid grid-cols-2 gap-3">
             {participants.map((participant) => (
-              <div key={participant.id} style={{ position: 'relative' }}>
-                <div
-                  style={{
-                    aspectRatio: '1',
-                    background: '#F3F4F6',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    position: 'relative'
-                  }}
-                >
-                  {participant.videoTrack ? (
-                    <video
-                      ref={(el) => {
-                        if (el && participant.videoTrack) {
-                          participant.videoTrack.attach(el)
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
-                      }}
-                      autoPlay
-                      playsInline
-                      muted={participant.isLocal}
-                    />
-                  ) : (
-                    <div style={{
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      fontSize: '24px',
-                      fontWeight: 'bold'
-                    }}>
-                      {participant.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  
-                  {/* Participant name overlay */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '8px',
-                    left: '8px',
-                    background: 'rgba(0,0,0,0.7)',
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: '500'
-                  }}>
-                    {participant.name}
-                    {participant.isLocal && ' (You)'}
-                  </div>
-                </div>
-              </div>
+              <ParticipantVideoTile 
+                key={participant.id} 
+                participant={participant} 
+              />
             ))}
           </div>
         )}
