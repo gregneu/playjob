@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import { getBrowserClient } from '../lib/supabase-browser'
 
 // Extend Window interface for JitsiMeetExternalAPI
 declare global {
@@ -33,6 +34,39 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
+  // Function to get JWT token from Supabase Edge Function
+  const getJitsiToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        console.error('❌ No active session found')
+        return null
+      }
+
+      const response = await fetch('/functions/v1/get-jitsi-token', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('❌ Failed to get Jitsi token:', errorData)
+        return null
+      }
+
+      const { token } = await response.json()
+      console.log('✅ Jitsi token obtained successfully')
+      return token
+    } catch (error) {
+      console.error('❌ Error getting Jitsi token:', error)
+      return null
+    }
+  }, [])
+
   // Load Jitsi IFrame API dynamically from CDN
   useEffect(() => {
     if (!isOpen) return
@@ -50,7 +84,7 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
     }
 
     const script = document.createElement('script')
-    script.src = 'https://meet.jit.si/external_api.js'
+    script.src = 'https://8x8.vc/vpaas-magic-cookie-2eae40794b2947ad92e0371e6c3d0bf4/external_api.js'
     script.async = true
     
     script.onload = () => {
@@ -74,7 +108,7 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
     }
   }, [isOpen])
 
-  const initializeJitsi = useCallback(() => {
+  const initializeJitsi = useCallback(async () => {
     if (!window.JitsiMeetExternalAPI) {
       console.error('❌ JitsiMeetExternalAPI is not available')
       setConnectionError('Jitsi API not loaded')
@@ -82,17 +116,31 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
       return
     }
 
-    console.log('🎥 Initializing Jitsi IFrame API...')
+    console.log('🎥 Initializing Jitsi IFrame API with JaaS...')
 
-    const domain = 'meet.jit.si'
+    // Get JWT token for JaaS authentication
+    const jwt = await getJitsiToken()
+    if (!jwt) {
+      console.error('❌ Failed to get JWT token, falling back to public Jitsi Meet')
+      setConnectionError('Authentication failed. Please try again.')
+      setIsLoading(false)
+      return
+    }
+
+    // Use JaaS domain
+    const domain = '8x8.vc'
+    const appId = 'vpaas-magic-cookie-2eae40794b2947ad92e0371e6c3d0bf4'
     const cleanRoomId = roomId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()
     const playjoobRoomId = `playjoob-meet-${cleanRoomId}`
+    const roomName = `${appId}/${playjoobRoomId}`
     
-    console.log('🎥 Room name:', playjoobRoomId)
+    console.log('🎥 Room name:', roomName)
     console.log('🎥 User name:', userName)
+    console.log('🔐 Using JaaS with JWT authentication')
 
     const options = {
-      roomName: playjoobRoomId,
+      roomName: roomName,
+      jwt: jwt,
       width: '100%',
       height: '100%',
       parentNode: jitsiContainerRef.current,
@@ -142,14 +190,14 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
         onClose()
       })
 
-      console.log('✅ Jitsi IFrame API initialized successfully')
+      console.log('✅ Jitsi IFrame API initialized successfully with JaaS')
 
     } catch (error) {
       console.error('❌ Failed to initialize Jitsi IFrame API:', error)
       setConnectionError('Failed to initialize Jitsi meeting')
       setIsLoading(false)
     }
-  }, [roomId, userName, userEmail, onClose])
+  }, [roomId, userName, userEmail, onClose, getJitsiToken])
 
   // Cleanup Jitsi API when component unmounts
   useEffect(() => {
