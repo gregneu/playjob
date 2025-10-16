@@ -290,6 +290,83 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
           }}>
             {participant.name}
           </span>
+
+          {/* Control Icons for Avatar-only state - Top Left (only show on hover) */}
+          {isHovered && (
+            <div 
+              style={{
+                position: 'absolute',
+                top: 12,
+                left: 12,
+                display: 'flex',
+                gap: 8
+              }}
+            >
+              {/* Mic Icon */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleMuteToggle()
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                }}
+              >
+                <img 
+                  src={isMuted ? "/icons/entypo_sound-no.svg" : "/icons/entypo_sound.svg"}
+                  alt={isMuted ? "Unmute" : "Mute"}
+                  style={{ width: '16px', height: '16px' }}
+                />
+              </button>
+
+              {/* Camera Icon */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleVideoToggle()
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                }}
+              >
+                <img 
+                  src={isVideoOff ? "/icons/tdesign_camera-2-filled-no.svg" : "/icons/tdesign_camera-2-filled.svg"}
+                  alt={isVideoOff ? "Turn on camera" : "Turn off camera"}
+                  style={{ width: '16px', height: '16px' }}
+                />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -419,7 +496,7 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
                 style={{ 
                   width: '16px', 
                   height: '16px',
-                  filter: isBlurEnabled ? 'brightness(1.2)' : 'brightness(0.8)'
+                  filter: 'brightness(0) invert(1)' // Make icon white
                 }}
               />
             </button>
@@ -427,39 +504,6 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
         </div>
       )}
 
-      {/* Footer: participant avatar and name - Bottom Left */}
-      <div style={{
-        position: 'absolute',
-        bottom: 12,
-        left: 12,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        opacity: hasVideo ? (isHovered ? 1 : 0) : 1,
-        transition: 'opacity 0.3s ease-in-out'
-      }}>
-        {/* Avatar */}
-        <UserAvatar
-          userId={participant.userId}
-          userName={participant.name}
-          size={24}
-          showName={false}
-          renderHex3D={false}
-        />
-        {/* Name */}
-        <span style={{
-          fontSize: '12px',
-          color: '#FFFFFF',
-          fontWeight: '500',
-          fontFamily: 'Inter, sans-serif',
-          maxWidth: '100px',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}>
-          {participant.name}
-        </span>
-      </div>
     </div>
   )
 }
