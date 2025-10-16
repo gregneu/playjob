@@ -9,6 +9,9 @@ interface MeetObjectPanelProps {
   buildingTitle: string
   userName?: string
   userEmail?: string
+  userAvatarUrl?: string
+  userAvatarConfig?: any
+  userId?: string
   side?: 'left' | 'right'
 }
 
@@ -19,6 +22,9 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
   buildingTitle,
   userName = 'Guest',
   userEmail,
+  userAvatarUrl,
+  userAvatarConfig,
+  userId,
   side = 'right'
 }) => {
   const [participantCount, setParticipantCount] = useState(0)
@@ -243,14 +249,17 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
             overflow: 'hidden',
             background: 'transparent'
           }}>
-            <MeetVideoGrid
-              ref={videoGridRef}
-              roomId={roomId}
-              userName={userName}
-              userEmail={userEmail}
-              onConnectionChange={handleConnectionChange}
-              onError={handleError}
-            />
+                <MeetVideoGrid
+                  ref={videoGridRef}
+                  roomId={roomId}
+                  userName={userName}
+                  userEmail={userEmail}
+                  userAvatarUrl={userAvatarUrl}
+                  userAvatarConfig={userAvatarConfig}
+                  userId={userId}
+                  onConnectionChange={handleConnectionChange}
+                  onError={handleError}
+                />
           </div>
         </div>
       </div>

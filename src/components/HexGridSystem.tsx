@@ -4893,6 +4893,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         buildingTitle={selectedMeetBuilding?.title || 'Meet Object'}
         userName={user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email || 'Guest'}
         userEmail={user?.email}
+        userAvatarUrl={user?.user_metadata?.avatar_url}
+        userAvatarConfig={user?.user_metadata?.avatar_config}
+        userId={user?.id}
         side="right"
       />
 
