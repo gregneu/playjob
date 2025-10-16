@@ -84,105 +84,251 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden bg-gray-800 shadow-lg transition-all duration-300 ease-in-out"
       style={{
-        aspectRatio: '1',
-        height: '165px',
+        display: 'flex',
+        flexDirection: 'column',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        borderRadius: 18,
+        background: 'rgba(0, 0, 0, 0.59)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        padding: 14,
+        boxShadow: isHovered ? '0 8px 32px rgba(0,0,0,0.15)' : '0 4px 14px rgba(0,0,0,0.06)',
+        cursor: 'pointer',
+        height: 165,
         maxWidth: '180px',
         width: 'auto',
-        cursor: 'pointer'
-      }}
+        position: 'relative',
+        transition: 'transform 0.1s ease-out, box-shadow 0.2s ease-out',
+        transformStyle: 'preserve-3d',
+        willChange: 'transform',
+        overflow: 'hidden'
+      } as React.CSSProperties}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Video or Avatar Content */}
-      {hasVideo ? (
-        <video
-          ref={videoRef}
-          className="w-full h-full object-cover"
-          autoPlay
-          playsInline
-          muted={participant.isLocal}
-        />
-      ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800">
-          {/* 3D Avatar or Emoji Avatar */}
-          <div className="w-16 h-16 mb-2 flex items-center justify-center text-4xl">
-            {participant.name.charAt(0).toUpperCase()}
-          </div>
-          {/* Name below avatar */}
-          <span className="text-sm text-white/80 text-center px-2">
-            {participant.name}
-          </span>
-        </div>
-      )}
-
-      {/* Hover Overlay */}
-      <div 
-        className={`absolute inset-0 bg-black/25 transition-opacity duration-300 ease-in-out ${
-          isHovered ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
-
-      {/* Control Icons - Top Left */}
-      <div 
-        className={`absolute top-2 left-2 flex gap-2 transition-all duration-300 ease-in-out ${
-          isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-        }`}
-      >
-        {/* Mic Icon */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            handleMuteToggle()
-          }}
-          className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors"
-        >
-          <img 
-            src={isMuted ? "/icons/entypo_sound-no.svg" : "/icons/entypo_sound.svg"}
-            alt={isMuted ? "Unmute" : "Mute"}
-            className="w-4 h-4"
+      {/* Video or Avatar Content Area */}
+      <div style={{ 
+        flex: 1, 
+        marginBottom: 10, 
+        overflow: 'hidden',
+        borderRadius: 12,
+        position: 'relative',
+        background: 'rgba(0, 0, 0, 0.3)'
+      }}>
+        {hasVideo ? (
+          <video
+            ref={videoRef}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: 12
+            }}
+            autoPlay
+            playsInline
+            muted={participant.isLocal}
           />
-        </button>
-
-        {/* Camera Icon */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            handleVideoToggle()
-          }}
-          className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors"
-        >
-          <img 
-            src={isVideoOff ? "/icons/tdesign_camera-2-filled-no.svg" : "/icons/tdesign_camera-2-filled.svg"}
-            alt={isVideoOff ? "Turn on camera" : "Turn off camera"}
-            className="w-4 h-4"
-          />
-        </button>
-      </div>
-
-      {/* "You" Badge - Top Left (above icons) */}
-      {participant.isLocal && (
-        <div className="absolute top-2 left-2 bg-green-500 text-white text-xs rounded-md px-2 py-0.5 font-medium z-10">
-          You
-        </div>
-      )}
-
-      {/* Name Overlay - Bottom (only for video tiles) */}
-      {hasVideo && (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm p-2">
-          <div className="flex items-center gap-2">
-            {/* Avatar Circle */}
-            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+        ) : (
+          <div style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            borderRadius: 12
+          }}>
+            {/* 3D Avatar or Emoji Avatar */}
+            <div style={{
+              width: '64px',
+              height: '64px',
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '32px',
+              fontWeight: 'bold'
+            }}>
               {participant.name.charAt(0).toUpperCase()}
             </div>
-            {/* Name */}
-            <span className="text-white text-sm font-medium truncate">
+            {/* Name below avatar */}
+            <span style={{
+              fontSize: '14px',
+              color: 'rgba(255, 255, 255, 0.8)',
+              textAlign: 'center',
+              padding: '0 8px'
+            }}>
               {participant.name}
             </span>
           </div>
+        )}
+
+        {/* Hover Overlay - only for video tiles */}
+        {hasVideo && (
+          <div 
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.25)',
+              opacity: isHovered ? 1 : 0,
+              transition: 'opacity 0.3s ease-in-out',
+              borderRadius: 12
+            }}
+          />
+        )}
+
+        {/* Control Icons - Top Left (only show on hover for video tiles) */}
+        {hasVideo && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              display: 'flex',
+              gap: 8,
+              opacity: isHovered ? 1 : 0,
+              transform: isHovered ? 'scale(1)' : 'scale(0.95)',
+              transition: 'all 0.3s ease-in-out'
+            }}
+          >
+            {/* Mic Icon */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleMuteToggle()
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                padding: '6px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(10px)',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              <img 
+                src={isMuted ? "/icons/entypo_sound-no.svg" : "/icons/entypo_sound.svg"}
+                alt={isMuted ? "Unmute" : "Mute"}
+                style={{ width: '16px', height: '16px' }}
+              />
+            </button>
+
+            {/* Camera Icon */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleVideoToggle()
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                padding: '6px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(10px)',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              <img 
+                src={isVideoOff ? "/icons/tdesign_camera-2-filled-no.svg" : "/icons/tdesign_camera-2-filled.svg"}
+                alt={isVideoOff ? "Turn on camera" : "Turn off camera"}
+                style={{ width: '16px', height: '16px' }}
+              />
+            </button>
+          </div>
+        )}
+
+        {/* "You" Badge - Top Left (above icons) */}
+        {participant.isLocal && (
+          <div style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            background: 'rgba(34, 197, 94, 0.9)',
+            color: '#FFFFFF',
+            fontSize: 10,
+            fontWeight: 700,
+            padding: '2px 6px',
+            borderRadius: 8,
+            backdropFilter: 'blur(10px)',
+            zIndex: 10
+          }}>
+            You
+          </div>
+        )}
+      </div>
+
+      {/* Footer: participant avatar and name - matching TicketCard exactly */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
+          {/* Avatar */}
+          <div style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '0',
+            background: 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            border: 'none',
+            marginRight: '8px'
+          }}>
+            <div style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              fontSize: '12px',
+              fontWeight: '600',
+              borderRadius: '4px'
+            }}>
+              {participant.name.charAt(0).toUpperCase()}
+            </div>
+          </div>
+          
+          {/* Name */}
+          <span style={{
+            fontSize: '12px',
+            color: '#FFFFFF',
+            fontWeight: '500',
+            fontFamily: 'Inter, sans-serif',
+            textAlign: 'left',
+            maxWidth: '110px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: 'block'
+          }}>
+            {participant.name}
+          </span>
         </div>
-      )}
+      </div>
     </div>
   )
 }
