@@ -24,7 +24,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useNotifications } from '../hooks/useNotifications'
 import { GlassPanel } from './GlassPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
-import { LiveKitPanel } from './LiveKitPanel'
+import { MeetObjectPanel } from './MeetObjectPanel'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
 import { Vegetation } from './Vegetation'
 import { DustBurst } from './effects/DustBurst'
@@ -181,7 +181,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   })
 
   const [selectedZoneObject, setSelectedZoneObject] = useState<any>(null)
-  const [isLiveKitPanelOpen, setIsLiveKitPanelOpen] = useState(false)
+  const [isMeetPanelOpen, setIsMeetPanelOpen] = useState(false)
   const [selectedMeetBuilding, setSelectedMeetBuilding] = useState<any>(null)
   
 
@@ -2060,15 +2060,15 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         (zoneObject as any).description?.toLowerCase().includes('meet')
       )
       
-      if (isMeetBuilding) {
-        console.log('Opening LiveKit panel for Meet building:', zoneObject)
-        const meetBuildingData = buildZoneObjectData(zoneObject, q, r)
-        setSelectedMeetBuilding(meetBuildingData)
-        setIsLiveKitPanelOpen(true)
-        setIsZoneObjectDetailsOpen(false)
-        setIsSprintOpen(false)
-        return
-      }
+        if (isMeetBuilding) {
+          console.log('Opening Meet panel for Meet building:', zoneObject)
+          const meetBuildingData = buildZoneObjectData(zoneObject, q, r)
+          setSelectedMeetBuilding(meetBuildingData)
+          setIsMeetPanelOpen(true)
+          setIsZoneObjectDetailsOpen(false)
+          setIsSprintOpen(false)
+          return
+        }
       
       setIsSprintOpen(false)
       setSprintObjectId(null)
@@ -4882,11 +4882,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }}
       />
 
-      {/* LiveKit Video Panel for Meet Buildings */}
-      <LiveKitPanel
-        isOpen={isLiveKitPanelOpen}
+      {/* Meet Video Panel for Meet Buildings */}
+      <MeetObjectPanel
+        isOpen={isMeetPanelOpen}
         onClose={() => {
-          setIsLiveKitPanelOpen(false)
+          setIsMeetPanelOpen(false)
           setSelectedMeetBuilding(null)
         }}
         roomId={selectedMeetBuilding ? `meet-${selectedMeetBuilding.id}` : 'default-room'}

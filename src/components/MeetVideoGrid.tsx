@@ -1,22 +1,20 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, RemoteTrack, LocalTrack, createLocalVideoTrack, createLocalAudioTrack } from 'livekit-client'
 
-interface LiveKitPanelProps {
-  isOpen: boolean
-  onClose: () => void
-  roomId: string
-  buildingTitle: string
-  userName?: string
-  userEmail?: string
-  side?: 'left' | 'right'
-}
-
 interface ParticipantVideo {
   id: string
   name: string
   videoTrack?: RemoteTrack | LocalTrack
   audioTrack?: RemoteTrack | LocalTrack
   isLocal: boolean
+}
+
+interface MeetVideoGridProps {
+  roomId: string
+  userName?: string
+  userEmail?: string
+  onConnectionChange?: (isConnected: boolean, participantCount: number) => void
+  onError?: (error: string) => void
 }
 
 // Separate component for individual video tiles with proper track attachment
@@ -55,57 +53,24 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
   }, [participant.videoTrack, participant.name])
 
   return (
-    <div style={{ position: 'relative' }}>
-      <div
-        style={{
-          aspectRatio: '1',
-          background: '#F3F4F6',
-          borderRadius: '16px',
-          overflow: 'hidden',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          position: 'relative'
-        }}
-      >
+    <div className="relative">
+      <div className="rounded-2xl overflow-hidden aspect-square bg-gray-100 shadow-sm relative">
         {participant.videoTrack ? (
           <video
             ref={videoRef}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover'
-            }}
+            className="w-full h-full object-cover"
             autoPlay
             playsInline
             muted={participant.isLocal}
           />
         ) : (
-          <div style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            fontSize: '24px',
-            fontWeight: 'bold'
-          }}>
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-2xl font-bold">
             {participant.name.charAt(0).toUpperCase()}
           </div>
         )}
         
         {/* Participant name overlay */}
-        <div style={{
-          position: 'absolute',
-          bottom: '8px',
-          left: '8px',
-          background: 'rgba(0,0,0,0.7)',
-          color: 'white',
-          padding: '4px 8px',
-          borderRadius: '6px',
-          fontSize: '12px',
-          fontWeight: '500'
-        }}>
+        <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded-md text-xs font-medium">
           {participant.name}
           {participant.isLocal && ' (You)'}
         </div>
@@ -114,15 +79,16 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
   )
 }
 
-export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
-  isOpen,
-  onClose,
+export const MeetVideoGrid = React.forwardRef<
+  { disconnect: () => Promise<void> },
+  MeetVideoGridProps
+>(({
   roomId,
-  buildingTitle,
   userName = 'Guest',
   userEmail,
-  side = 'right'
-}) => {
+  onConnectionChange,
+  onError
+}, ref) => {
   const roomRef = useRef<Room | null>(null)
   const [participants, setParticipants] = useState<ParticipantVideo[]>([])
   const [isConnecting, setIsConnecting] = useState(false)
@@ -191,6 +157,7 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
       room.on(RoomEvent.Connected, () => {
         console.log('✅ Connected to LiveKit room')
         setIsConnecting(false)
+        onConnectionChange?.(true, participantCount)
       })
 
       room.on(RoomEvent.Disconnected, (reason) => {
@@ -198,6 +165,7 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
         setParticipants([])
         setParticipantCount(0)
         roomRef.current = null
+        onConnectionChange?.(false, 0)
       })
 
       room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
@@ -274,10 +242,12 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
 
     } catch (error) {
       console.error('❌ Failed to connect to LiveKit room:', error)
-      setConnectionError(error instanceof Error ? error.message : 'Failed to connect to video room')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to video room'
+      setConnectionError(errorMessage)
+      onError?.(errorMessage)
       setIsConnecting(false)
     }
-  }, [getLiveKitToken])
+  }, [getLiveKitToken, onConnectionChange, onError])
 
   // Update participants list
   const updateParticipants = useCallback(() => {
@@ -331,31 +301,47 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
 
     setParticipants(participantVideos)
     setParticipantCount(participantVideos.length)
-  }, [])
+    onConnectionChange?.(true, participantVideos.length)
+  }, [onConnectionChange])
 
-  // Disconnect from room
+  // Disconnect from room and stop all tracks
   const disconnectFromRoom = useCallback(async () => {
     if (roomRef.current) {
       console.log('🎥 Disconnecting from LiveKit room...')
-      await roomRef.current.disconnect()
+      
+      const room = roomRef.current
+      const localParticipant = room.localParticipant
+      
+      // Stop all local tracks
+      localParticipant.tracks.forEach(track => {
+        if (track.track) {
+          console.log('🛑 Stopping local track:', track.kind)
+          track.track.stop()
+        }
+      })
+      
+      // Detach all video elements
+      Array.from(localParticipant.trackPublications.values()).forEach(publication => {
+        if (publication.track && publication.kind === 'video') {
+          console.log('🔌 Detaching video track')
+          publication.track.detach()
+        }
+      })
+      
+      // Disconnect from room
+      await room.disconnect(true)
+      
       roomRef.current = null
       setParticipants([])
       setParticipantCount(0)
+      onConnectionChange?.(false, 0)
     }
-  }, [])
+  }, [onConnectionChange])
 
-  // Connect when panel opens
+  // Connect when component mounts
   useEffect(() => {
-    if (isOpen) {
-      connectToRoom()
-    } else {
-      disconnectFromRoom()
-    }
-
-    return () => {
-      disconnectFromRoom()
-    }
-  }, [isOpen, connectToRoom, disconnectFromRoom])
+    connectToRoom()
+  }, [connectToRoom])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -364,119 +350,46 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
     }
   }, [disconnectFromRoom])
 
-  if (!isOpen) return null
+  // Expose disconnect function for parent component
+  React.useImperativeHandle(ref, () => ({
+    disconnect: disconnectFromRoom
+  }))
 
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      [side]: 0,
-      width: '480px',
-      height: '100vh',
-      background: 'rgba(255, 255, 255, 0.95)',
-      backdropFilter: 'blur(12px)',
-      boxShadow: side === 'right' ? '-4px 0 24px rgba(0,0,0,0.1)' : '4px 0 24px rgba(0,0,0,0.1)',
-      zIndex: 2500,
-      display: 'flex',
-      flexDirection: 'column',
-      pointerEvents: 'auto',
-      borderRadius: side === 'right' ? '16px 0 0 16px' : '0 16px 16px 0'
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '20px',
-        borderBottom: '1px solid rgba(0,0,0,0.1)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div>
-          <h2 style={{ margin: 0, color: '#374151', fontSize: '18px', fontWeight: 600 }}>
-            {buildingTitle}
-          </h2>
-          <p style={{ margin: '4px 0 0', color: '#6B7280', fontSize: '13px' }}>
-            {participantCount} participant{participantCount !== 1 ? 's' : ''}
-          </p>
+  if (isConnecting) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto mb-2"></div>
+          <div>Connecting to video room...</div>
         </div>
+      </div>
+    )
+  }
+
+  if (connectionError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-red-500 text-center p-4">
+        <div className="text-lg mb-2">Connection failed: {connectionError}</div>
         <button
-          onClick={onClose}
-          style={{
-            background: 'rgba(0,0,0,0.1)',
-            border: 'none',
-            borderRadius: '8px',
-            width: '32px',
-            height: '32px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#374151'
-          }}
+          onClick={connectToRoom}
+          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
         >
-          ✕
+          Retry Connection
         </button>
       </div>
+    )
+  }
 
-      {/* Video Grid */}
-      <div style={{
-        flex: 1,
-        padding: '20px',
-        overflow: 'auto'
-      }}>
-        {isConnecting && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '200px',
-            color: '#6B7280',
-            fontSize: '16px'
-          }}>
-            Connecting to video room...
-          </div>
-        )}
-
-        {connectionError && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '200px',
-            color: '#EF4444',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '16px', marginBottom: '8px' }}>
-              Connection failed: {connectionError}
-            </div>
-            <button
-              onClick={connectToRoom}
-              style={{
-                background: '#EF4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '8px 16px',
-                cursor: 'pointer',
-                marginTop: '8px'
-              }}
-            >
-              Retry Connection
-            </button>
-          </div>
-        )}
-
-        {!isConnecting && !connectionError && (
-          <div className="grid grid-cols-2 gap-3">
-            {participants.map((participant) => (
-              <ParticipantVideoTile 
-                key={participant.id} 
-                participant={participant} 
-              />
-            ))}
-          </div>
-        )}
+  return (
+    <div className="p-4">
+      <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+        {participants.map((participant) => (
+          <ParticipantVideoTile 
+            key={participant.id} 
+            participant={participant} 
+          />
+        ))}
       </div>
     </div>
   )
-}
+})
