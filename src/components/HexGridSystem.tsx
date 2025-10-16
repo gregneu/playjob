@@ -25,7 +25,6 @@ import { useNotifications } from '../hooks/useNotifications'
 import { GlassPanel } from './GlassPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
 import { MeetObjectPanel } from './MeetObjectPanel'
-import { MeetingBadge } from './MeetingBadge'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
 import { Vegetation } from './Vegetation'
 import { DustBurst } from './effects/DustBurst'
@@ -4565,6 +4564,28 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 energyPulseColor={pulse?.color ?? null}
                 ticketBadgeAnimation={badgeAnim?.type ?? null}
                 ticketBadgeAnimationKey={badgeAnim?.key}
+                meetingParticipants={(() => {
+                  // Check if this is a Meet building and get participants
+                  if (!building) return []
+                  const title = building?.title?.toLowerCase() || ''
+                  const description = building?.description?.toLowerCase() || ''
+                  const isMeetBuilding = title.includes('meet') || description.includes('meet') || 
+                                       title.includes('meeting') || description.includes('meeting')
+                  
+                  if (!isMeetBuilding) return []
+                  
+                  // Get participants for this meeting room
+                  const roomId = `playjoob-meet-${building?.id}`
+                  return meetingParticipants.get(roomId) || []
+                })()}
+                onMeetingClick={() => {
+                  // Handle meeting click - open meeting panel
+                  if (building) {
+                    const roomId = `playjoob-meet-${building.id}`
+                    setSelectedZoneObject(building)
+                    // The meeting panel will be opened automatically when selectedZoneObject is set
+                  }
+                }}
               />
               {isDraggingTicket && dragTicketId && isZoneCenterCell && candidateCenterCell && candidateCenterCell[0] === q && candidateCenterCell[1] === r && (() => {
                 const foundObject = getZoneObjectForCellLocal(q, r)
@@ -4623,40 +4644,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             )
           })}
 
-          {/* Meeting badges for active meetings */}
-          {(zoneObjects || []).filter((obj) => {
-            // Show badge for meet buildings (house type with meet in title/description)
-            return obj.object_type === 'house' && (
-              obj.title?.toLowerCase().includes('meet') ||
-              obj.description?.toLowerCase().includes('meet')
-            )
-          }).map((obj) => {
-            const [x, , z] = hexToWorldPosition(obj.q, obj.r)
-            const roomId = `meet-${obj.id}`
-            const participants = meetingParticipants.get(roomId) || []
-            
-            // Only show badge if there are participants
-            if (participants.length === 0) {
-              return null
-            }
-
-            return (
-              <MeetingBadge
-                key={`meeting-badge-${obj.id}`}
-                position={[x, 3.5, z]} // Position above the building
-                participants={participants}
-                onClick={() => {
-                  // Open the meeting panel for this building
-                  const meetBuildingData = buildZoneObjectData(obj, obj.q, obj.r)
-                  setSelectedMeetBuilding(meetBuildingData)
-                  setIsMeetPanelOpen(true)
-                  setIsZoneObjectDetailsOpen(false)
-                  setIsSprintOpen(false)
-                }}
-                isHidden={participants.length === 0}
-              />
-            )
-          })}
 
           {/* Story tents: render only on non-center cells to avoid overlap with zone centers */}
           {(zoneObjects || []).filter((obj) => obj.object_type === 'story' && !isZoneCenter(obj.q, obj.r)).map((obj, idx) => {

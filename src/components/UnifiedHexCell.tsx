@@ -7,6 +7,7 @@ import { Html } from '@react-three/drei'
 import { Stones, getStoneColorTint } from './Stones'
 import { Trees, getTreeColorTint } from './Trees'
 import BuildingProgressBubble from './BuildingProgressBubble'
+import { MeetingBadge } from './MeetingBadge'
 
 export const HexCellState = {
   DEFAULT: 'default',
@@ -62,6 +63,15 @@ interface UnifiedHexCellProps {
   energyPulseColor?: string | null
   ticketBadgeAnimation?: 'gain' | 'lose' | null
   ticketBadgeAnimationKey?: string | number
+  // Meeting participants props
+  meetingParticipants?: Array<{
+    id: string
+    name: string
+    avatarUrl?: string
+    avatarConfig?: any
+    userId?: string
+  }>
+  onMeetingClick?: () => void
 }
 
 // Конвертация hex-координат в мировые для сетки с ПЛОСКИМ верхом
@@ -111,6 +121,8 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   energyPulseColor = null,
   ticketBadgeAnimation = null,
   ticketBadgeAnimationKey,
+  meetingParticipants = [],
+  onMeetingClick,
 }) => {
   console.log(`🏠 UnifiedHexCell [${q},${r}] rendering:`, {
     state,
@@ -168,6 +180,17 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
     return items
   }, [showCommentNotification, showAssignmentNotification, commentCount, assignmentCount])
   const showNotificationPanel = notificationItems.length > 0
+  
+  // Check if this is a Meet building
+  const isMeetBuilding = useMemo(() => {
+    if (!zoneObject) return false
+    const title = zoneObject.title?.toLowerCase() || ''
+    const description = zoneObject.description?.toLowerCase() || ''
+    return title.includes('meet') || description.includes('meet') || 
+           title.includes('meeting') || description.includes('meeting')
+  }, [zoneObject])
+  
+  const showMeetingBadge = isMeetBuilding && meetingParticipants && meetingParticipants.length > 0
 
   const notificationStyleTag = useMemo(() => (
     `<style>
@@ -728,7 +751,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
       )}
 
       {/* Bubble с уведомлениями и количеством тикетов - по центру здания */}
-      {isZoneCenter && !isSprintObject && (showTicketBubble || showNotificationPanel) && (
+      {isZoneCenter && !isSprintObject && (showTicketBubble || showNotificationPanel || showMeetingBadge) && (
         <Html key={badgeDomKey} position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div
             style={{
@@ -812,11 +835,17 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
                 </div>
               </>
             )}
+            {showMeetingBadge && (
+              <MeetingBadge
+                participants={meetingParticipants}
+                onClick={onMeetingClick}
+              />
+            )}
           </div>
         </Html>
       )}
 
-      {isZoneCenter && isSprintObject && ((sprintProgress && sprintProgress.total > 0) || showNotificationPanel) && (
+      {isZoneCenter && isSprintObject && ((sprintProgress && sprintProgress.total > 0) || showNotificationPanel || showMeetingBadge) && (
         <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {sprintProgress && sprintProgress.total > 0 && (
@@ -869,6 +898,12 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
                   ))}
                 </div>
               </>
+            )}
+            {showMeetingBadge && (
+              <MeetingBadge
+                participants={meetingParticipants}
+                onClick={onMeetingClick}
+              />
             )}
           </div>
         </Html>
