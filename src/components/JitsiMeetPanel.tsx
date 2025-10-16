@@ -45,6 +45,7 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
         return null
       }
 
+      console.log('🔑 Requesting Jitsi token from Edge Function...')
       const response = await fetch('/functions/v1/get-jitsi-token', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -52,15 +53,62 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
         }
       })
 
+      console.log('📡 Response status:', response.status)
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()))
+
+      // Get response as text first to handle both JSON and HTML responses
+      const responseText = await response.text()
+      console.log('📄 Response text (first 200 chars):', responseText.substring(0, 200))
+
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error('❌ Failed to get Jitsi token:', errorData)
+        console.error('❌ HTTP error:', response.status, response.statusText)
+        
+        // Try to parse as JSON for error details
+        try {
+          const errorData = JSON.parse(responseText)
+          console.error('❌ Error details:', errorData)
+        } catch (parseError) {
+          console.error('❌ Non-JSON error response:', responseText.substring(0, 500))
+        }
         return null
       }
 
-      const { token } = await response.json()
-      console.log('✅ Jitsi token obtained successfully')
-      return token
+      // Try to parse as JSON
+      try {
+        const data = JSON.parse(responseText)
+        const { token } = data
+        
+        if (!token) {
+          console.error('❌ No token in response:', data)
+          return null
+        }
+
+        console.log('✅ Jitsi token obtained successfully')
+        console.log('🔐 Token (first 50 chars):', token.substring(0, 50) + '...')
+        
+        // Decode and validate JWT payload
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          console.log('📋 JWT Payload:', payload)
+          
+          // Check expiration
+          const now = Math.floor(Date.now() / 1000)
+          if (payload.exp && payload.exp < now) {
+            console.error('❌ JWT token is expired')
+            return null
+          }
+          
+          console.log('⏰ Token expires at:', new Date(payload.exp * 1000).toLocaleString())
+        } catch (jwtError) {
+          console.error('❌ Failed to decode JWT payload:', jwtError)
+        }
+        
+        return token
+      } catch (parseError) {
+        console.error('❌ Failed to parse JSON response:', parseError)
+        console.error('❌ Response was:', responseText.substring(0, 500))
+        return null
+      }
     } catch (error) {
       console.error('❌ Error getting Jitsi token:', error)
       return null
@@ -84,7 +132,8 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
     }
 
     const script = document.createElement('script')
-    script.src = 'https://8x8.vc/vpaas-magic-cookie-2eae40794b2947ad92e0371e6c3d0bf4/external_api.js'
+    // Use public Jitsi Meet script for now (works with both domains)
+    script.src = 'https://meet.jit.si/external_api.js'
     script.async = true
     
     script.onload = () => {
@@ -116,55 +165,87 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
       return
     }
 
-    console.log('🎥 Initializing Jitsi IFrame API with JaaS...')
+    console.log('🎥 Initializing Jitsi IFrame API...')
 
-    // Get JWT token for JaaS authentication
+    // Try to get JWT token for JaaS authentication
     const jwt = await getJitsiToken()
-    if (!jwt) {
-      console.error('❌ Failed to get JWT token, falling back to public Jitsi Meet')
-      setConnectionError('Authentication failed. Please try again.')
-      setIsLoading(false)
-      return
-    }
+    
+    let domain, roomName, options
 
-    // Use JaaS domain
-    const domain = '8x8.vc'
-    const appId = 'vpaas-magic-cookie-2eae40794b2947ad92e0371e6c3d0bf4'
-    const cleanRoomId = roomId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()
-    const playjoobRoomId = `playjoob-meet-${cleanRoomId}`
-    const roomName = `${appId}/${playjoobRoomId}`
+    if (jwt) {
+      // Use JaaS with JWT authentication
+      console.log('🔐 Using JaaS with JWT authentication')
+      domain = '8x8.vc'
+      const appId = 'vpaas-magic-cookie-2eae40794b2947ad92e0371e6c3d0bf4'
+      const cleanRoomId = roomId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()
+      const playjoobRoomId = `playjoob-meet-${cleanRoomId}`
+      roomName = `${appId}/${playjoobRoomId}`
+      
+      options = {
+        roomName: roomName,
+        jwt: jwt,
+        width: '100%',
+        height: '100%',
+        parentNode: jitsiContainerRef.current,
+        userInfo: {
+          displayName: userName,
+          email: userEmail
+        },
+        configOverwrite: {
+          startWithAudioMuted: false,
+          startWithVideoMuted: false,
+          prejoinPageEnabled: false,
+          disableDeepLinking: true,
+          enableWelcomePage: false
+        },
+        interfaceConfigOverwrite: {
+          TOOLBAR_BUTTONS: [
+            'microphone', 'camera', 'hangup', 'tileview'
+          ],
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_WATERMARK_FOR_GUESTS: false,
+          DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
+          DISABLE_JOIN_LEAVE_NOTIFICATIONS: false
+        }
+      }
+    } else {
+      // Fallback to public Jitsi Meet
+      console.log('⚠️ JWT token failed, falling back to public Jitsi Meet')
+      domain = 'meet.jit.si'
+      const cleanRoomId = roomId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()
+      roomName = `playjoob-meet-${cleanRoomId}`
+      
+      options = {
+        roomName: roomName,
+        width: '100%',
+        height: '100%',
+        parentNode: jitsiContainerRef.current,
+        userInfo: {
+          displayName: userName,
+          email: userEmail
+        },
+        configOverwrite: {
+          startWithAudioMuted: false,
+          startWithVideoMuted: false,
+          prejoinPageEnabled: false,
+          disableDeepLinking: true,
+          enableWelcomePage: false
+        },
+        interfaceConfigOverwrite: {
+          TOOLBAR_BUTTONS: [
+            'microphone', 'camera', 'hangup', 'tileview'
+          ],
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_WATERMARK_FOR_GUESTS: false,
+          DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
+          DISABLE_JOIN_LEAVE_NOTIFICATIONS: false
+        }
+      }
+    }
     
     console.log('🎥 Room name:', roomName)
     console.log('🎥 User name:', userName)
-    console.log('🔐 Using JaaS with JWT authentication')
-
-    const options = {
-      roomName: roomName,
-      jwt: jwt,
-      width: '100%',
-      height: '100%',
-      parentNode: jitsiContainerRef.current,
-      userInfo: {
-        displayName: userName,
-        email: userEmail
-      },
-      configOverwrite: {
-        startWithAudioMuted: false,
-        startWithVideoMuted: false,
-        prejoinPageEnabled: false,
-        disableDeepLinking: true,
-        enableWelcomePage: false
-      },
-      interfaceConfigOverwrite: {
-        TOOLBAR_BUTTONS: [
-          'microphone', 'camera', 'hangup', 'tileview'
-        ],
-        SHOW_JITSI_WATERMARK: false,
-        SHOW_WATERMARK_FOR_GUESTS: false,
-        DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
-        DISABLE_JOIN_LEAVE_NOTIFICATIONS: false
-      }
-    }
+    console.log('🌐 Domain:', domain)
 
     try {
       const api = new window.JitsiMeetExternalAPI(domain, options)
@@ -190,7 +271,7 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
         onClose()
       })
 
-      console.log('✅ Jitsi IFrame API initialized successfully with JaaS')
+      console.log('✅ Jitsi IFrame API initialized successfully')
 
     } catch (error) {
       console.error('❌ Failed to initialize Jitsi IFrame API:', error)

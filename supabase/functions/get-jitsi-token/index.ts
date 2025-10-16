@@ -95,8 +95,20 @@ serve(async (req) => {
     const keyId = Deno.env.get('JITSI_KEY_ID') || 'SAMPLE_KEY_ID' // You can set this in your environment
 
     if (!appId || !privateKey) {
+      console.error('❌ Missing environment variables:', { 
+        hasAppId: !!appId, 
+        hasPrivateKey: !!privateKey,
+        appId: appId ? 'SET' : 'MISSING',
+        privateKey: privateKey ? 'SET' : 'MISSING'
+      })
       return new Response(
-        JSON.stringify({ error: 'Missing Jitsi private key or App ID' }),
+        JSON.stringify({ 
+          error: 'Missing Jitsi private key or App ID',
+          details: {
+            hasAppId: !!appId,
+            hasPrivateKey: !!privateKey
+          }
+        }),
         { 
           status: 500,
           headers: {
