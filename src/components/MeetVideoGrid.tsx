@@ -20,6 +20,9 @@ interface MeetVideoGridProps {
 // Separate component for individual video tiles with proper track attachment
 const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ participant }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isVideoOff, setIsVideoOff] = useState(false)
 
   useEffect(() => {
     const videoElement = videoRef.current
@@ -52,27 +55,218 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
     }
   }, [participant.videoTrack, participant.name])
 
+  // Handle mute/unmute
+  const handleMuteToggle = () => {
+    if (participant.audioTrack) {
+      if (isMuted) {
+        participant.audioTrack.unmute()
+      } else {
+        participant.audioTrack.mute()
+      }
+      setIsMuted(!isMuted)
+    }
+  }
+
+  // Handle video on/off
+  const handleVideoToggle = () => {
+    if (participant.videoTrack) {
+      if (isVideoOff) {
+        participant.videoTrack.unmute()
+      } else {
+        participant.videoTrack.mute()
+      }
+      setIsVideoOff(!isVideoOff)
+    }
+  }
+
   return (
-    <div className="relative">
-      <div className="rounded-2xl overflow-hidden aspect-square bg-gray-100 shadow-sm relative">
-        {participant.videoTrack ? (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        borderRadius: 18,
+        background: 'rgba(0, 0, 0, 0.59)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        padding: 14,
+        boxShadow: isHovered ? '0 8px 32px rgba(0,0,0,0.15)' : '0 4px 14px rgba(0,0,0,0.06)',
+        cursor: 'pointer',
+        height: 165,
+        maxWidth: '180px',
+        width: 'auto',
+        position: 'relative',
+        transition: 'transform 0.1s ease-out, box-shadow 0.2s ease-out',
+        transformStyle: 'preserve-3d',
+        willChange: 'transform'
+      } as React.CSSProperties}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Video content area */}
+      <div style={{ 
+        flex: 1, 
+        marginBottom: 10, 
+        overflow: 'hidden',
+        borderRadius: 12,
+        position: 'relative',
+        background: 'rgba(0, 0, 0, 0.3)'
+      }}>
+        {participant.videoTrack && !isVideoOff ? (
           <video
             ref={videoRef}
-            className="w-full h-full object-cover"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: 12
+            }}
             autoPlay
             playsInline
             muted={participant.isLocal}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-2xl font-bold">
+          <div style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            fontSize: '24px',
+            fontWeight: 'bold',
+            borderRadius: 12
+          }}>
             {participant.name.charAt(0).toUpperCase()}
           </div>
         )}
-        
-        {/* Participant name overlay */}
-        <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded-md text-xs font-medium">
-          {participant.name}
-          {participant.isLocal && ' (You)'}
+
+        {/* Top overlay for controls - show on hover or always on touch devices */}
+        <div style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          display: 'flex',
+          gap: 6,
+          opacity: isHovered ? 1 : 0,
+          transition: 'opacity 0.2s ease',
+          background: 'rgba(0, 0, 0, 0.7)',
+          borderRadius: 8,
+          padding: '4px 6px',
+          backdropFilter: 'blur(10px)'
+        }}>
+          {/* Mute/Unmute button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleMuteToggle()
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: isMuted ? '#EF4444' : '#FFFFFF',
+              cursor: 'pointer',
+              padding: '2px',
+              borderRadius: 4,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px'
+            }}
+          >
+            {isMuted ? '🔇' : '🎤'}
+          </button>
+
+          {/* Video on/off button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleVideoToggle()
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: isVideoOff ? '#EF4444' : '#FFFFFF',
+              cursor: 'pointer',
+              padding: '2px',
+              borderRadius: 4,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px'
+            }}
+          >
+            {isVideoOff ? '📹' : '📷'}
+          </button>
+        </div>
+
+        {/* "You" indicator for local participant */}
+        {participant.isLocal && (
+          <div style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            background: 'rgba(34, 197, 94, 0.9)',
+            color: '#FFFFFF',
+            fontSize: 10,
+            fontWeight: 700,
+            padding: '2px 6px',
+            borderRadius: 8,
+            backdropFilter: 'blur(10px)'
+          }}>
+            You
+          </div>
+        )}
+      </div>
+
+      {/* Footer: participant avatar and name - matching TicketCard exactly */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
+          {/* Avatar */}
+          <div style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '0',
+            background: 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            border: 'none',
+            marginRight: '8px'
+          }}>
+            <div style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              fontSize: '12px',
+              fontWeight: '600',
+              borderRadius: '4px'
+            }}>
+              {participant.name.charAt(0).toUpperCase()}
+            </div>
+          </div>
+          
+          {/* Name */}
+          <span style={{
+            fontSize: '12px',
+            color: '#FFFFFF',
+            fontWeight: '500',
+            fontFamily: 'Inter, sans-serif',
+            textAlign: 'left',
+            maxWidth: '110px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: 'block'
+          }}>
+            {participant.name}
+          </span>
         </div>
       </div>
     </div>
@@ -414,8 +608,15 @@ export const MeetVideoGrid = React.forwardRef<
   }
 
   return (
-    <div className="p-4">
-      <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+    <div style={{ padding: '16px' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '12px',
+        maxHeight: '400px',
+        overflowY: 'auto',
+        padding: '4px'
+      }}>
         {participants.map((participant) => (
           <ParticipantVideoTile 
             key={participant.id} 
