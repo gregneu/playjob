@@ -177,8 +177,7 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
           }
 
           // Add blur processor
-          const processor = new BackgroundBlur({
-            blurRadius: 12,
+          const processor = BackgroundBlur(12, {
             edgeBlur: true,
           })
           await participant.videoTrack.setProcessor(processor)
