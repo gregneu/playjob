@@ -186,11 +186,33 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
     if (!zoneObject) return false
     const title = zoneObject.title?.toLowerCase() || ''
     const description = zoneObject.description?.toLowerCase() || ''
-    return title.includes('meet') || description.includes('meet') || 
-           title.includes('meeting') || description.includes('meeting')
+    const isMeet = title.includes('meet') || description.includes('meet') || 
+                   title.includes('meeting') || description.includes('meeting')
+    
+    // Debug logging
+    if (isMeet) {
+      console.log('🏢 UnifiedHexCell: Meet building detected:', {
+        buildingId: zoneObject.id,
+        title: zoneObject.title,
+        description: zoneObject.description,
+        isMeet
+      })
+    }
+    
+    return isMeet
   }, [zoneObject])
   
   const showMeetingBadge = isMeetBuilding && meetingParticipants && meetingParticipants.length > 0
+  
+  // Debug logging for meeting badge
+  if (isMeetBuilding) {
+    console.log('👥 UnifiedHexCell: Meeting badge check:', {
+      buildingId: zoneObject?.id,
+      isMeetBuilding,
+      participantsCount: meetingParticipants?.length || 0,
+      showMeetingBadge
+    })
+  }
 
   const notificationStyleTag = useMemo(() => (
     `<style>
