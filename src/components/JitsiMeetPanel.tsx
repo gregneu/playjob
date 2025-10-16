@@ -37,18 +37,9 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
   // Function to get JWT token from Supabase Edge Function
   const getJitsiToken = useCallback(async (): Promise<string | null> => {
     try {
-      const supabase = getBrowserClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        console.error('❌ No active session found')
-        return null
-      }
-
       console.log('🔑 Requesting Jitsi token from Edge Function...')
       const response = await fetch('/functions/v1/get-jitsi-token', {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         }
       })
