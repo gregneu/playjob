@@ -31,7 +31,7 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
       return
     }
 
-    if (participant.videoTrack) {
+    if (participant.videoTrack && !isVideoOff) {
       console.log('🎥 Attaching video track for participant:', participant.name, 'Track:', participant.videoTrack)
       console.log('🎥 Video element:', videoElement)
       
@@ -53,7 +53,7 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
     } else {
       console.log('❌ No video track available for participant:', participant.name)
     }
-  }, [participant.videoTrack, participant.name])
+  }, [participant.videoTrack, participant.name, isVideoOff])
 
   // Handle mute/unmute
   const handleMuteToggle = () => {
@@ -79,196 +79,110 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
     }
   }
 
+  // Determine if we should show video or avatar
+  const hasVideo = participant.videoTrack && !isVideoOff
+
   return (
     <div
+      className="relative rounded-2xl overflow-hidden bg-gray-800 shadow-lg transition-all duration-300 ease-in-out"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        borderRadius: 18,
-        background: 'rgba(0, 0, 0, 0.59)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        padding: 14,
-        boxShadow: isHovered ? '0 8px 32px rgba(0,0,0,0.15)' : '0 4px 14px rgba(0,0,0,0.06)',
-        cursor: 'pointer',
-        height: 165,
+        aspectRatio: '1',
+        height: '165px',
         maxWidth: '180px',
         width: 'auto',
-        position: 'relative',
-        transition: 'transform 0.1s ease-out, box-shadow 0.2s ease-out',
-        transformStyle: 'preserve-3d',
-        willChange: 'transform'
-      } as React.CSSProperties}
+        cursor: 'pointer'
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Video content area */}
-      <div style={{ 
-        flex: 1, 
-        marginBottom: 10, 
-        overflow: 'hidden',
-        borderRadius: 12,
-        position: 'relative',
-        background: 'rgba(0, 0, 0, 0.3)'
-      }}>
-        {participant.videoTrack && !isVideoOff ? (
-          <video
-            ref={videoRef}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              borderRadius: 12
-            }}
-            autoPlay
-            playsInline
-            muted={participant.isLocal}
-          />
-        ) : (
-          <div style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            fontSize: '24px',
-            fontWeight: 'bold',
-            borderRadius: 12
-          }}>
+      {/* Video or Avatar Content */}
+      {hasVideo ? (
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          autoPlay
+          playsInline
+          muted={participant.isLocal}
+        />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800">
+          {/* 3D Avatar or Emoji Avatar */}
+          <div className="w-16 h-16 mb-2 flex items-center justify-center text-4xl">
             {participant.name.charAt(0).toUpperCase()}
           </div>
-        )}
-
-        {/* Top overlay for controls - show on hover or always on touch devices */}
-        <div style={{
-          position: 'absolute',
-          top: 8,
-          right: 8,
-          display: 'flex',
-          gap: 6,
-          opacity: isHovered ? 1 : 0,
-          transition: 'opacity 0.2s ease',
-          background: 'rgba(0, 0, 0, 0.7)',
-          borderRadius: 8,
-          padding: '4px 6px',
-          backdropFilter: 'blur(10px)'
-        }}>
-          {/* Mute/Unmute button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleMuteToggle()
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: isMuted ? '#EF4444' : '#FFFFFF',
-              cursor: 'pointer',
-              padding: '2px',
-              borderRadius: 4,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px'
-            }}
-          >
-            {isMuted ? '🔇' : '🎤'}
-          </button>
-
-          {/* Video on/off button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleVideoToggle()
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: isVideoOff ? '#EF4444' : '#FFFFFF',
-              cursor: 'pointer',
-              padding: '2px',
-              borderRadius: 4,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px'
-            }}
-          >
-            {isVideoOff ? '📹' : '📷'}
-          </button>
-        </div>
-
-        {/* "You" indicator for local participant */}
-        {participant.isLocal && (
-          <div style={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            background: 'rgba(34, 197, 94, 0.9)',
-            color: '#FFFFFF',
-            fontSize: 10,
-            fontWeight: 700,
-            padding: '2px 6px',
-            borderRadius: 8,
-            backdropFilter: 'blur(10px)'
-          }}>
-            You
-          </div>
-        )}
-      </div>
-
-      {/* Footer: participant avatar and name - matching TicketCard exactly */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
-          {/* Avatar */}
-          <div style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '0',
-            background: 'transparent',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            border: 'none',
-            marginRight: '8px'
-          }}>
-            <div style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              fontSize: '12px',
-              fontWeight: '600',
-              borderRadius: '4px'
-            }}>
-              {participant.name.charAt(0).toUpperCase()}
-            </div>
-          </div>
-          
-          {/* Name */}
-          <span style={{
-            fontSize: '12px',
-            color: '#FFFFFF',
-            fontWeight: '500',
-            fontFamily: 'Inter, sans-serif',
-            textAlign: 'left',
-            maxWidth: '110px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: 'block'
-          }}>
+          {/* Name below avatar */}
+          <span className="text-sm text-white/80 text-center px-2">
             {participant.name}
           </span>
         </div>
+      )}
+
+      {/* Hover Overlay */}
+      <div 
+        className={`absolute inset-0 bg-black/25 transition-opacity duration-300 ease-in-out ${
+          isHovered ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+
+      {/* Control Icons - Top Left */}
+      <div 
+        className={`absolute top-2 left-2 flex gap-2 transition-all duration-300 ease-in-out ${
+          isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+        }`}
+      >
+        {/* Mic Icon */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleMuteToggle()
+          }}
+          className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors"
+        >
+          <img 
+            src={isMuted ? "/icons/entypo_sound-no.svg" : "/icons/entypo_sound.svg"}
+            alt={isMuted ? "Unmute" : "Mute"}
+            className="w-4 h-4"
+          />
+        </button>
+
+        {/* Camera Icon */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleVideoToggle()
+          }}
+          className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors"
+        >
+          <img 
+            src={isVideoOff ? "/icons/tdesign_camera-2-filled-no.svg" : "/icons/tdesign_camera-2-filled.svg"}
+            alt={isVideoOff ? "Turn on camera" : "Turn off camera"}
+            className="w-4 h-4"
+          />
+        </button>
       </div>
+
+      {/* "You" Badge - Top Left (above icons) */}
+      {participant.isLocal && (
+        <div className="absolute top-2 left-2 bg-green-500 text-white text-xs rounded-md px-2 py-0.5 font-medium z-10">
+          You
+        </div>
+      )}
+
+      {/* Name Overlay - Bottom (only for video tiles) */}
+      {hasVideo && (
+        <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm p-2">
+          <div className="flex items-center gap-2">
+            {/* Avatar Circle */}
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+              {participant.name.charAt(0).toUpperCase()}
+            </div>
+            {/* Name */}
+            <span className="text-white text-sm font-medium truncate">
+              {participant.name}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
