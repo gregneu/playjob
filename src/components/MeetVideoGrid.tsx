@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, RemoteTrack, LocalTrack, createLocalVideoTrack, createLocalAudioTrack } from 'livekit-client'
+import { getBrowserClient } from '../lib/supabase-browser'
 
 interface ParticipantVideo {
   id: string
@@ -7,6 +8,8 @@ interface ParticipantVideo {
   videoTrack?: RemoteTrack | LocalTrack
   audioTrack?: RemoteTrack | LocalTrack
   isLocal: boolean
+  avatarUrl?: string
+  email?: string
 }
 
 interface MeetVideoGridProps {
@@ -141,9 +144,24 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '32px',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            background: participant.avatarUrl ? 'transparent' : 'rgba(255, 255, 255, 0.2)'
           }}>
-            {participant.name.charAt(0).toUpperCase()}
+            {participant.avatarUrl ? (
+              <img 
+                src={participant.avatarUrl} 
+                alt={participant.name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              participant.name.charAt(0).toUpperCase()
+            )}
           </div>
           {/* Name below avatar */}
           <span style={{
@@ -268,15 +286,28 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
           width: '24px',
           height: '24px',
           borderRadius: '4px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: participant.avatarUrl ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: 'white',
           fontSize: '12px',
-          fontWeight: '600'
+          fontWeight: '600',
+          overflow: 'hidden'
         }}>
-          {participant.name.charAt(0).toUpperCase()}
+          {participant.avatarUrl ? (
+            <img 
+              src={participant.avatarUrl} 
+              alt={participant.name}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
+              }}
+            />
+          ) : (
+            participant.name.charAt(0).toUpperCase()
+          )}
         </div>
         {/* Name */}
         <span style={{
@@ -466,8 +497,30 @@ export const MeetVideoGrid = React.forwardRef<
     }
   }, [getLiveKitToken, onConnectionChange, onError])
 
+  // Fetch user data from Supabase
+  const fetchUserData = useCallback(async (email: string) => {
+    try {
+      const supabase = getBrowserClient()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('email', email)
+        .single()
+      
+      if (error) {
+        console.warn('⚠️ Could not fetch user data for:', email, error.message)
+        return null
+      }
+      
+      return data
+    } catch (error) {
+      console.warn('⚠️ Error fetching user data for:', email, error)
+      return null
+    }
+  }, [])
+
   // Update participants list
-  const updateParticipants = useCallback(() => {
+  const updateParticipants = useCallback(async () => {
     if (!roomRef.current) {
       setParticipants([])
       setParticipantCount(0)
@@ -490,14 +543,15 @@ export const MeetVideoGrid = React.forwardRef<
 
     participantVideos.push({
       id: localParticipant.identity,
-      name: localParticipant.identity,
+      name: userName || localParticipant.identity,
       videoTrack: localVideoTrack,
       audioTrack: localAudioTrack,
-      isLocal: true
+      isLocal: true,
+      email: userEmail
     })
 
-    // Add remote participants
-    room.remoteParticipants.forEach((participant: RemoteParticipant) => {
+    // Add remote participants with user data
+    for (const participant of room.remoteParticipants.values()) {
       console.log('🔍 Remote participant all tracks:', participant.identity, participant.trackPublications)
       
       // Get subscribed tracks for remote participants from trackPublications (convert Map to Array first)
@@ -507,19 +561,28 @@ export const MeetVideoGrid = React.forwardRef<
       console.log('🎥 Remote video track found for', participant.identity, ':', !!remoteVideoTrack)
       console.log('🎵 Remote audio track found for', participant.identity, ':', !!remoteAudioTrack)
 
+      // Try to fetch user data for remote participant
+      let userData = null
+      if (participant.identity.includes('@')) {
+        // If identity is an email, fetch user data
+        userData = await fetchUserData(participant.identity)
+      }
+
       participantVideos.push({
         id: participant.identity,
-        name: participant.identity,
+        name: userData?.full_name || participant.identity,
         videoTrack: remoteVideoTrack,
         audioTrack: remoteAudioTrack,
-        isLocal: false
+        isLocal: false,
+        avatarUrl: userData?.avatar_url,
+        email: participant.identity
       })
-    })
+    }
 
     setParticipants(participantVideos)
     setParticipantCount(participantVideos.length)
     onConnectionChange?.(true, participantVideos.length)
-  }, [onConnectionChange])
+  }, [onConnectionChange, userName, userEmail, fetchUserData])
 
   // Disconnect from room and stop all tracks
   const disconnectFromRoom = useCallback(async () => {
