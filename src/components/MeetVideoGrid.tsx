@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, RemoteTrack, LocalTrack, createLocalVideoTrack, createLocalAudioTrack } from 'livekit-client'
-import { BackgroundBlurProcessor } from '@livekit/track-processors'
+import { BackgroundBlur } from '@livekit/track-processors'
 import { getBrowserClient } from '../lib/supabase-browser'
 import { UserAvatar } from './UserAvatar'
 
@@ -177,7 +177,7 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
           }
 
           // Add blur processor
-          const processor = new BackgroundBlurProcessor({
+          const processor = new BackgroundBlur({
             blurRadius: 12,
             edgeBlur: true,
           })

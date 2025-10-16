@@ -215,9 +215,7 @@ const progressPercent = Math.min(100, Math.max(0, stats.totalTickets > 0 ? (stat
       width: '100vw',
       position: 'relative',
       overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,0.35)',
-              border: '1px solid rgba(255,255,255,0.35)',
-              border: '1px solid rgba(255,255,255,0.35)',
+      border: '1px solid rgba(255,255,255,0.35)',
       background: 'radial-gradient(1000px 700px at 50% 40%, #FFFFFF 0%, #FFFFFF 20%, #EBECF7 70%, #EBECF7 100%)'
     } as React.CSSProperties}>
       {/* Full Screen Map */}
