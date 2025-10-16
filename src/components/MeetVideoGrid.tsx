@@ -84,16 +84,22 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden bg-[rgba(58,58,61,0.85)] backdrop-blur-[10px] border border-white/10 shadow-xl"
       style={{
+        position: 'relative',
+        borderRadius: '18px',
+        overflow: 'hidden',
+        background: 'rgba(0, 0, 0, 0.59)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: isHovered ? '0 8px 32px rgba(0,0,0,0.15)' : '0 4px 14px rgba(0,0,0,0.06)',
+        cursor: 'pointer',
         height: 165,
         maxWidth: '180px',
         width: 'auto',
-        cursor: 'pointer',
         transition: 'transform 0.1s ease-out, box-shadow 0.2s ease-out',
         transformStyle: 'preserve-3d',
-        willChange: 'transform',
-        boxShadow: isHovered ? '0 8px 32px rgba(0,0,0,0.15)' : '0 4px 14px rgba(0,0,0,0.06)'
+        willChange: 'transform'
       } as React.CSSProperties}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -102,19 +108,50 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
       {hasVideo ? (
         <video
           ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover rounded-2xl"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            borderRadius: '18px'
+          }}
           autoPlay
           playsInline
           muted={participant.isLocal}
         />
       ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl">
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          borderRadius: '18px'
+        }}>
           {/* 3D Avatar or Emoji Avatar */}
-          <div className="w-16 h-16 mb-2 flex items-center justify-center text-4xl font-bold text-white">
+          <div style={{
+            width: '64px',
+            height: '64px',
+            marginBottom: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '32px',
+            fontWeight: 'bold'
+          }}>
             {participant.name.charAt(0).toUpperCase()}
           </div>
           {/* Name below avatar */}
-          <span className="text-sm text-white/80 text-center px-2">
+          <span style={{
+            fontSize: '14px',
+            color: 'rgba(255, 255, 255, 0.8)',
+            textAlign: 'center',
+            padding: '0 8px'
+          }}>
             {participant.name}
           </span>
         </div>
@@ -123,15 +160,32 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
       {/* Hover Overlay - only for video tiles */}
       {hasVideo && (
         <div 
-          className={`absolute inset-0 bg-black/25 rounded-2xl transition-opacity duration-300 ease-in-out ${
-            isHovered ? 'opacity-100' : 'opacity-0'
-          }`}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.25)',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.3s ease-in-out',
+            borderRadius: '18px'
+          }}
         />
       )}
 
       {/* "You" Badge - Top Left */}
       {participant.isLocal && (
-        <div className="absolute top-3 left-3 bg-green-500 text-white text-xs rounded-md px-2 py-0.5 font-medium z-10">
+        <div style={{
+          position: 'absolute',
+          top: 12,
+          left: 12,
+          background: 'rgba(34, 197, 94, 0.9)',
+          color: '#FFFFFF',
+          fontSize: 10,
+          fontWeight: 700,
+          padding: '2px 6px',
+          borderRadius: 8,
+          backdropFilter: 'blur(10px)',
+          zIndex: 10
+        }}>
           You
         </div>
       )}
@@ -139,9 +193,16 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
       {/* Control Icons - Top Right (only show on hover for video tiles) */}
       {hasVideo && (
         <div 
-          className={`absolute top-3 right-3 flex gap-2 transition-all duration-300 ease-in-out ${
-            isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-          }`}
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            display: 'flex',
+            gap: 8,
+            opacity: isHovered ? 1 : 0,
+            transform: isHovered ? 'scale(1)' : 'scale(0.95)',
+            transition: 'all 0.3s ease-in-out'
+          }}
         >
           {/* Mic Icon */}
           <button
@@ -149,12 +210,29 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
               e.stopPropagation()
               handleMuteToggle()
             }}
-            className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors"
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              padding: '6px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(10px)',
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+            }}
           >
             <img 
               src={isMuted ? "/icons/entypo_sound-no.svg" : "/icons/entypo_sound.svg"}
               alt={isMuted ? "Unmute" : "Mute"}
-              className="w-4 h-4"
+              style={{ width: '16px', height: '16px' }}
             />
           </button>
 
@@ -164,25 +242,69 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
               e.stopPropagation()
               handleVideoToggle()
             }}
-            className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors"
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              padding: '6px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(10px)',
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+            }}
           >
             <img 
               src={isVideoOff ? "/icons/tdesign_camera-2-filled-no.svg" : "/icons/tdesign_camera-2-filled.svg"}
               alt={isVideoOff ? "Turn on camera" : "Turn off camera"}
-              className="w-4 h-4"
+              style={{ width: '16px', height: '16px' }}
             />
           </button>
         </div>
       )}
 
       {/* Footer: participant avatar and name - Bottom Left */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2">
+      <div style={{
+        position: 'absolute',
+        bottom: 12,
+        left: 12,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8
+      }}>
         {/* Avatar */}
-        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+        <div style={{
+          width: '24px',
+          height: '24px',
+          borderRadius: '4px',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontSize: '12px',
+          fontWeight: '600'
+        }}>
           {participant.name.charAt(0).toUpperCase()}
         </div>
         {/* Name */}
-        <span className="text-white text-sm font-medium truncate max-w-[100px]">
+        <span style={{
+          fontSize: '12px',
+          color: '#FFFFFF',
+          fontWeight: '500',
+          fontFamily: 'Inter, sans-serif',
+          maxWidth: '100px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
           {participant.name}
         </span>
       </div>
@@ -525,8 +647,14 @@ export const MeetVideoGrid = React.forwardRef<
   }
 
   return (
-    <div className="p-4">
-      <div className="grid grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+    <div style={{ padding: '16px' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '16px',
+        maxHeight: '400px',
+        overflowY: 'auto'
+      }}>
         {participants.map((participant) => (
           <ParticipantVideoTile 
             key={participant.id} 
