@@ -177,7 +177,7 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
           }
 
           // Add blur processor
-          const processor = BackgroundBlur(12, {
+          const processor = BackgroundBlur(25, {
             edgeBlur: true,
           })
           await participant.videoTrack.setProcessor(processor)
@@ -413,18 +413,15 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
                 e.currentTarget.style.background = isBlurEnabled ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.2)'
               }}
             >
-              <div style={{
-                width: '16px',
-                height: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '12px',
-                color: 'white',
-                fontWeight: 'bold'
-              }}>
-                {isBlurEnabled ? '🌫️' : '🔍'}
-              </div>
+              <img 
+                src="/icons/tabler_background.svg"
+                alt={isBlurEnabled ? "Disable background blur" : "Enable background blur"}
+                style={{ 
+                  width: '16px', 
+                  height: '16px',
+                  filter: isBlurEnabled ? 'brightness(1.2)' : 'brightness(0.8)'
+                }}
+              />
             </button>
           )}
         </div>
