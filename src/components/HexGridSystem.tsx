@@ -4579,8 +4579,25 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 ticketBadgeAnimation={badgeAnim?.type ?? null}
                 ticketBadgeAnimationKey={badgeAnim?.key}
                 meetingParticipants={(() => {
+                  // Debug logging for building
+                  console.log('🔍 HexGridSystem: Building check for cell:', {
+                    q,
+                    r,
+                    building: building ? {
+                      id: building.id,
+                      title: building.title,
+                      description: building.description,
+                      object_type: building.object_type
+                    } : null,
+                    isZoneCenterCell
+                  })
+                  
                   // Check if this is a Meet building and get participants
-                  if (!building) return []
+                  if (!building) {
+                    console.log('❌ HexGridSystem: No building found for cell:', { q, r })
+                    return []
+                  }
+                  
                   const title = building?.title?.toLowerCase() || ''
                   const description = building?.description?.toLowerCase() || ''
                   const isMeetBuilding = title.includes('meet') || description.includes('meet') || 
