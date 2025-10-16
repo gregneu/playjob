@@ -29,9 +29,18 @@ interface MeetVideoGridProps {
 // Separate component for individual video tiles with proper track attachment
 const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ participant }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
   const [isHovered, setIsHovered] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(false)
+
+  // Initialize mute state based on track
+  useEffect(() => {
+    if (participant.audioTrack) {
+      setIsMuted(participant.audioTrack.isMuted)
+      console.log('🎵 Initial mute state for', participant.name, ':', participant.audioTrack.isMuted)
+    }
+  }, [participant.audioTrack, participant.name])
 
   useEffect(() => {
     const videoElement = videoRef.current
@@ -64,15 +73,53 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
     }
   }, [participant.videoTrack, participant.name, isVideoOff])
 
+  // Handle audio track attachment
+  useEffect(() => {
+    const audioElement = audioRef.current
+    if (!audioElement) {
+      console.log('❌ No audio element for participant:', participant.name)
+      return
+    }
+
+    if (participant.audioTrack && !participant.isLocal) {
+      console.log('🎵 Attaching audio track for participant:', participant.name, 'Track:', participant.audioTrack)
+      console.log('🎵 Audio element:', audioElement)
+      
+      try {
+        participant.audioTrack.attach(audioElement)
+        console.log('✅ Audio track attached successfully for:', participant.name)
+      } catch (error) {
+        console.error('❌ Failed to attach audio track for:', participant.name, error)
+      }
+      
+      return () => {
+        console.log('🎵 Detaching audio track for participant:', participant.name)
+        try {
+          participant.audioTrack?.detach()
+        } catch (error) {
+          console.error('❌ Failed to detach audio track for:', participant.name, error)
+        }
+      }
+    } else if (participant.isLocal) {
+      console.log('🎵 Local participant audio track - no attachment needed for:', participant.name)
+    } else {
+      console.log('❌ No audio track available for participant:', participant.name)
+    }
+  }, [participant.audioTrack, participant.name, participant.isLocal])
+
   // Handle mute/unmute
   const handleMuteToggle = () => {
     if (participant.audioTrack) {
       if (isMuted) {
         participant.audioTrack.unmute()
+        console.log('🔊 Unmuted audio for:', participant.name)
       } else {
         participant.audioTrack.mute()
+        console.log('🔇 Muted audio for:', participant.name)
       }
       setIsMuted(!isMuted)
+    } else {
+      console.warn('⚠️ No audio track available for mute toggle:', participant.name)
     }
   }
 
@@ -112,7 +159,26 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
       } as React.CSSProperties}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={() => {
+        // Resume audio context on user interaction (Safari requirement)
+        if (typeof window !== 'undefined' && window.AudioContext) {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+          if (audioContext.state === 'suspended') {
+            audioContext.resume()
+          }
+        }
+      }}
     >
+      {/* Audio element for remote participants */}
+      {!participant.isLocal && (
+        <audio
+          ref={audioRef}
+          autoPlay
+          playsInline
+          style={{ display: 'none' }}
+        />
+      )}
+
       {/* Video or Avatar Content */}
       {hasVideo ? (
         <video
@@ -321,6 +387,20 @@ export const MeetVideoGrid = React.forwardRef<
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [participantCount, setParticipantCount] = useState(0)
 
+  // Handle audio context for Safari
+  const resumeAudioContext = useCallback(() => {
+    if (typeof window !== 'undefined' && window.AudioContext) {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+          console.log('🎵 Audio context resumed for Safari compatibility')
+        }).catch(error => {
+          console.warn('⚠️ Failed to resume audio context:', error)
+        })
+      }
+    }
+  }, [])
+
   // Function to get LiveKit token from Supabase Edge Function
   const getLiveKitToken = useCallback(async (): Promise<{ token: string; wsUrl: string } | null> => {
     try {
@@ -383,6 +463,8 @@ export const MeetVideoGrid = React.forwardRef<
       room.on(RoomEvent.Connected, () => {
         console.log('✅ Connected to LiveKit room')
         setIsConnecting(false)
+        // Resume audio context for Safari compatibility
+        resumeAudioContext()
         onConnectionChange?.(true, participantCount)
       })
 
@@ -450,13 +532,25 @@ export const MeetVideoGrid = React.forwardRef<
       })
       
       console.log('📡 Creating local audio track...')
-      const localAudioTrack = await createLocalAudioTrack()
-      
-      console.log('📡 Publishing local tracks...')
-      await room.localParticipant.publishTrack(localVideoTrack)
-      await room.localParticipant.publishTrack(localAudioTrack)
-      
-      console.log('✅ Local tracks published successfully')
+      try {
+        const localAudioTrack = await createLocalAudioTrack({
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        })
+        console.log('✅ Local audio track created successfully')
+        
+        console.log('📡 Publishing local tracks...')
+        await room.localParticipant.publishTrack(localVideoTrack)
+        await room.localParticipant.publishTrack(localAudioTrack)
+        
+        console.log('✅ Local tracks published successfully')
+      } catch (audioError) {
+        console.error('❌ Failed to create audio track:', audioError)
+        // Continue with video only if audio fails
+        await room.localParticipant.publishTrack(localVideoTrack)
+        console.log('✅ Local video track published (audio failed)')
+      }
       
       roomRef.current = room
       
@@ -473,7 +567,7 @@ export const MeetVideoGrid = React.forwardRef<
       onError?.(errorMessage)
       setIsConnecting(false)
     }
-  }, [getLiveKitToken, onConnectionChange, onError])
+  }, [getLiveKitToken, onConnectionChange, onError, resumeAudioContext])
 
   // Fetch user data from Supabase
   const fetchUserData = useCallback(async (identity: string) => {
