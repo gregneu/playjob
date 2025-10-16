@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, RemoteTrack, LocalTrack } from 'livekit-client'
+import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, RemoteTrack, LocalTrack, createLocalVideoTrack, createLocalAudioTrack } from 'livekit-client'
 
 interface LiveKitPanelProps {
   isOpen: boolean
@@ -206,14 +206,17 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
         // Subscribe to all available tracks for the new participant
         participant.trackPublications.forEach((publication) => {
           if (publication.track) {
-            console.log('✅ Subscribed to remote track:', publication.kind, participant.identity)
+            console.log('✅ Already subscribed to remote track:', publication.kind, participant.identity)
           } else if (publication.subscribe) {
             publication.subscribe()
             console.log('📡 Subscribing to remote track:', publication.kind, participant.identity)
           }
         })
         
-        updateParticipants()
+        // Update participants after a short delay to allow tracks to be ready
+        setTimeout(() => {
+          updateParticipants()
+        }, 500)
       })
 
       room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
@@ -245,22 +248,21 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
       console.log('🔗 Connecting to LiveKit room with URL:', tokenData.wsUrl)
       await room.connect(tokenData.wsUrl, tokenData.token)
       
-      // Enable camera and microphone
-      console.log('📹 Enabling camera and microphone...')
-      await room.localParticipant.enableCameraAndMicrophone()
+      // Create and publish local tracks manually
+      console.log('📡 Creating local video track...')
+      const localVideoTrack = await createLocalVideoTrack({
+        resolution: { width: 640, height: 480 },
+        facingMode: 'user'
+      })
       
-      // Explicitly publish video and audio tracks
-      console.log('📡 Publishing video track...')
-      const videoTrack = await room.localParticipant.setCameraEnabled(true)
-      if (videoTrack) {
-        console.log('✅ Video track published successfully')
-      }
+      console.log('📡 Creating local audio track...')
+      const localAudioTrack = await createLocalAudioTrack()
       
-      console.log('📡 Publishing audio track...')
-      const audioTrack = await room.localParticipant.setMicrophoneEnabled(true)
-      if (audioTrack) {
-        console.log('✅ Audio track published successfully')
-      }
+      console.log('📡 Publishing local tracks...')
+      await room.localParticipant.publishTrack(localVideoTrack)
+      await room.localParticipant.publishTrack(localAudioTrack)
+      
+      console.log('✅ Local tracks published successfully')
       
       roomRef.current = room
       
@@ -290,13 +292,11 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
 
     // Add local participant first
     const localParticipant = room.localParticipant
-    console.log('🔍 Local participant video tracks:', localParticipant.videoTrackPublications)
-    console.log('🔍 Local participant audio tracks:', localParticipant.audioTrackPublications)
     console.log('🔍 Local participant all tracks:', localParticipant.trackPublications)
     
-    // Get the first available video track (local tracks are always subscribed)
-    const localVideoTrack = localParticipant.videoTrackPublications.find(p => p.track)?.track || null
-    const localAudioTrack = localParticipant.audioTrackPublications.find(p => p.track)?.track || null
+    // Get tracks from trackPublications instead of videoTrackPublications
+    const localVideoTrack = localParticipant.trackPublications.find(p => p.kind === 'video' && p.track)?.track || null
+    const localAudioTrack = localParticipant.trackPublications.find(p => p.kind === 'audio' && p.track)?.track || null
     
     console.log('🎥 Local video track found:', !!localVideoTrack)
     console.log('🎵 Local audio track found:', !!localAudioTrack)
@@ -311,12 +311,11 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
 
     // Add remote participants
     room.remoteParticipants.forEach((participant: RemoteParticipant) => {
-      console.log('🔍 Remote participant video tracks:', participant.identity, participant.videoTrackPublications)
       console.log('🔍 Remote participant all tracks:', participant.identity, participant.trackPublications)
       
-      // Get subscribed tracks for remote participants
-      const remoteVideoTrack = participant.videoTrackPublications.find(p => p.isSubscribed && p.track)?.track || null
-      const remoteAudioTrack = participant.audioTrackPublications.find(p => p.isSubscribed && p.track)?.track || null
+      // Get subscribed tracks for remote participants from trackPublications
+      const remoteVideoTrack = participant.trackPublications.find(p => p.kind === 'video' && p.isSubscribed && p.track)?.track || null
+      const remoteAudioTrack = participant.trackPublications.find(p => p.kind === 'audio' && p.isSubscribed && p.track)?.track || null
       
       console.log('🎥 Remote video track found for', participant.identity, ':', !!remoteVideoTrack)
       console.log('🎵 Remote audio track found for', participant.identity, ':', !!remoteAudioTrack)
