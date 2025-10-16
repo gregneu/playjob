@@ -252,44 +252,46 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
         </div>
       )}
 
-      {/* Footer: participant avatar and name - Bottom Left */}
-      <div style={{
-        position: 'absolute',
-        bottom: 12,
-        left: 12,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8
-      }}>
-        {/* Avatar */}
+      {/* Footer: participant avatar and name - Bottom Left (only show when video is off) */}
+      {!hasVideo && (
         <div style={{
-          width: '24px',
-          height: '24px',
-          borderRadius: '4px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          position: 'absolute',
+          bottom: 12,
+          left: 12,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontSize: '12px',
-          fontWeight: '600'
+          gap: 8
         }}>
-          {participant.name.charAt(0).toUpperCase()}
+          {/* Avatar */}
+          <div style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '4px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '12px',
+            fontWeight: '600'
+          }}>
+            {participant.name.charAt(0).toUpperCase()}
+          </div>
+          {/* Name */}
+          <span style={{
+            fontSize: '12px',
+            color: '#FFFFFF',
+            fontWeight: '500',
+            fontFamily: 'Inter, sans-serif',
+            maxWidth: '100px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {participant.name}
+          </span>
         </div>
-        {/* Name */}
-        <span style={{
-          fontSize: '12px',
-          color: '#FFFFFF',
-          fontWeight: '500',
-          fontFamily: 'Inter, sans-serif',
-          maxWidth: '100px',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}>
-          {participant.name}
-        </span>
-      </div>
+      )}
     </div>
   )
 }
