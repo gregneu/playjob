@@ -89,13 +89,7 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
       
       const room = new Room({
         adaptiveStream: true,
-        dynacast: true,
-        publishDefaults: {
-          videoSimulcastLayers: [
-            { resolution: { width: 640, height: 360 }, encoding: { maxBitrate: 200_000 } },
-            { resolution: { width: 1280, height: 720 }, encoding: { maxBitrate: 500_000 } }
-          ]
-        }
+        dynacast: true
       })
 
       // Set up event listeners
@@ -142,9 +136,11 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
       })
 
       // Connect to room
+      console.log('🔗 Connecting to LiveKit room with URL:', tokenData.wsUrl)
       await room.connect(tokenData.wsUrl, tokenData.token)
       
       // Enable camera and microphone
+      console.log('📹 Enabling camera and microphone...')
       await room.localParticipant.enableCameraAndMicrophone()
       
       roomRef.current = room
