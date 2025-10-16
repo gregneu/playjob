@@ -2,19 +2,19 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 // JWT implementation using Web Crypto API
 class JWT {
-  static base64UrlEncode(data) {
+  static base64UrlEncode(data: ArrayBuffer): string {
     const base64 = btoa(String.fromCharCode(...new Uint8Array(data)));
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
-  static base64UrlDecode(str) {
+  static base64UrlDecode(str: string): ArrayBuffer {
     const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
     const binary = atob(padded);
     return new Uint8Array(binary.split('').map((c) => c.charCodeAt(0))).buffer;
   }
 
-  static async sign(payload, privateKey, keyId) {
+  static async sign(payload: any, privateKey: string, keyId: string): Promise<string> {
     const header = {
       alg: 'RS256',
       typ: 'JWT',
@@ -57,7 +57,6 @@ serve(async (req) => {
     });
   }
 
-  // No authentication required - simplified function
   try {
     // Get environment variables
     const appId = Deno.env.get('JITSI_APP_ID');

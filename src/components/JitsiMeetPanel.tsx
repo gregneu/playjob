@@ -37,11 +37,21 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
   const getJitsiToken = useCallback(async (): Promise<string | null> => {
     try {
       console.log('🔑 Requesting Jitsi token from Edge Function...')
+      // Try to get JWT token, but don't fail if it doesn't work
       const response = await fetch('https://cicmapcwlvdatmgwdylh.supabase.co/functions/v1/get-jitsi-token', {
         headers: {
           'Content-Type': 'application/json'
         }
+      }).catch(() => {
+        // If fetch fails, return null to use fallback
+        console.log('⚠️ JWT token fetch failed, using fallback to public Jitsi Meet')
+        return null
       })
+
+      if (!response) {
+        console.log('⚠️ No response from JWT endpoint, using fallback')
+        return null
+      }
 
       console.log('📡 Response status:', response.status)
       console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()))
@@ -156,6 +166,21 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
     }
 
     console.log('🎥 Initializing Jitsi IFrame API...')
+
+    // Request camera and microphone permissions first
+    try {
+      console.log('🎤 Requesting camera and microphone permissions...')
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: true 
+      })
+      console.log('✅ Camera and microphone permissions granted')
+      // Stop the stream as we just needed to get permissions
+      stream.getTracks().forEach(track => track.stop())
+    } catch (error) {
+      console.warn('⚠️ Camera/microphone permissions denied:', error)
+      // Continue anyway - Jitsi will handle this gracefully
+    }
 
     // Try to get JWT token for JaaS authentication
     const jwt = await getJitsiToken()
