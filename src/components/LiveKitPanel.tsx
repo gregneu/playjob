@@ -25,16 +25,32 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
 
   useEffect(() => {
     const videoElement = videoRef.current
-    if (!videoElement) return
+    if (!videoElement) {
+      console.log('❌ No video element for participant:', participant.name)
+      return
+    }
 
     if (participant.videoTrack) {
-      console.log('🎥 Attaching video track for participant:', participant.name)
-      participant.videoTrack.attach(videoElement)
+      console.log('🎥 Attaching video track for participant:', participant.name, 'Track:', participant.videoTrack)
+      console.log('🎥 Video element:', videoElement)
+      
+      try {
+        participant.videoTrack.attach(videoElement)
+        console.log('✅ Video track attached successfully for:', participant.name)
+      } catch (error) {
+        console.error('❌ Failed to attach video track for:', participant.name, error)
+      }
       
       return () => {
         console.log('🎥 Detaching video track for participant:', participant.name)
-        participant.videoTrack?.detach()
+        try {
+          participant.videoTrack?.detach()
+        } catch (error) {
+          console.error('❌ Failed to detach video track for:', participant.name, error)
+        }
       }
+    } else {
+      console.log('❌ No video track available for participant:', participant.name)
     }
   }, [participant.videoTrack, participant.name])
 
@@ -186,6 +202,17 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
 
       room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
         console.log('👤 Participant connected:', participant.identity)
+        
+        // Subscribe to all available tracks for the new participant
+        participant.trackPublications.forEach((publication) => {
+          if (publication.track) {
+            console.log('✅ Subscribed to remote track:', publication.kind, participant.identity)
+          } else if (publication.subscribe) {
+            publication.subscribe()
+            console.log('📡 Subscribing to remote track:', publication.kind, participant.identity)
+          }
+        })
+        
         updateParticipants()
       })
 
@@ -195,7 +222,7 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
       })
 
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, participant: RemoteParticipant) => {
-        console.log('📹 Track subscribed:', track.kind, participant.identity)
+        console.log('✅ Subscribed to remote video track:', track.kind, participant.identity)
         updateParticipants()
       })
 
@@ -221,6 +248,19 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
       // Enable camera and microphone
       console.log('📹 Enabling camera and microphone...')
       await room.localParticipant.enableCameraAndMicrophone()
+      
+      // Explicitly publish video and audio tracks
+      console.log('📡 Publishing video track...')
+      const videoTrack = await room.localParticipant.setCameraEnabled(true)
+      if (videoTrack) {
+        console.log('✅ Video track published successfully')
+      }
+      
+      console.log('📡 Publishing audio track...')
+      const audioTrack = await room.localParticipant.setMicrophoneEnabled(true)
+      if (audioTrack) {
+        console.log('✅ Audio track published successfully')
+      }
       
       roomRef.current = room
       
@@ -252,13 +292,14 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
     const localParticipant = room.localParticipant
     console.log('🔍 Local participant video tracks:', localParticipant.videoTrackPublications)
     console.log('🔍 Local participant audio tracks:', localParticipant.audioTrackPublications)
+    console.log('🔍 Local participant all tracks:', localParticipant.trackPublications)
     
-    const localVideoTrack = Array.isArray(localParticipant.videoTrackPublications) 
-      ? localParticipant.videoTrackPublications.find(p => p.isSubscribed)?.track
-      : localParticipant.videoTrackPublications?.track || null
-    const localAudioTrack = Array.isArray(localParticipant.audioTrackPublications)
-      ? localParticipant.audioTrackPublications.find(p => p.isSubscribed)?.track
-      : localParticipant.audioTrackPublications?.track || null
+    // Get the first available video track (local tracks are always subscribed)
+    const localVideoTrack = localParticipant.videoTrackPublications.find(p => p.track)?.track || null
+    const localAudioTrack = localParticipant.audioTrackPublications.find(p => p.track)?.track || null
+    
+    console.log('🎥 Local video track found:', !!localVideoTrack)
+    console.log('🎵 Local audio track found:', !!localAudioTrack)
 
     participantVideos.push({
       id: localParticipant.identity,
@@ -271,13 +312,14 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
     // Add remote participants
     room.remoteParticipants.forEach((participant: RemoteParticipant) => {
       console.log('🔍 Remote participant video tracks:', participant.identity, participant.videoTrackPublications)
+      console.log('🔍 Remote participant all tracks:', participant.identity, participant.trackPublications)
       
-      const remoteVideoTrack = Array.isArray(participant.videoTrackPublications)
-        ? participant.videoTrackPublications.find(p => p.isSubscribed)?.track
-        : participant.videoTrackPublications?.track || null
-      const remoteAudioTrack = Array.isArray(participant.audioTrackPublications)
-        ? participant.audioTrackPublications.find(p => p.isSubscribed)?.track
-        : participant.audioTrackPublications?.track || null
+      // Get subscribed tracks for remote participants
+      const remoteVideoTrack = participant.videoTrackPublications.find(p => p.isSubscribed && p.track)?.track || null
+      const remoteAudioTrack = participant.audioTrackPublications.find(p => p.isSubscribed && p.track)?.track || null
+      
+      console.log('🎥 Remote video track found for', participant.identity, ':', !!remoteVideoTrack)
+      console.log('🎵 Remote audio track found for', participant.identity, ':', !!remoteAudioTrack)
 
       participantVideos.push({
         id: participant.identity,
