@@ -4588,7 +4588,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                   
                   // Debug logging
                   if (isMeetBuilding) {
-                    console.log('🏢 Meet building detected:', {
+                    console.log('🏢 HexGridSystem: Meet building detected:', {
                       buildingId: building?.id,
                       title: building?.title,
                       description: building?.description,
@@ -4603,7 +4603,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                   const participants = meetingParticipants.get(roomId) || []
                   
                   // Debug logging
-                  console.log('👥 Meeting participants for room:', {
+                  console.log('👥 HexGridSystem: Meeting participants for room:', {
                     roomId,
                     participantsCount: participants.length,
                     participants: participants.map(p => ({ id: p.id, name: p.name }))
