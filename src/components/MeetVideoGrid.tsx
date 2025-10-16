@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, RemoteTrack, LocalTrack, createLocalVideoTrack, createLocalAudioTrack } from 'livekit-client'
+import { BackgroundBlurProcessor } from '@livekit/track-processors'
 import { getBrowserClient } from '../lib/supabase-browser'
 import { UserAvatar } from './UserAvatar'
 
@@ -33,6 +34,7 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
   const [isHovered, setIsHovered] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(false)
+  const [isBlurEnabled, setIsBlurEnabled] = useState(false)
 
   // Initialize mute state based on track
   useEffect(() => {
@@ -41,6 +43,17 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
       console.log('🎵 Initial mute state for', participant.name, ':', participant.audioTrack.isMuted)
     }
   }, [participant.audioTrack, participant.name])
+
+  // Check WebGL2 support on component mount
+  useEffect(() => {
+    if (participant.isLocal) {
+      const hasWebGL2 = checkWebGL2Support()
+      console.log('🎮 WebGL2 support for background blur:', hasWebGL2)
+      if (!hasWebGL2) {
+        console.warn('⚠️ Background blur will not be available - WebGL2 not supported')
+      }
+    }
+  }, [participant.isLocal])
 
   useEffect(() => {
     const videoElement = videoRef.current
@@ -132,6 +145,51 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
         participant.videoTrack.mute()
       }
       setIsVideoOff(!isVideoOff)
+    }
+  }
+
+  // Check WebGL2 support for background blur
+  const checkWebGL2Support = () => {
+    try {
+      const canvas = document.createElement('canvas')
+      const gl = canvas.getContext('webgl2')
+      return !!gl
+    } catch (e) {
+      return false
+    }
+  }
+
+  // Handle background blur toggle
+  const handleBlurToggle = async () => {
+    if (participant.videoTrack && participant.isLocal) {
+      try {
+        if (isBlurEnabled) {
+          // Remove blur processor
+          await participant.videoTrack.setProcessor(undefined)
+          console.log('🌫️ Background blur disabled for:', participant.name)
+          setIsBlurEnabled(false)
+        } else {
+          // Check WebGL2 support before enabling blur
+          if (!checkWebGL2Support()) {
+            console.warn('⚠️ WebGL2 not supported, background blur unavailable')
+            alert('Background blur requires WebGL2 support. Please use a modern browser.')
+            return
+          }
+
+          // Add blur processor
+          const processor = new BackgroundBlurProcessor({
+            blurRadius: 12,
+            edgeBlur: true,
+          })
+          await participant.videoTrack.setProcessor(processor)
+          console.log('🌫️ Background blur enabled for:', participant.name)
+          setIsBlurEnabled(true)
+        }
+      } catch (error) {
+        console.error('❌ Failed to toggle background blur:', error)
+        // Reset state on error
+        setIsBlurEnabled(false)
+      }
     }
   }
 
@@ -328,6 +386,48 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
               style={{ width: '16px', height: '16px' }}
             />
           </button>
+
+          {/* Background Blur Icon - only for local participant */}
+          {participant.isLocal && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleBlurToggle()
+              }}
+              title={isBlurEnabled ? "Disable background blur" : "Enable background blur"}
+              style={{
+                background: isBlurEnabled ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.2)',
+                padding: '6px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(10px)',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = isBlurEnabled ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = isBlurEnabled ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              <div style={{
+                width: '16px',
+                height: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                color: 'white',
+                fontWeight: 'bold'
+              }}>
+                {isBlurEnabled ? '🌫️' : '🔍'}
+              </div>
+            </button>
+          )}
         </div>
       )}
 
@@ -527,7 +627,7 @@ export const MeetVideoGrid = React.forwardRef<
       // Create and publish local tracks manually
       console.log('📡 Creating local video track...')
       const localVideoTrack = await createLocalVideoTrack({
-        resolution: { width: 640, height: 480 },
+        resolution: { width: 1280, height: 720 },
         facingMode: 'user'
       })
       
