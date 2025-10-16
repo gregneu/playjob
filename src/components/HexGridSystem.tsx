@@ -4579,48 +4579,16 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 ticketBadgeAnimation={badgeAnim?.type ?? null}
                 ticketBadgeAnimationKey={badgeAnim?.key}
                 meetingParticipants={(() => {
-                  // Debug logging for building
-                  console.log('🔍 HexGridSystem: Building check for cell:', {
-                    q,
-                    r,
-                    building: building ? {
-                      id: building.id,
-                      title: building.title,
-                      description: building.description,
-                      object_type: building.object_type
-                    } : null,
-                    isZoneCenterCell
-                  })
+                  // Simplified logic: get participants for any building that exists
+                  if (!building) return []
                   
-                  // Check if this is a Meet building and get participants
-                  if (!building) {
-                    console.log('❌ HexGridSystem: No building found for cell:', { q, r })
-                    return []
-                  }
-                  
-                  const title = building?.title?.toLowerCase() || ''
-                  const description = building?.description?.toLowerCase() || ''
-                  const isMeetBuilding = title.includes('meet') || description.includes('meet') || 
-                                       title.includes('meeting') || description.includes('meeting')
-                  
-                  // Debug logging
-                  if (isMeetBuilding) {
-                    console.log('🏢 HexGridSystem: Meet building detected:', {
-                      buildingId: building?.id,
-                      title: building?.title,
-                      description: building?.description,
-                      isMeetBuilding
-                    })
-                  }
-                  
-                  if (!isMeetBuilding) return []
-                  
-                  // Get participants for this meeting room
-                  const roomId = `playjoob-meet-${building?.id}`
+                  const roomId = `playjoob-meet-${building.id}`
                   const participants = meetingParticipants.get(roomId) || []
                   
                   // Debug logging
-                  console.log('👥 HexGridSystem: Meeting participants for room:', {
+                  console.log('🔍 HexGridSystem: Meeting participants lookup:', {
+                    buildingId: building.id,
+                    buildingTitle: building.title,
                     roomId,
                     participantsCount: participants.length,
                     participants: participants.map(p => ({ id: p.id, name: p.name }))
