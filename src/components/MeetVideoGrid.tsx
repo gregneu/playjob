@@ -171,24 +171,6 @@ const ParticipantVideoTile: React.FC<{ participant: ParticipantVideo }> = ({ par
         />
       )}
 
-      {/* "You" Badge - Top Left */}
-      {participant.isLocal && (
-        <div style={{
-          position: 'absolute',
-          top: 12,
-          left: 12,
-          background: 'rgba(34, 197, 94, 0.9)',
-          color: '#FFFFFF',
-          fontSize: 10,
-          fontWeight: 700,
-          padding: '2px 6px',
-          borderRadius: 8,
-          backdropFilter: 'blur(10px)',
-          zIndex: 10
-        }}>
-          You
-        </div>
-      )}
 
       {/* Control Icons - Top Right (only show on hover for video tiles) */}
       {hasVideo && (
