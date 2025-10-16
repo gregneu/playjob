@@ -756,13 +756,27 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Function to update meeting participants
   const updateMeetingParticipants = useCallback((roomId: string, participants: any[]) => {
+    console.log('🔄 Updating meeting participants:', {
+      roomId,
+      participantsCount: participants.length,
+      participants: participants.map(p => ({ id: p.id, name: p.name }))
+    })
+    
     setMeetingParticipants(prev => {
       const newMap = new Map(prev)
       if (participants.length === 0) {
         newMap.delete(roomId)
+        console.log('🗑️ Removed room from participants map:', roomId)
       } else {
         newMap.set(roomId, participants)
+        console.log('✅ Added/updated room in participants map:', roomId)
       }
+      
+      console.log('📊 Current participants map:', Array.from(newMap.entries()).map(([id, p]) => ({
+        roomId: id,
+        count: p.length
+      })))
+      
       return newMap
     })
   }, [])
@@ -4572,11 +4586,30 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                   const isMeetBuilding = title.includes('meet') || description.includes('meet') || 
                                        title.includes('meeting') || description.includes('meeting')
                   
+                  // Debug logging
+                  if (isMeetBuilding) {
+                    console.log('🏢 Meet building detected:', {
+                      buildingId: building?.id,
+                      title: building?.title,
+                      description: building?.description,
+                      isMeetBuilding
+                    })
+                  }
+                  
                   if (!isMeetBuilding) return []
                   
                   // Get participants for this meeting room
                   const roomId = `playjoob-meet-${building?.id}`
-                  return meetingParticipants.get(roomId) || []
+                  const participants = meetingParticipants.get(roomId) || []
+                  
+                  // Debug logging
+                  console.log('👥 Meeting participants for room:', {
+                    roomId,
+                    participantsCount: participants.length,
+                    participants: participants.map(p => ({ id: p.id, name: p.name }))
+                  })
+                  
+                  return participants
                 })()}
                 onMeetingClick={() => {
                   // Handle meeting click - open meeting panel
@@ -4926,7 +4959,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           setIsMeetPanelOpen(false)
           setSelectedMeetBuilding(null)
         }}
-        roomId={selectedMeetBuilding ? `meet-${selectedMeetBuilding.id}` : 'default-room'}
+        roomId={selectedMeetBuilding ? `playjoob-meet-${selectedMeetBuilding.id}` : 'default-room'}
         buildingTitle={selectedMeetBuilding?.title || 'Meet Object'}
         userName={user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email || 'Guest'}
         userEmail={user?.email}
