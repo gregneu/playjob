@@ -306,35 +306,68 @@ export const MeetVideoGrid = React.forwardRef<
 
   // Disconnect from room and stop all tracks
   const disconnectFromRoom = useCallback(async () => {
-    if (roomRef.current) {
-      console.log('🎥 Disconnecting from LiveKit room...')
+    if (!roomRef.current) {
+      console.log('🎥 No room to disconnect from')
+      return
+    }
+
+    console.log('🎥 Disconnecting from LiveKit room...')
+    
+    const room = roomRef.current
+    const localParticipant = room.localParticipant
+    
+    try {
+      // Safely stop all local tracks
+      if (localParticipant && localParticipant.tracks && Array.isArray(localParticipant.tracks)) {
+        console.log('🛑 Stopping local tracks...')
+        localParticipant.tracks.forEach(track => {
+          if (track && track.track) {
+            console.log('🛑 Stopping local track:', track.kind)
+            try {
+              track.track.stop()
+            } catch (error) {
+              console.warn('⚠️ Error stopping track:', error)
+            }
+          }
+        })
+      }
       
-      const room = roomRef.current
-      const localParticipant = room.localParticipant
-      
-      // Stop all local tracks
-      localParticipant.tracks.forEach(track => {
-        if (track.track) {
-          console.log('🛑 Stopping local track:', track.kind)
-          track.track.stop()
+      // Safely detach all video elements
+      if (localParticipant && localParticipant.trackPublications) {
+        console.log('🔌 Detaching video tracks...')
+        try {
+          const publications = Array.from(localParticipant.trackPublications.values())
+          publications.forEach(publication => {
+            if (publication && publication.track && publication.kind === 'video') {
+              console.log('🔌 Detaching video track')
+              try {
+                publication.track.detach()
+              } catch (error) {
+                console.warn('⚠️ Error detaching track:', error)
+              }
+            }
+          })
+        } catch (error) {
+          console.warn('⚠️ Error processing track publications:', error)
         }
-      })
-      
-      // Detach all video elements
-      Array.from(localParticipant.trackPublications.values()).forEach(publication => {
-        if (publication.track && publication.kind === 'video') {
-          console.log('🔌 Detaching video track')
-          publication.track.detach()
-        }
-      })
+      }
       
       // Disconnect from room
+      console.log('🔌 Disconnecting from room...')
       await room.disconnect(true)
+      console.log('✅ Successfully disconnected from room')
       
+    } catch (error) {
+      console.error('❌ Error during disconnect:', error)
+    } finally {
+      // Always clean up state, even if disconnect failed
       roomRef.current = null
       setParticipants([])
       setParticipantCount(0)
+      setIsConnecting(false)
+      setConnectionError(null)
       onConnectionChange?.(false, 0)
+      console.log('🧹 Cleaned up room state')
     }
   }, [onConnectionChange])
 

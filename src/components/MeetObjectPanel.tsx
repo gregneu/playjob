@@ -41,18 +41,28 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
   const handleClose = useCallback(async () => {
     console.log('🚪 Closing Meet panel, disconnecting from room...')
     
-    // Disconnect from room and stop all tracks
-    if (videoGridRef.current) {
-      await videoGridRef.current.disconnect()
+    try {
+      // Disconnect from room and stop all tracks
+      if (videoGridRef.current) {
+        console.log('🔌 Calling disconnect on video grid...')
+        await videoGridRef.current.disconnect()
+        console.log('✅ Video grid disconnected successfully')
+      } else {
+        console.log('⚠️ No video grid ref available for disconnect')
+      }
+    } catch (error) {
+      console.error('❌ Error during video grid disconnect:', error)
+    } finally {
+      // Always clear state and close panel, even if disconnect failed
+      console.log('🧹 Clearing panel state...')
+      setParticipantCount(0)
+      setIsConnected(false)
+      setConnectionError(null)
+      
+      // Call parent close handler to close the panel
+      console.log('🚪 Calling parent onClose...')
+      onClose()
     }
-    
-    // Clear state
-    setParticipantCount(0)
-    setIsConnected(false)
-    setConnectionError(null)
-    
-    // Call parent close handler
-    onClose()
   }, [onClose])
 
   // ESC key handler
@@ -71,6 +81,18 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen, handleClose])
+
+  // Cleanup on unmount or when panel closes
+  React.useEffect(() => {
+    return () => {
+      if (videoGridRef.current) {
+        console.log('🧹 MeetObjectPanel unmounting, cleaning up...')
+        videoGridRef.current.disconnect().catch(error => {
+          console.warn('⚠️ Error during cleanup disconnect:', error)
+        })
+      }
+    }
+  }, [])
 
   if (!isOpen) return null
 
