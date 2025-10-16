@@ -21,7 +21,7 @@ async function debugJitsiIntegration() {
     // 2. Test Edge Function endpoint
     console.log('\n2️⃣ Testing Edge Function endpoint...')
     
-    const response = await fetch('/functions/v1/get-jitsi-token', {
+    const response = await fetch('https://cicmapcwlvdatmgwdylh.supabase.co/functions/v1/get-jitsi-token', {
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'

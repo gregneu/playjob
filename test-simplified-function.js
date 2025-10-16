@@ -6,7 +6,7 @@ async function testSimplifiedFunction() {
   
   try {
     // Test the function endpoint (no authentication needed)
-    const response = await fetch('/functions/v1/get-jitsi-token', {
+    const response = await fetch('https://cicmapcwlvdatmgwdylh.supabase.co/functions/v1/get-jitsi-token', {
       headers: {
         'Content-Type': 'application/json'
       }

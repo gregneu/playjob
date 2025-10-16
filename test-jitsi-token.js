@@ -13,7 +13,7 @@ async function testJitsiToken() {
 
     console.log('🔑 Testing Jitsi token generation...')
     
-    const response = await fetch('/functions/v1/get-jitsi-token', {
+    const response = await fetch('https://cicmapcwlvdatmgwdylh.supabase.co/functions/v1/get-jitsi-token', {
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'

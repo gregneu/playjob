@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { getBrowserClient } from '../lib/supabase-browser'
 
 // Extend Window interface for JitsiMeetExternalAPI
 declare global {
@@ -38,7 +37,7 @@ export const JitsiMeetPanel: React.FC<JitsiMeetPanelProps> = ({
   const getJitsiToken = useCallback(async (): Promise<string | null> => {
     try {
       console.log('🔑 Requesting Jitsi token from Edge Function...')
-      const response = await fetch('/functions/v1/get-jitsi-token', {
+      const response = await fetch('https://cicmapcwlvdatmgwdylh.supabase.co/functions/v1/get-jitsi-token', {
         headers: {
           'Content-Type': 'application/json'
         }
