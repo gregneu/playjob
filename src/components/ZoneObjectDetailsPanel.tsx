@@ -11,7 +11,7 @@ type TaskStatus = 'open' | 'in_progress' | 'done'
 
 interface ZoneObject {
   id: string
-  type: 'story' | 'task' | 'bug' | 'test' | 'mountain' | 'castle' | 'house' | 'garden' | 'factory' | 'helipad' | 'zone' | 'meet'
+  type: 'story' | 'task' | 'bug' | 'test' | 'mountain' | 'castle' | 'house' | 'garden' | 'factory' | 'helipad' | 'zone'
   title: string
   description?: string
   status: TaskStatus

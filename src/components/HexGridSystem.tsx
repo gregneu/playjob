@@ -24,7 +24,6 @@ import { useAuth } from '../hooks/useAuth'
 import { useNotifications } from '../hooks/useNotifications'
 import { GlassPanel } from './GlassPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
-import { JitsiMeetPanel } from './JitsiMeetPanel'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
 import { Vegetation } from './Vegetation'
 import { DustBurst } from './effects/DustBurst'
@@ -182,9 +181,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   const [selectedZoneObject, setSelectedZoneObject] = useState<any>(null)
   
-  // Jitsi Meet panel state
-  const [isJitsiPanelOpen, setIsJitsiPanelOpen] = useState(false)
-  const [selectedMeetBuilding, setSelectedMeetBuilding] = useState<any>(null)
 
   const selectedTicketNotifications = useMemo(() => {
     if (!selectedZoneObject) {
@@ -2055,18 +2051,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         return
       }
       
-      // Special case: Meet buildings open Jitsi panel
-      // Meet buildings can be created as 'house' type (from RadialMenu) or 'meet' type
-      if (zoneObjectType === 'meet' || zoneObjectType === 'house') {
-        console.log('🎥 Opening Jitsi Meet panel for building:', {
-          zoneObjectType,
-          zoneObject,
-          jitsiRoomId: zoneObject.jitsi_room_id
-        })
-        setSelectedMeetBuilding(zoneObject)
-        setIsJitsiPanelOpen(true)
-        return
-      }
       setIsSprintOpen(false)
       setSprintObjectId(null)
       
@@ -4879,22 +4863,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }}
       />
 
-      {/* Jitsi Meet Panel */}
-      {isJitsiPanelOpen && selectedMeetBuilding && (
-        <JitsiMeetPanel
-          isOpen={isJitsiPanelOpen}
-          onClose={() => {
-            setIsJitsiPanelOpen(false)
-            setSelectedMeetBuilding(null)
-          }}
-          roomId={selectedMeetBuilding.jitsi_room_id || `fallback-${selectedMeetBuilding.id}`}
-          buildingTitle={selectedMeetBuilding.title}
-          userName={user?.user_metadata?.full_name || user?.email || 'Guest'}
-          userEmail={user?.email}
-          userAvatar={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
-          side="right"
-        />
-      )}
 
       {isSprintOpen && (
         <Sidebar

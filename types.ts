@@ -920,7 +920,6 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
-          jitsi_room_id: string | null
           object_type: string
           priority: string | null
           q: number
