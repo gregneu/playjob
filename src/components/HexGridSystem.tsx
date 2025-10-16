@@ -25,6 +25,7 @@ import { useNotifications } from '../hooks/useNotifications'
 import { GlassPanel } from './GlassPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
 import { MeetObjectPanel } from './MeetObjectPanel'
+import { MeetingBadge } from './MeetingBadge'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
 import { Vegetation } from './Vegetation'
 import { DustBurst } from './effects/DustBurst'
@@ -183,6 +184,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [selectedZoneObject, setSelectedZoneObject] = useState<any>(null)
   const [isMeetPanelOpen, setIsMeetPanelOpen] = useState(false)
   const [selectedMeetBuilding, setSelectedMeetBuilding] = useState<any>(null)
+  const [meetingParticipants, setMeetingParticipants] = useState<Map<string, any[]>>(new Map())
   
 
   const selectedTicketNotifications = useMemo(() => {
@@ -751,6 +753,19 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   const handleBeamFinish = useCallback((_payload: BeamLifecyclePayload) => {
     // Reserved for future cleanup hooks if necessary
+  }, [])
+
+  // Function to update meeting participants
+  const updateMeetingParticipants = useCallback((roomId: string, participants: any[]) => {
+    setMeetingParticipants(prev => {
+      const newMap = new Map(prev)
+      if (participants.length === 0) {
+        newMap.delete(roomId)
+      } else {
+        newMap.set(roomId, participants)
+      }
+      return newMap
+    })
   }, [])
 
   const energyPulseMap = useMemo(() => {
@@ -4608,6 +4623,41 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             )
           })}
 
+          {/* Meeting badges for active meetings */}
+          {(zoneObjects || []).filter((obj) => {
+            // Show badge for meet buildings (house type with meet in title/description)
+            return obj.object_type === 'house' && (
+              obj.title?.toLowerCase().includes('meet') ||
+              obj.description?.toLowerCase().includes('meet')
+            )
+          }).map((obj) => {
+            const [x, , z] = hexToWorldPosition(obj.q, obj.r)
+            const roomId = `meet-${obj.id}`
+            const participants = meetingParticipants.get(roomId) || []
+            
+            // Only show badge if there are participants
+            if (participants.length === 0) {
+              return null
+            }
+
+            return (
+              <MeetingBadge
+                key={`meeting-badge-${obj.id}`}
+                position={[x, 3.5, z]} // Position above the building
+                participants={participants}
+                onClick={() => {
+                  // Open the meeting panel for this building
+                  const meetBuildingData = buildZoneObjectData(obj, obj.q, obj.r)
+                  setSelectedMeetBuilding(meetBuildingData)
+                  setIsMeetPanelOpen(true)
+                  setIsZoneObjectDetailsOpen(false)
+                  setIsSprintOpen(false)
+                }}
+                isHidden={participants.length === 0}
+              />
+            )
+          })}
+
           {/* Story tents: render only on non-center cells to avoid overlap with zone centers */}
           {(zoneObjects || []).filter((obj) => obj.object_type === 'story' && !isZoneCenter(obj.q, obj.r)).map((obj, idx) => {
             const [x, , z] = hexToWorldPosition(obj.q, obj.r)
@@ -4897,6 +4947,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         userAvatarConfig={user?.user_metadata?.avatar_config}
         userId={user?.id}
         side="right"
+        onParticipantsChange={updateMeetingParticipants}
       />
 
       {isSprintOpen && (

@@ -13,6 +13,7 @@ interface MeetObjectPanelProps {
   userAvatarConfig?: any
   userId?: string
   side?: 'left' | 'right'
+  onParticipantsChange?: (roomId: string, participants: any[]) => void
 }
 
 export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
@@ -25,7 +26,8 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
   userAvatarUrl,
   userAvatarConfig,
   userId,
-  side = 'right'
+  side = 'right',
+  onParticipantsChange
 }) => {
   const [participantCount, setParticipantCount] = useState(0)
   const [isConnected, setIsConnected] = useState(false)
@@ -37,6 +39,12 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
     setIsConnected(connected)
     setParticipantCount(count)
   }, [])
+
+  const handleParticipantsChange = useCallback((participants: any[]) => {
+    if (onParticipantsChange) {
+      onParticipantsChange(roomId, participants)
+    }
+  }, [onParticipantsChange, roomId])
 
   // Handle errors
   const handleError = useCallback((error: string) => {
@@ -259,6 +267,7 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
                   userId={userId}
                   onConnectionChange={handleConnectionChange}
                   onError={handleError}
+                  onParticipantsChange={handleParticipantsChange}
                 />
           </div>
         </div>

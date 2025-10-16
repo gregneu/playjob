@@ -25,6 +25,7 @@ interface MeetVideoGridProps {
   userId?: string
   onConnectionChange?: (isConnected: boolean, participantCount: number) => void
   onError?: (error: string) => void
+  onParticipantsChange?: (participants: any[]) => void
 }
 
 // Separate component for individual video tiles with proper track attachment
@@ -519,7 +520,8 @@ export const MeetVideoGrid = React.forwardRef<
   userAvatarConfig,
   userId,
   onConnectionChange,
-  onError
+  onError,
+  onParticipantsChange
 }, ref) => {
   const roomRef = useRef<Room | null>(null)
   const [participants, setParticipants] = useState<ParticipantVideo[]>([])
@@ -802,10 +804,15 @@ export const MeetVideoGrid = React.forwardRef<
       })
     }
 
-    setParticipants(participantVideos)
-    setParticipantCount(participantVideos.length)
-    onConnectionChange?.(true, participantVideos.length)
-  }, [onConnectionChange, userName, userEmail, userAvatarUrl, userAvatarConfig, userId, fetchUserData])
+        setParticipants(participantVideos)
+        setParticipantCount(participantVideos.length)
+        onConnectionChange?.(true, participantVideos.length)
+        
+        // Notify parent component about participant changes
+        if (onParticipantsChange) {
+          onParticipantsChange(participantVideos)
+        }
+  }, [onConnectionChange, onParticipantsChange, userName, userEmail, userAvatarUrl, userAvatarConfig, userId, fetchUserData])
 
   // Disconnect from room and stop all tracks
   const disconnectFromRoom = useCallback(async () => {
