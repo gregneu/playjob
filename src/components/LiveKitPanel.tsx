@@ -203,8 +203,8 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
       room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
         console.log('👤 Participant connected:', participant.identity)
         
-        // Subscribe to all available tracks for the new participant
-        participant.trackPublications.forEach((publication) => {
+        // Subscribe to all available tracks for the new participant (convert Map to Array first)
+        Array.from(participant.trackPublications.values()).forEach((publication) => {
           if (publication.track) {
             console.log('✅ Already subscribed to remote track:', publication.kind, participant.identity)
           } else if (publication.subscribe) {
@@ -294,9 +294,9 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
     const localParticipant = room.localParticipant
     console.log('🔍 Local participant all tracks:', localParticipant.trackPublications)
     
-    // Get tracks from trackPublications instead of videoTrackPublications
-    const localVideoTrack = localParticipant.trackPublications.find(p => p.kind === 'video' && p.track)?.track || null
-    const localAudioTrack = localParticipant.trackPublications.find(p => p.kind === 'audio' && p.track)?.track || null
+    // Get tracks from trackPublications (convert Map to Array first)
+    const localVideoTrack = Array.from(localParticipant.trackPublications.values()).find(p => p.kind === 'video' && p.track)?.track || null
+    const localAudioTrack = Array.from(localParticipant.trackPublications.values()).find(p => p.kind === 'audio' && p.track)?.track || null
     
     console.log('🎥 Local video track found:', !!localVideoTrack)
     console.log('🎵 Local audio track found:', !!localAudioTrack)
@@ -313,9 +313,9 @@ export const LiveKitPanel: React.FC<LiveKitPanelProps> = ({
     room.remoteParticipants.forEach((participant: RemoteParticipant) => {
       console.log('🔍 Remote participant all tracks:', participant.identity, participant.trackPublications)
       
-      // Get subscribed tracks for remote participants from trackPublications
-      const remoteVideoTrack = participant.trackPublications.find(p => p.kind === 'video' && p.isSubscribed && p.track)?.track || null
-      const remoteAudioTrack = participant.trackPublications.find(p => p.kind === 'audio' && p.isSubscribed && p.track)?.track || null
+      // Get subscribed tracks for remote participants from trackPublications (convert Map to Array first)
+      const remoteVideoTrack = Array.from(participant.trackPublications.values()).find(p => p.kind === 'video' && p.isSubscribed && p.track)?.track || null
+      const remoteAudioTrack = Array.from(participant.trackPublications.values()).find(p => p.kind === 'audio' && p.isSubscribed && p.track)?.track || null
       
       console.log('🎥 Remote video track found for', participant.identity, ':', !!remoteVideoTrack)
       console.log('🎵 Remote audio track found for', participant.identity, ':', !!remoteAudioTrack)
