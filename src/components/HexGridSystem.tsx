@@ -4302,7 +4302,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             })
             
             // Находим здание для центральной ячейки зоны (для building mode)
-            const building = isZoneCenterCell && zone ? zoneObjects.find(obj => obj.zone_id === zone.id) : null
+            // Также ищем здание для любой ячейки в зоне (для Meet зданий)
+            const building = zone ? zoneObjects.find(obj => obj.zone_id === zone.id) : null
             const isSprintBuilding = Boolean(building && typeof building.object_type === 'string' && ['sprint', 'mountain'].includes(building.object_type.toLowerCase()))
             const progressEntry = isSprintBuilding && building ? (sprintProgressByObject[building.id] ?? { total: 0, done: 0 }) : null
             const sprintProgressForCell = isSprintBuilding
