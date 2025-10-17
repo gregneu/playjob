@@ -3,6 +3,7 @@ import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, RemoteTrac
 import { BackgroundBlur } from '@livekit/track-processors'
 import { getBrowserClient } from '../lib/supabase-browser'
 import { UserAvatar } from './UserAvatar'
+import { useMeetingParticipants } from '../hooks/useMeetingParticipants'
 
 interface ParticipantVideo {
   id: string
@@ -18,6 +19,7 @@ interface ParticipantVideo {
 
 interface MeetVideoGridProps {
   roomId: string
+  projectId?: string
   userName?: string
   userEmail?: string
   userAvatarUrl?: string
@@ -25,7 +27,6 @@ interface MeetVideoGridProps {
   userId?: string
   onConnectionChange?: (isConnected: boolean, participantCount: number) => void
   onError?: (error: string) => void
-  onParticipantsChange?: (participants: any[]) => void
 }
 
 // Separate component for individual video tiles with proper track attachment
@@ -514,20 +515,26 @@ export const MeetVideoGrid = React.forwardRef<
   MeetVideoGridProps
 >(({
   roomId,
+  projectId,
   userName = 'Guest',
   userEmail,
   userAvatarUrl,
   userAvatarConfig,
   userId,
   onConnectionChange,
-  onError,
-  onParticipantsChange
+  onError
 }, ref) => {
   const roomRef = useRef<Room | null>(null)
   const [participants, setParticipants] = useState<ParticipantVideo[]>([])
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [participantCount, setParticipantCount] = useState(0)
+
+  // Initialize meeting participants hook for realtime sync
+  const {
+    addParticipant,
+    removeParticipant
+  } = useMeetingParticipants(projectId || null, userId || null)
 
   // Handle audio context for Safari
   const resumeAudioContext = useCallback(() => {
@@ -814,11 +821,21 @@ export const MeetVideoGrid = React.forwardRef<
         setParticipantCount(participantVideos.length)
         onConnectionChange?.(true, participantVideos.length)
         
-        // Notify parent component about participant changes
-        if (onParticipantsChange) {
-          onParticipantsChange(participantVideos)
+        // Sync participants with database for realtime updates
+        if (projectId && userId) {
+          // Add local participant to database
+          const localParticipant = participantVideos.find(p => p.isLocal)
+          if (localParticipant) {
+            await addParticipant(roomId, {
+              name: localParticipant.name,
+              userId: localParticipant.userId || userId,
+              avatarUrl: localParticipant.avatarUrl,
+              avatarConfig: localParticipant.avatarConfig,
+              email: localParticipant.email
+            })
+          }
         }
-  }, [onConnectionChange, onParticipantsChange, userName, userEmail, userAvatarUrl, userAvatarConfig, userId, fetchUserData])
+  }, [onConnectionChange, userName, userEmail, userAvatarUrl, userAvatarConfig, userId, fetchUserData, projectId, roomId, addParticipant])
 
   // Disconnect from room and stop all tracks
   const disconnectFromRoom = useCallback(async () => {
@@ -868,6 +885,12 @@ export const MeetVideoGrid = React.forwardRef<
         }
       }
       
+      // Remove participant from database before disconnecting
+      if (projectId && userId) {
+        console.log('🗑️ Removing participant from database...')
+        await removeParticipant(roomId, userId)
+      }
+      
       // Disconnect from room
       console.log('🔌 Disconnecting from room...')
       await room.disconnect(true)
@@ -884,15 +907,9 @@ export const MeetVideoGrid = React.forwardRef<
       setConnectionError(null)
       onConnectionChange?.(false, 0)
       
-      // Notify parent that all participants have left
-      if (onParticipantsChange) {
-        onParticipantsChange([])
-        console.log('👥 Notified parent: all participants left')
-      }
-      
       console.log('🧹 Cleaned up room state')
     }
-  }, [onConnectionChange, onParticipantsChange])
+  }, [onConnectionChange, projectId, userId, roomId, removeParticipant])
 
   // Connect when component mounts
   useEffect(() => {

@@ -25,6 +25,7 @@ import { useNotifications } from '../hooks/useNotifications'
 import { GlassPanel } from './GlassPanel'
 import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
 import { MeetObjectPanel } from './MeetObjectPanel'
+import { useMeetingParticipants } from '../hooks/useMeetingParticipants'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
 import { Vegetation } from './Vegetation'
 import { DustBurst } from './effects/DustBurst'
@@ -183,7 +184,12 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [selectedZoneObject, setSelectedZoneObject] = useState<any>(null)
   const [isMeetPanelOpen, setIsMeetPanelOpen] = useState(false)
   const [selectedMeetBuilding, setSelectedMeetBuilding] = useState<any>(null)
-  const [meetingParticipants, setMeetingParticipants] = useState<Map<string, any[]>>(new Map())
+  
+  // Use meeting participants hook for realtime sync
+  const {
+    meetingParticipants: meetingParticipantsMap,
+    getRoomParticipants
+  } = useMeetingParticipants(projectId || null, user?.id || null)
   
 
   const selectedTicketNotifications = useMemo(() => {
@@ -754,32 +760,6 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     // Reserved for future cleanup hooks if necessary
   }, [])
 
-  // Function to update meeting participants
-  const updateMeetingParticipants = useCallback((roomId: string, participants: any[]) => {
-    console.log('🔄 Updating meeting participants:', {
-      roomId,
-      participantsCount: participants.length,
-      participants: participants.map(p => ({ id: p.id, name: p.name }))
-    })
-    
-    setMeetingParticipants(prev => {
-      const newMap = new Map(prev)
-      if (participants.length === 0) {
-        newMap.delete(roomId)
-        console.log('🗑️ Removed room from participants map:', roomId)
-      } else {
-        newMap.set(roomId, participants)
-        console.log('✅ Added/updated room in participants map:', roomId)
-      }
-      
-      console.log('📊 Current participants map:', Array.from(newMap.entries()).map(([id, p]) => ({
-        roomId: id,
-        count: p.length
-      })))
-      
-      return newMap
-    })
-  }, [])
 
   const energyPulseMap = useMemo(() => {
     const map: Record<string, { type: 'source' | 'target'; key: string; color: string }> = {}
@@ -4602,7 +4582,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                   if (!building || !isZoneCenterCell) return []
                   
                   const roomId = `playjoob-meet-${building.id}`
-                  const participants = meetingParticipants.get(roomId) || []
+                  const participants = getRoomParticipants(roomId)
                   
                   // Debug logging
                   console.log('🔍 HexGridSystem: Meeting participants lookup:', {
@@ -4974,7 +4954,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         userAvatarConfig={user?.user_metadata?.avatar_config}
         userId={user?.id}
         side="right"
-        onParticipantsChange={updateMeetingParticipants}
+        projectId={projectId}
       />
 
       {isSprintOpen && (

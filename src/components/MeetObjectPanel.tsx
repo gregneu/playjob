@@ -12,8 +12,8 @@ interface MeetObjectPanelProps {
   userAvatarUrl?: string
   userAvatarConfig?: any
   userId?: string
+  projectId?: string
   side?: 'left' | 'right'
-  onParticipantsChange?: (roomId: string, participants: any[]) => void
 }
 
 export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
@@ -26,8 +26,8 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
   userAvatarUrl,
   userAvatarConfig,
   userId,
-  side = 'right',
-  onParticipantsChange
+  projectId,
+  side = 'right'
 }) => {
   const [participantCount, setParticipantCount] = useState(0)
   const [isConnected, setIsConnected] = useState(false)
@@ -40,11 +40,6 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
     setParticipantCount(count)
   }, [])
 
-  const handleParticipantsChange = useCallback((participants: any[]) => {
-    if (onParticipantsChange) {
-      onParticipantsChange(roomId, participants)
-    }
-  }, [onParticipantsChange, roomId])
 
   // Handle errors
   const handleError = useCallback((error: string) => {
@@ -260,6 +255,7 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
                 <MeetVideoGrid
                   ref={videoGridRef}
                   roomId={roomId}
+                  projectId={projectId}
                   userName={userName}
                   userEmail={userEmail}
                   userAvatarUrl={userAvatarUrl}
@@ -267,7 +263,6 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
                   userId={userId}
                   onConnectionChange={handleConnectionChange}
                   onError={handleError}
-                  onParticipantsChange={handleParticipantsChange}
                 />
           </div>
         </div>
