@@ -266,7 +266,7 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
                 />
           </div>
         </div>
-      </div>
+      </div>,
     document.body
   )
 }
