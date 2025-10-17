@@ -222,7 +222,7 @@ const PlayjobBuilder = () => {
           }}
         >
           <Plus size={16} />
-          Новый проект
+          Create new project
         </button>
 
         {/* User Avatar clickable to open picker */}
