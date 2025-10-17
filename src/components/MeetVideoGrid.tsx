@@ -623,12 +623,6 @@ export const MeetVideoGrid = React.forwardRef<
         setParticipantCount(0)
         roomRef.current = null
         onConnectionChange?.(false, 0)
-        
-        // Notify parent that all participants have left
-        if (onParticipantsChange) {
-          onParticipantsChange([])
-          console.log('👥 Notified parent: all participants left (disconnected)')
-        }
       })
 
       room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {

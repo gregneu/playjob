@@ -36,14 +36,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
         .select(`
           room_id,
           user_id,
-          joined_at,
-          profiles!inner(
-            id,
-            full_name,
-            email,
-            avatar_url,
-            avatar_config
-          )
+          joined_at
         `)
         .eq('project_id', projectId)
         .eq('is_active', true)
@@ -55,27 +48,48 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
         return
       }
 
-      // Group participants by room_id
+      // Group participants by room_id and fetch profile data separately
       const participantsMap: MeetingParticipantsMap = {}
       
-      if (data) {
+      if (data && data.length > 0) {
+        // Get unique user IDs
+        const userIds = [...new Set(data.map(record => record.user_id))]
+        
+        // Fetch profiles for all users
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url, avatar_config')
+          .in('id', userIds)
+        
+        if (profilesError) {
+          console.error('❌ Error loading profiles:', profilesError)
+          setMeetingParticipants({})
+          return
+        }
+        
+        // Create a map of user profiles
+        const profilesMap = new Map(profiles?.map(p => [p.id, p]) || [])
+        
+        // Group participants by room_id
         data.forEach(record => {
           const roomId = record.room_id
-          const profile = record.profiles
+          const profile = profilesMap.get(record.user_id)
           
           if (!participantsMap[roomId]) {
             participantsMap[roomId] = []
           }
           
-          participantsMap[roomId].push({
-            id: `${roomId}-${profile.id}`,
-            name: profile.full_name || profile.email || 'Unknown',
-            userId: profile.id,
-            avatarUrl: profile.avatar_url,
-            avatarConfig: profile.avatar_config,
-            email: profile.email,
-            joinedAt: record.joined_at
-          })
+          if (profile) {
+            participantsMap[roomId].push({
+              id: `${roomId}-${profile.id}`,
+              name: profile.full_name || profile.email || 'Unknown',
+              userId: profile.id,
+              avatarUrl: profile.avatar_url,
+              avatarConfig: profile.avatar_config,
+              email: profile.email,
+              joinedAt: record.joined_at
+            })
+          }
         })
       }
 
@@ -104,6 +118,9 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
           user_id: participant.userId,
           is_active: true,
           joined_at: new Date().toISOString()
+        }, { 
+          onConflict: 'project_id, room_id, user_id',
+          ignoreDuplicates: false 
         })
 
       if (error) {
