@@ -4285,8 +4285,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           />
         )}
           
-          {/* Оригинальная сетка для интерактивности (временно включена для режима строительства) */}
-          {isZoneMode && gridCells.map((cell) => {
+          {/* Сетка для отображения бейджей встреч во всех режимах */}
+          {gridCells.map((cell) => {
             const [q, r] = cell.coordinates
             const [x, _y, z] = hexToWorldPosition(q, r)
             
@@ -4301,9 +4301,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
               return zoneCellsForZone.some(zc => zc.q === q && zc.r === r)
             })
             
-            // Находим здание для центральной ячейки зоны (для building mode)
-            // Также ищем здание для любой ячейки в зоне (для Meet зданий)
-            const building = zone ? zoneObjects.find(obj => obj.zone_id === zone.id) : null
+            // Находим здание только для центральной ячейки зоны
+            const building = isZoneCenterCell && zone ? zoneObjects.find(obj => obj.zone_id === zone.id) : null
             const isSprintBuilding = Boolean(building && typeof building.object_type === 'string' && ['sprint', 'mountain'].includes(building.object_type.toLowerCase()))
             const progressEntry = isSprintBuilding && building ? (sprintProgressByObject[building.id] ?? { total: 0, done: 0 }) : null
             const sprintProgressForCell = isSprintBuilding
@@ -4580,8 +4579,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 ticketBadgeAnimation={badgeAnim?.type ?? null}
                 ticketBadgeAnimationKey={badgeAnim?.key}
                 meetingParticipants={(() => {
-                  // Simplified logic: get participants for any building that exists
-                  if (!building) return []
+                  // Only get participants for central zone cells with buildings
+                  if (!building || !isZoneCenterCell) return []
                   
                   const roomId = `playjoob-meet-${building.id}`
                   const participants = meetingParticipants.get(roomId) || []
@@ -4592,7 +4591,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                     buildingTitle: building.title,
                     roomId,
                     participantsCount: participants.length,
-                    participants: participants.map(p => ({ id: p.id, name: p.name }))
+                    participants: participants.map(p => ({ id: p.id, name: p.name })),
+                    isZoneCenterCell
                   })
                   
                   return participants
