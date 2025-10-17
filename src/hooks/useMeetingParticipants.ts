@@ -33,6 +33,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
         .delete()
         .eq('project_id', projectId)
         .eq('is_active', false)
+        .not('left_at', 'is', null)
         .lt('left_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
       
       if (inactiveError) {
@@ -47,6 +48,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
         .delete()
         .eq('project_id', projectId)
         .eq('is_active', true)
+        .not('joined_at', 'is', null)
         .lt('joined_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       
       if (activeError) {
