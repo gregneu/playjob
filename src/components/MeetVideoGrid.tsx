@@ -893,6 +893,16 @@ export const MeetVideoGrid = React.forwardRef<
     } catch (error) {
       console.error('❌ Error during disconnect:', error)
     } finally {
+      // Remove participant from database ALWAYS
+      if (projectId && userId) {
+        console.log('🗑️ Ensuring participant removal from database...')
+        try {
+          await removeParticipant(roomId, userId)
+        } catch (err) {
+          console.error('⚠️ Error removing participant in finally block:', err)
+        }
+      }
+      
       // Always clean up state, even if disconnect failed
       roomRef.current = null
       setParticipants([])
@@ -916,6 +926,23 @@ export const MeetVideoGrid = React.forwardRef<
       disconnectFromRoom()
     }
   }, [disconnectFromRoom])
+
+  // Cleanup on page unload
+  useEffect(() => {
+    const handleUnload = async () => {
+      if (projectId && userId && roomId) {
+        console.log('🚪 Page unloading, cleaning up participant...')
+        try {
+          await removeParticipant(roomId, userId)
+        } catch (err) {
+          console.error('⚠️ Error removing participant on unload:', err)
+        }
+      }
+    }
+    
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [projectId, userId, roomId, removeParticipant])
 
   // Expose disconnect function for parent component
   React.useImperativeHandle(ref, () => ({

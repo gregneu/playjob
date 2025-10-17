@@ -128,18 +128,6 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
         return
       }
 
-      // Update local state immediately for better UX
-      setMeetingParticipants(prev => ({
-        ...prev,
-        [roomId]: [
-          ...(prev[roomId] || []),
-          {
-            ...participant,
-            id: `${roomId}-${participant.userId}`,
-            joinedAt: new Date().toISOString()
-          }
-        ]
-      }))
 
       console.log('✅ useMeetingParticipants: Participant added successfully')
     } catch (err) {
@@ -166,11 +154,6 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
         return
       }
 
-      // Update local state immediately for better UX
-      setMeetingParticipants(prev => ({
-        ...prev,
-        [roomId]: (prev[roomId] || []).filter(p => p.userId !== participantUserId)
-      }))
 
       console.log('✅ useMeetingParticipants: Participant removed successfully')
     } catch (err) {
@@ -198,12 +181,17 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
 
     console.log('🔔 useMeetingParticipants: Setting up realtime subscription for project:', projectId)
 
-    const channel = supabase.channel(`meeting-participants:${projectId}:${userId}`)
+    const channel = supabase.channel(`meeting-participants:${projectId}`)
 
     // Listen for INSERT events (new participants joining)
     channel.on(
       'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'meeting_participants' },
+      { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'meeting_participants',
+        filter: `project_id=eq.${projectId}`
+      },
       (payload) => {
         console.log('🔔 useMeetingParticipants: New participant joined', payload)
         setTimeout(() => loadMeetingParticipants(), 300)
@@ -213,7 +201,12 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     // Listen for UPDATE events (participants leaving)
     channel.on(
       'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'meeting_participants' },
+      { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'meeting_participants',
+        filter: `project_id=eq.${projectId}`
+      },
       (payload) => {
         console.log('🔔 useMeetingParticipants: Participant status changed', payload)
         setTimeout(() => loadMeetingParticipants(), 300)
@@ -223,7 +216,12 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     // Listen for DELETE events (participants removed)
     channel.on(
       'postgres_changes',
-      { event: 'DELETE', schema: 'public', table: 'meeting_participants' },
+      { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'meeting_participants',
+        filter: `project_id=eq.${projectId}`
+      },
       (payload) => {
         console.log('🔔 useMeetingParticipants: Participant removed', payload)
         setTimeout(() => loadMeetingParticipants(), 300)
