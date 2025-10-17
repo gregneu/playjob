@@ -139,24 +139,6 @@ export const MeetingBadge: React.FC<MeetingBadgeProps> = ({
           </span>
         )}
 
-        {/* Иконка встречи */}
-        <div style={{
-          width: '16px',
-          height: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <img 
-            src="/icons/tdesign_camera-2-filled.svg" 
-            alt="Meeting"
-            style={{ 
-              width: '14px', 
-              height: '14px',
-              filter: 'brightness(0) invert(1)' // Белая иконка
-            }}
-          />
-        </div>
 
         {/* Tooltip с именами участников */}
         {showTooltip && (

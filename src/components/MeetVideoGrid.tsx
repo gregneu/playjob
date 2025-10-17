@@ -941,7 +941,7 @@ export const MeetVideoGrid = React.forwardRef<
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '16px',
+        gap: '4px',
         maxHeight: '400px',
         overflowY: 'auto'
       }}>

@@ -111,26 +111,21 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
   if (!isOpen) return null
 
   return createPortal(
-    <div style={{ 
-      position: 'fixed', 
-      inset: 0, 
-      zIndex: 2500,
-      pointerEvents: 'none'
+    <div style={{
+      position: 'fixed',
+      top: 16,
+      right: side === 'right' ? 16 : 'auto',
+      left: side === 'left' ? 16 : 'auto',
+      bottom: 16,
+      width: 386,
+      borderRadius: '20px',
+      overflow: 'hidden',
+      transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+      transform: isOpen ? 'translateX(0)' : side === 'right' ? 'translateX(100%)' : 'translateX(-100%)',
+      pointerEvents: 'auto',
+      opacity: isOpen ? 1 : 0,
+      zIndex: 2500
     }}>
-      <div style={{
-        position: 'absolute',
-        top: 16,
-        right: side === 'right' ? 16 : 'auto',
-        left: side === 'left' ? 16 : 'auto',
-        bottom: 16,
-        width: 386,
-        borderRadius: '20px',
-        overflow: 'hidden',
-        transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-        transform: isOpen ? 'translateX(0)' : side === 'right' ? 'translateX(100%)' : 'translateX(-100%)',
-        pointerEvents: 'auto',
-        opacity: isOpen ? 1 : 0
-      }}>
         <div
           onMouseEnter={() => {
             try { window.dispatchEvent(new CustomEvent('sidebar-hover', { detail: { hover: true } })) } catch {}
@@ -272,7 +267,6 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
           </div>
         </div>
       </div>
-    </div>,
     document.body
   )
 }
