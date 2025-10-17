@@ -773,7 +773,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
       )}
 
       {/* Bubble с уведомлениями и количеством тикетов - по центру здания */}
-      {isZoneCenter && !isSprintObject && (showTicketBubble || showNotificationPanel || showMeetingBadge) && (
+      {isZoneCenter && !isSprintObject && (showTicketBubble || showNotificationPanel) && (
         <Html key={badgeDomKey} position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div
             style={{
@@ -857,17 +857,11 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
                 </div>
               </>
             )}
-            {showMeetingBadge && (
-              <MeetingBadge
-                participants={meetingParticipants}
-                onClick={onMeetingClick}
-              />
-            )}
           </div>
         </Html>
       )}
 
-      {isZoneCenter && isSprintObject && ((sprintProgress && sprintProgress.total > 0) || showNotificationPanel || showMeetingBadge) && (
+      {isZoneCenter && isSprintObject && ((sprintProgress && sprintProgress.total > 0) || showNotificationPanel) && (
         <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {sprintProgress && sprintProgress.total > 0 && (
@@ -921,13 +915,17 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
                 </div>
               </>
             )}
-            {showMeetingBadge && (
-              <MeetingBadge
-                participants={meetingParticipants}
-                onClick={onMeetingClick}
-              />
-            )}
           </div>
+        </Html>
+      )}
+
+      {/* Meeting Badge - показывается для любых Meet зданий, не только центральных */}
+      {showMeetingBadge && (
+        <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
+          <MeetingBadge
+            participants={meetingParticipants}
+            onClick={onMeetingClick}
+          />
         </Html>
       )}
 
