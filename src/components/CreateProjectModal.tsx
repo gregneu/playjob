@@ -76,153 +76,427 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   if (!isOpen) return null
 
   return createPortal(
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 modal-backdrop"
-      onClick={handleClose}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}
-    >
+    <>
+      <style>
+        {`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}
+      </style>
       <div 
-        className="bg-white rounded-2xl shadow-lg w-full max-w-[800px] mx-auto transform transition-all duration-300 ease-out modal-content overflow-y-auto flex flex-col"
-        onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'relative',
-          zIndex: 10000,
-          padding: '32px',
-          backgroundColor: '#ffffff',
-          borderRadius: '16px',
-          height: '750px'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#f8f9fa',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
         }}
+        onClick={handleClose}
       >
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900">Create New Project</h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <X size={20} />
-          </button>
+      <div 
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '20px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          width: '100%',
+          maxWidth: '500px',
+          padding: '40px',
+          position: 'relative'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close button */}
+        <button
+          onClick={handleClose}
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'none',
+            border: 'none',
+            color: '#6b7280',
+            cursor: 'pointer',
+            padding: '8px',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f3f4f6'
+            e.currentTarget.style.color = '#374151'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+            e.currentTarget.style.color = '#6b7280'
+          }}
+        >
+          <X size={20} />
+        </button>
+
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          {/* Logo */}
+          <div style={{
+            width: '64px',
+            height: '64px',
+            backgroundColor: '#6366f1',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px',
+            position: 'relative'
+          }}>
+            <div style={{
+              width: '0',
+              height: '0',
+              borderLeft: '12px solid transparent',
+              borderRight: '12px solid transparent',
+              borderBottom: '20px solid white',
+              transform: 'rotate(90deg)'
+            }} />
+          </div>
+          
+          {/* Title */}
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: '700',
+            color: '#111827',
+            margin: '0 0 8px 0',
+            fontFamily: 'system-ui, -apple-system, sans-serif'
+          }}>
+            Create New Project
+          </h2>
+          
+          {/* Subtitle */}
+          <p style={{
+            fontSize: '14px',
+            color: '#6b7280',
+            margin: '0',
+            fontFamily: 'system-ui, -apple-system, sans-serif'
+          }}>
+            Set up your new project workspace
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 flex-1 flex flex-col">
-          <div className="flex-1 space-y-4">
-            <div className="space-y-4">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Project Name *
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Enter project name"
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Project Name */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#111827',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+              Project Name *
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{
+                width: '100%',
+                height: '48px',
+                padding: '12px 16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                backgroundColor: '#ffffff',
+                color: '#111827',
+                outline: 'none',
+                transition: 'border-color 0.2s ease'
+              }}
+              placeholder="Enter project name"
+              required
+              onFocus={(e) => {
+                e.target.style.borderColor = '#6366f1'
+                e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#d1d5db'
+                e.target.style.boxShadow = 'none'
+              }}
+            />
+          </div>
 
-            <div className="space-y-4">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Add project description (optional)"
-              />
-            </div>
+          {/* Description */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#111827',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                backgroundColor: '#ffffff',
+                color: '#111827',
+                outline: 'none',
+                resize: 'vertical',
+                minHeight: '80px',
+                transition: 'border-color 0.2s ease'
+              }}
+              placeholder="Add project description (optional)"
+              onFocus={(e) => {
+                e.target.style.borderColor = '#6366f1'
+                e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#d1d5db'
+                e.target.style.boxShadow = 'none'
+              }}
+            />
+          </div>
 
-            <div className="space-y-5">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Project Color
-              </label>
-              <div className="grid grid-cols-8 gap-2">
-                {projectColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setSelectedColor(color)}
-                    className={`w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110 ${
-                      selectedColor === color ? 'border-gray-400 scale-110 shadow-md' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
+          {/* Project Color */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <label style={{
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#111827',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+              Project Color
+            </label>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(8, 1fr)',
+              gap: '8px'
+            }}>
+              {projectColors.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setSelectedColor(color)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    border: selectedColor === color ? '2px solid #374151' : '2px solid #e5e7eb',
+                    backgroundColor: color,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    transform: selectedColor === color ? 'scale(1.1)' : 'scale(1)',
+                    boxShadow: selectedColor === color ? '0 2px 4px rgba(0, 0, 0, 0.1)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedColor !== color) {
+                      e.currentTarget.style.borderColor = '#9ca3af'
+                      e.currentTarget.style.transform = 'scale(1.05)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedColor !== color) {
+                      e.currentTarget.style.borderColor = '#e5e7eb'
+                      e.currentTarget.style.transform = 'scale(1)'
+                    }
+                  }}
+                />
+              ))}
             </div>
+          </div>
 
-            <div className="space-y-5">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Project Icon
-              </label>
-              <div className="grid grid-cols-8 gap-2">
-                {projectIcons.map((icon, index) => (
-                  <button
-                    key={`${icon}-${index}`}
-                    type="button"
-                    onClick={() => setSelectedIcon(icon)}
-                    className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center text-sm transition-all duration-200 hover:scale-110 ${
-                      selectedIcon === icon ? 'border-blue-500 bg-blue-50 scale-110 shadow-md' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    {icon}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Preview */}
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <div className="text-sm font-medium text-gray-700 mb-3">Preview</div>
-              <div className="flex items-center gap-3">
-                <div 
-                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-semibold"
-                  style={{ backgroundColor: selectedColor }}
+          {/* Project Icon */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <label style={{
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#111827',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+              Project Icon
+            </label>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(8, 1fr)',
+              gap: '8px'
+            }}>
+              {projectIcons.map((icon, index) => (
+                <button
+                  key={`${icon}-${index}`}
+                  type="button"
+                  onClick={() => setSelectedIcon(icon)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    border: selectedIcon === icon ? '2px solid #6366f1' : '2px solid #e5e7eb',
+                    backgroundColor: selectedIcon === icon ? '#eef2ff' : '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    transform: selectedIcon === icon ? 'scale(1.1)' : 'scale(1)',
+                    boxShadow: selectedIcon === icon ? '0 2px 4px rgba(0, 0, 0, 0.1)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedIcon !== icon) {
+                      e.currentTarget.style.borderColor = '#9ca3af'
+                      e.currentTarget.style.transform = 'scale(1.05)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedIcon !== icon) {
+                      e.currentTarget.style.borderColor = '#e5e7eb'
+                      e.currentTarget.style.transform = 'scale(1)'
+                    }
+                  }}
                 >
-                  {selectedIcon}
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: '12px',
+            backgroundColor: '#f9fafb',
+            padding: '16px'
+          }}>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '12px',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+              Preview
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                backgroundColor: selectedColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '20px',
+                fontWeight: '600'
+              }}>
+                {selectedIcon}
+              </div>
+              <div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  color: '#111827',
+                  fontFamily: 'system-ui, -apple-system, sans-serif'
+                }}>
+                  {name || 'Project Name'}
                 </div>
-                <div>
-                  <div className="font-medium text-gray-900">
-                    {name || 'Project Name'}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {description || 'Project Description'}
-                  </div>
+                <div style={{
+                  fontSize: '14px',
+                  color: '#6b7280',
+                  fontFamily: 'system-ui, -apple-system, sans-serif'
+                }}>
+                  {description || 'Project Description'}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex gap-4 pt-6">
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
             <button
               type="button"
               onClick={handleClose}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-gray-300 bg-white hover:bg-gray-50 hover:text-gray-900 h-12 px-6 py-3"
+              style={{
+                flex: 1,
+                height: '48px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: '#ffffff',
+                color: '#374151',
+                fontSize: '14px',
+                fontWeight: '500',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f9fafb'
+                e.currentTarget.style.borderColor = '#9ca3af'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#ffffff'
+                e.currentTarget.style.borderColor = '#d1d5db'
+              }}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700 h-12 px-6 py-3"
+              style={{
+                flex: 1,
+                height: '48px',
+                border: 'none',
+                borderRadius: '8px',
+                backgroundColor: loading || !name.trim() ? '#9ca3af' : '#6366f1',
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: '500',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                cursor: loading || !name.trim() ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+              onMouseEnter={(e) => {
+                if (!loading && name.trim()) {
+                  e.currentTarget.style.backgroundColor = '#4f46e5'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading && name.trim()) {
+                  e.currentTarget.style.backgroundColor = '#6366f1'
+                }
+              }}
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    border: '2px solid #ffffff',
+                    borderTop: '2px solid transparent',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
                   Creating...
                 </>
               ) : (
                 <>
-                  <Plus size={16} className="mr-2" />
+                  <Plus size={16} />
                   Create Project
                 </>
               )}
@@ -230,7 +504,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
           </div>
         </form>
       </div>
-    </div>,
+    </div>
+    </>,
     document.body
   )
 } 
