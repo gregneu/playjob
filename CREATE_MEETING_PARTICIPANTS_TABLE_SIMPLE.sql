@@ -1,4 +1,6 @@
 -- Create meeting_participants table for realtime meeting participant tracking
+-- Simplified version without complex RLS policies
+
 CREATE TABLE IF NOT EXISTS meeting_participants (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -22,35 +24,18 @@ CREATE INDEX IF NOT EXISTS idx_meeting_participants_active ON meeting_participan
 -- Enable RLS
 ALTER TABLE meeting_participants ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
--- Users can view participants in projects they have access to
-CREATE POLICY "Users can view meeting participants in accessible projects" ON meeting_participants
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM projects p
-      WHERE p.id = meeting_participants.project_id
-      AND p.owner_id = auth.uid()
-    )
-  );
+-- Simple RLS Policies - allow all authenticated users to access their own data
+CREATE POLICY "Users can view their own meeting participation" ON meeting_participants
+  FOR SELECT USING (user_id = auth.uid());
 
--- Users can insert their own participation
-CREATE POLICY "Users can join meetings" ON meeting_participants
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    AND EXISTS (
-      SELECT 1 FROM projects p
-      WHERE p.id = meeting_participants.project_id
-      AND p.owner_id = auth.uid()
-    )
-  );
+CREATE POLICY "Users can insert their own participation" ON meeting_participants
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
--- Users can update their own participation
 CREATE POLICY "Users can update their own participation" ON meeting_participants
   FOR UPDATE USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
--- Users can delete their own participation
-CREATE POLICY "Users can leave meetings" ON meeting_participants
+CREATE POLICY "Users can delete their own participation" ON meeting_participants
   FOR DELETE USING (user_id = auth.uid());
 
 -- Enable realtime
