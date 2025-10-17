@@ -27,6 +27,7 @@ import { ZoneObjectDetailsPanel } from './ZoneObjectDetailsPanel'
 import { MeetObjectPanel } from './MeetObjectPanel'
 import { useMeetingParticipants } from '../hooks/useMeetingParticipants'
 import { supabase, checkColorFieldExists } from '../lib/supabase'
+import { logger } from '../utils/logger'
 import { Vegetation } from './Vegetation'
 import { DustBurst } from './effects/DustBurst'
 import { TicketBeamEffects, type BeamLifecyclePayload } from './effects/TicketBeamEffects'
@@ -124,11 +125,11 @@ interface HexGridSystemProps {
 }
 
 export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
-  console.log('=== HEXGRIDSYSTEM RENDER ===')
-  console.log('Project ID:', projectId)
-  console.log('Project ID type:', typeof projectId)
-  console.log('Project ID length:', projectId?.length)
-  console.log('Project ID is valid UUID:', /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(projectId || ''))
+  logger.debug('=== HEXGRIDSYSTEM RENDER ===')
+  logger.debug('Project ID:', projectId)
+  logger.debug('Project ID type:', typeof projectId)
+  logger.debug('Project ID length:', projectId?.length)
+  logger.debug('Project ID is valid UUID:', /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(projectId || ''))
   
   // Get current user
   const { user } = useAuth()
@@ -226,7 +227,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       .then((exists) => {
         if (cancelled) return
         if (exists) {
-          console.log('✅ Color field exists in database')
+          logger.info('✅ Color field exists in database')
         }
       })
       .catch(() => {})
@@ -269,15 +270,15 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   
   // Функции для регистрации hover targets
   const registerHoverTarget = useCallback((key: string, mesh: THREE.Object3D) => {
-    console.log('🎯 registerHoverTarget called for key:', key, 'mesh:', mesh)
+    logger.debug('🎯 registerHoverTarget called for key:', key, 'mesh:', mesh)
     hoverTargetsRef.current.set(key, mesh)
-    console.log('🎯 hoverTargetsRef size after registration:', hoverTargetsRef.current.size)
+    logger.debug('🎯 hoverTargetsRef size after registration:', hoverTargetsRef.current.size)
   }, [])
   
   const unregisterHoverTarget = useCallback((key: string) => {
-    console.log('🎯 unregisterHoverTarget called for key:', key)
+    logger.debug('🎯 unregisterHoverTarget called for key:', key)
     hoverTargetsRef.current.delete(key)
-    console.log('🎯 hoverTargetsRef size after unregistration:', hoverTargetsRef.current.size)
+    logger.debug('🎯 hoverTargetsRef size after unregistration:', hoverTargetsRef.current.size)
   }, [])
   const [rocketTicketCopies, setRocketTicketCopies] = useState<RocketTicketCopy[]>([])
   const [plannedTickets, setPlannedTickets] = useState<Set<string>>(() => new Set()) // IDs of tickets planned for sprint (per-sprint building)
@@ -423,29 +424,29 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Set global flag to prevent 3D rendering in UserAvatar components
   useEffect(() => {
-    console.log('🎭 HexGridSystem: Setting isIn3DScene = true')
+    logger.debug('🎭 HexGridSystem: Setting isIn3DScene = true')
     ;(window as any).isIn3DScene = true
     return () => {
-      console.log('🎭 HexGridSystem: Setting isIn3DScene = false')
+      logger.debug('🎭 HexGridSystem: Setting isIn3DScene = false')
       ;(window as any).isIn3DScene = false
     }
   }, [])
   
-  console.log('=== USE PROJECT DATA RESULT ===')
-  console.log('Zones:', zones)
+  logger.debug('=== USE PROJECT DATA RESULT ===')
+  logger.debug('Zones:', zones)
   
   // Используем реальные данные из базы данных
   const effectiveZones = zones
   const effectiveZoneCells = zoneCells
-  console.log('Zone cells:', zoneCells)
-  console.log('Zone objects:', zoneObjects)
-  console.log('Loading:', loading)
-  console.log('Error:', error)
+  logger.debug('Zone cells:', zoneCells)
+  logger.debug('Zone objects:', zoneObjects)
+  logger.debug('Loading:', loading)
+  logger.debug('Error:', error)
   
   // Отладка: показываем все ячейки зон
   useEffect(() => {
     if (zoneCells.length > 0) {
-      console.log('=== ZONE CELLS DEBUG ===')
+      logger.debug('=== ZONE CELLS DEBUG ===')
       const cellsByZone = zoneCells.reduce((acc, cell) => {
         if (!acc[cell.zone_id]) acc[cell.zone_id] = []
         acc[cell.zone_id].push(`[${cell.q}, ${cell.r}]`)
@@ -454,7 +455,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       
       Object.entries(cellsByZone).forEach(([zoneId, cells]) => {
         const z = zones.find(z => z.id === zoneId)
-        console.log(`Zone "${z?.name}" (${z?.color}): ${cells.join(', ')}`)
+        logger.debug(`Zone "${z?.name}" (${z?.color}): ${cells.join(', ')}`)
       })
     }
   }, [zoneCells, zones])
@@ -507,19 +508,19 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Обработчик событий для color picker
   useEffect(() => {
     const handleOpenColorPicker = (event: CustomEvent) => {
-      console.log('🎨 HexGridSystem: Opening color picker event received:', event.detail)
-      console.log('🎨 HexGridSystem: Event detail type:', typeof event.detail)
-      console.log('🎨 HexGridSystem: Event detail keys:', Object.keys(event.detail || {}))
+      logger.debug('🎨 HexGridSystem: Opening color picker event received:', event.detail)
+      logger.debug('🎨 HexGridSystem: Event detail type:', typeof event.detail)
+      logger.debug('🎨 HexGridSystem: Event detail keys:', Object.keys(event.detail || {}))
       
       const { position, currentColor, zoneId } = event.detail
-      console.log('🎨 HexGridSystem: Extracted values:', { position, currentColor, zoneId })
+      logger.debug('🎨 HexGridSystem: Extracted values:', { position, currentColor, zoneId })
       
       setColorPickerPosition(position)
       setColorPickerColor(currentColor)
       setColorPickerZoneId(zoneId)
       setColorPickerOpen(true)
       
-      console.log('🎨 HexGridSystem: Color picker states set:', {
+      logger.debug('🎨 HexGridSystem: Color picker states set:', {
         position,
         currentColor,
         zoneId,
@@ -537,8 +538,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Функция для сохранения цвета зоны в базу данных
   const saveZoneColor = async (zoneObjectId: string, color: string) => {
     try {
-      console.log('🎨 saveZoneColor called with:', { zoneObjectId, color })
-      console.log('🎨 Available zoneObjects:', zoneObjects.length)
+      logger.debug('🎨 saveZoneColor called with:', { zoneObjectId, color })
+      logger.debug('🎨 Available zoneObjects:', zoneObjects.length)
       
       // Находим зону, к которой принадлежит этот объект
       const zoneObject = zoneObjects.find(obj => obj.id === zoneObjectId)
@@ -553,7 +554,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         return
       }
       
-      console.log('🎨 Found zone ID:', zoneId, 'for zone object:', zoneObjectId)
+      logger.debug('🎨 Found zone ID:', zoneId, 'for zone object:', zoneObjectId)
       
       // Сохраняем цвет в таблицу zones (единственное место хранения цвета зоны)
       const { error } = await supabase
@@ -564,7 +565,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       if (error) {
         console.error('❌ Failed to save zone color:', error)
       } else {
-        console.log('✅ Zone color saved successfully in zones table:', color)
+        logger.info('✅ Zone color saved successfully in zones table:', color)
         
         // Обновляем локальное состояние зон для немедленного отображения на карте
         setLocalZones(prev => prev.map(zone => 
@@ -595,7 +596,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         // Обновляем colorPickerColor для отображения нового цвета в picker
         setColorPickerColor(color)
         
-        console.log('🔄 Updated all zone states with new color:', color)
+        logger.debug('🔄 Updated all zone states with new color:', color)
       }
     } catch (error) {
       console.error('❌ Error saving zone color:', error)
@@ -605,7 +606,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Синхронизируем localZones с серверными зонами
   useEffect(() => {
     if (zones.length > 0 && localZones.length === 0) {
-      console.log('🔄 Syncing localZones with server zones:', zones.length)
+      logger.debug('🔄 Syncing localZones with server zones:', zones.length)
       setLocalZones(zones.map(zone => ({
         id: zone.id,
         name: zone.name,
@@ -619,7 +620,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Синхронизируем ячейки зон
   useEffect(() => {
     if (zoneCells.length > 0 && localZones.length > 0) {
-      console.log('🔄 Syncing zone cells:', zoneCells.length)
+      logger.debug('🔄 Syncing zone cells:', zoneCells.length)
       setLocalZones(prev => prev.map(zone => {
         const cells = zoneCells
           .filter(cell => cell.zone_id === zone.id)
@@ -641,7 +642,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       
       // Если размер элемента меньше 8px, скрываем все лейблы (более мягкий порог)
       const shouldHide = rect.width < 8 || rect.height < 8
-      console.log('Badge size:', rect.width, 'x', rect.height, 'shouldHide:', shouldHide)
+      logger.debug('Badge size:', rect.width, 'x', rect.height, 'shouldHide:', shouldHide)
       // setLabelsVisible(!shouldHide) // Removed unused function
     }
     
@@ -670,8 +671,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Debug: Log zone centers
   useEffect(() => {
-    console.log('🏢 Zone centers:', zones.map(z => ({ name: z.name, center: getZoneCenter(z.id) })))
-    console.log('🎯 Available drop targets (zone centers):', zones.map(z => getZoneCenter(z.id)))
+    logger.debug('🏢 Zone centers:', zones.map(z => ({ name: z.name, center: getZoneCenter(z.id) })))
+    logger.debug('🎯 Available drop targets (zone centers):', zones.map(z => getZoneCenter(z.id)))
   }, [zones])
   const [dragTicketId, setDragTicketId] = useState<string | null>(null)
   const [sourcePulses, setSourcePulses] = useState<Record<string, { key: string; color: string }>>({})
@@ -777,19 +778,19 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   
   // Исправленный обработчик ticket-dragstart
   useEffect(() => {
-    console.log('🔧 HexGridSystem: Setting up ticket-dragstart event listeners')
+    logger.debug('🔧 HexGridSystem: Setting up ticket-dragstart event listeners')
     
     const handleTicketDragStart = (e: CustomEvent) => {
-      console.log('🚀 ticket-dragstart received:', e.detail)
+      logger.debug('🚀 ticket-dragstart received:', e.detail)
       
       // ВАЖНО: Обновляем и ref, и state
       isDraggingRef.current = true
       setIsDraggingTicket(true)
-      console.log('🔧 isDraggingRef.current set to:', isDraggingRef.current)
+      logger.debug('🔧 isDraggingRef.current set to:', isDraggingRef.current)
       
       // Сохраняем информацию о тикете для использования в onDrop
       const ticketDetail = e.detail
-      console.log('🔍 ticket-dragstart detail analysis:', {
+      logger.debug('🔍 ticket-dragstart detail analysis:', {
         hasTicketId: Boolean(ticketDetail?.ticketId),
         hasFromZoneObjectId: Boolean(ticketDetail?.fromZoneObjectId),
         hasType: Boolean(ticketDetail?.type),
@@ -799,23 +800,23 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       if (ticketDetail) {
         if (ticketDetail.ticketId && ticketDetail.fromZoneObjectId) {
           // Это существующий тикет - сохраняем полную информацию
-          console.log('📝 Setting pendingTicketType for existing ticket:', ticketDetail)
+          logger.debug('📝 Setting pendingTicketType for existing ticket:', ticketDetail)
           setPendingTicketType(ticketDetail)
           schedulePulse(ticketDetail.fromZoneObjectId, 'source', '#38bdf8', 950)
         } else if (ticketDetail.type) {
           // Это новый тикет - сохраняем только тип
-          console.log('📝 Setting pendingTicketType for new ticket:', ticketDetail.type)
+          logger.debug('📝 Setting pendingTicketType for new ticket:', ticketDetail.type)
           setPendingTicketType(ticketDetail.type)
         } else {
-          console.log('⚠️ No valid ticket info found in drag start event')
+          logger.warn('⚠️ No valid ticket info found in drag start event')
         }
       }
       
-      console.log('✅ isDraggingRef.current set to true')
+      logger.debug('✅ isDraggingRef.current set to true')
     }
     
     const handleTicketDragEnd = () => {
-      console.log('🎯 ticket-dragend received')
+      logger.debug('🎯 ticket-dragend received')
       
       // Сбрасываем и ref, и state
       isDraggingRef.current = false
@@ -825,20 +826,20 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       // НЕ сбрасываем pendingTicketType здесь - он должен остаться для открытия модалки
       // setPendingTicketType будет сброшен в handleZoneObjectCreatorClose
       
-      console.log('✅ isDraggingRef.current reset to false')
+      logger.debug('✅ isDraggingRef.current reset to false')
     }
     
-    console.log('🔧 HexGridSystem: Adding event listeners for ticket-dragstart and ticket-dragend')
+    logger.debug('🔧 HexGridSystem: Adding event listeners for ticket-dragstart and ticket-dragend')
     
     // Глобальный обработчик для отладки
     const globalDebugHandler = (e: any) => {
-      console.log('🔍 GLOBAL DEBUG: ticket-dragstart event received:', e.detail)
+      logger.debug('🔍 GLOBAL DEBUG: ticket-dragstart event received:', e.detail)
     }
     window.addEventListener('ticket-dragstart', globalDebugHandler)
     
     window.addEventListener('ticket-dragstart', handleTicketDragStart as any)
     window.addEventListener('ticket-dragend', handleTicketDragEnd as any)
-    console.log('🔧 HexGridSystem: Event listeners added successfully')
+    logger.debug('🔧 HexGridSystem: Event listeners added successfully')
     
     return () => {
       window.removeEventListener('ticket-dragstart', globalDebugHandler)
@@ -873,12 +874,12 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       const userData = hit.object.userData
       
       if (userData && userData.isBuilding) {
-        console.log('✅ Found building cell:', { q: userData.q, r: userData.r })
+        logger.debug('✅ Found building cell:', { q: userData.q, r: userData.r })
         return { q: userData.q, r: userData.r }
       }
     }
     
-    console.log('❌ No building cell found under cursor')
+    logger.debug('❌ No building cell found under cursor')
     return null
   }, [])
   
@@ -902,7 +903,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     const updatedTicket = ticketList.find(t => t.id === selectedTicket.id)
     
     if (updatedTicket) {
-      console.log('🔄 Syncing selectedTicket with realtime update:', {
+      logger.debug('🔄 Syncing selectedTicket with realtime update:', {
         ticketId: updatedTicket.id,
         oldCommentCount: selectedTicket.comments?.length || 0,
         newCommentCount: updatedTicket.comments?.length || 0
@@ -1044,9 +1045,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   React.useEffect(() => {
     if (loading) return
 
-    console.log('HexGridSystem useEffect triggered - recreating all cells')
+    logger.debug('HexGridSystem useEffect triggered - recreating all cells')
     const gridHexCells = generateHexGrid(12) // ~500 cells (оптимизировано)
-    console.log(`Generating ${gridHexCells.length} cells for radius 12`)
+    logger.debug(`Generating ${gridHexCells.length} cells for radius 12`)
     
     const initialCells: EnhancedHexCell[] = gridHexCells.map(({ q, r }) => {
       const distance = Math.abs(q) + Math.abs(r) + Math.abs(-q - r)
@@ -1063,14 +1064,14 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       
       // Debug information for buildings
       if (building) {
-        console.log(`Found building at [${q}, ${r}]:`, building)
+        logger.debug(`Found building at [${q}, ${r}]:`, building)
       }
       
       // Determine if there's a building on this cell
       const hasBuilding = localBuilding || building
       
       if (hasBuilding) {
-        console.log(`Cell [${q}, ${r}] has building:`, {
+        logger.debug(`Cell [${q}, ${r}] has building:`, {
           localBuilding,
           serverBuilding: building,
           hasBuilding
@@ -1090,7 +1091,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       }
     })
 
-    console.log(`Created ${initialCells.length} cells for display`)
+    logger.debug(`Created ${initialCells.length} cells for display`)
     setGridCells(initialCells)
   }, [loading, hexCells, getBuildingForCell, getZoneForCell, localBuildings, localZones])
 
@@ -1170,7 +1171,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     // setHoveredZoneColor(null)
     setHoveredCellType(null)
     setExtendingZoneId(null)
-    console.log('Exit from zone creation mode')
+    logger.debug('Exit from zone creation mode')
   }
 
   // Function for exiting zone mode
@@ -1192,71 +1193,71 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     setEditingZoneName('')
     setEditingZoneColor('')
     setIsZoneEditMode(false)
-    console.log('Exit from zone mode')
+    logger.debug('Exit from zone mode')
   }
 
 
 
   // Function for setting hover effect for cells
   const setCellHoverEffect = useCallback((q: number, r: number) => {
-    console.log(`setCellHoverEffect called for [${q}, ${r}]`)
-    console.log(`localZones count:`, localZones.length)
-    console.log(`zones count:`, zones.length)
+    logger.debug(`setCellHoverEffect called for [${q}, ${r}]`)
+    logger.debug(`localZones count:`, localZones.length)
+    logger.debug(`zones count:`, zones.length)
     // Removed: selectedBuildingType logging
     
     const zoneColor = getZoneColor(q, r)
-    console.log(`setCellHoverEffect for [${q}, ${r}]: zoneColor =`, zoneColor)
+    logger.debug(`setCellHoverEffect for [${q}, ${r}]: zoneColor =`, zoneColor)
     
     if (zoneColor && isZoneEditMode) {
       // Cell inside zone - show special hover
       setHoveredCell([q, r])
       // setHoveredZoneColor(zoneColor)
       setHoveredCellType('zone-cell')
-      console.log(`Setting zone-cell hover for [${q}, ${r}] with color ${zoneColor}`)
+      logger.debug(`Setting zone-cell hover for [${q}, ${r}] with color ${zoneColor}`)
     } else if (isZoneMode) {
       // Regular cell in zone mode - show "+"
       setHoveredCell([q, r])
       // setHoveredZoneColor(null)
       setHoveredCellType('empty')
-      console.log(`Setting empty hover for [${q}, ${r}] in zone mode`)
+      logger.debug(`Setting empty hover for [${q}, ${r}] in zone mode`)
     } else {
       // Regular cell not in zone mode - don't show hover
       setHoveredCell([q, r])
       // setHoveredZoneColor(null)
       setHoveredCellType(null)
-      console.log(`No hover for [${q}, ${r}] - not in zone mode`)
+      logger.debug(`No hover for [${q}, ${r}] - not in zone mode`)
     }
   }, [localZones, zones, isZoneMode, zoneSelectionMode, showTopPanel, localBuildings])
 
   // Cell hover handler
   const handleCellHover = useCallback((q: number, r: number) => {
     if (hoveredCell && hoveredCell[0] === q && hoveredCell[1] === r) return
-    console.log(`🖱️ handleCellHover called for [${q}, ${r}], isZoneMode: ${isZoneMode}`)
+    logger.debug(`🖱️ handleCellHover called for [${q}, ${r}], isZoneMode: ${isZoneMode}`)
     setHoveredCell([q, r])
-    console.log(`🖱️ handleCellHover: setHoveredCell([${q}, ${r}])`)
+    logger.debug(`🖱️ handleCellHover: setHoveredCell([${q}, ${r}])`)
     
     // If in zone creation mode and there's a first cell - update selection preview
     if (isZoneMode && firstClickCell && zoneSelectionMode === 'selecting') {
-      console.log(`Updating zone selection preview from [${firstClickCell[0]}, ${firstClickCell[1]}] to [${q}, ${r}]`)
+      logger.debug(`Updating zone selection preview from [${firstClickCell[0]}, ${firstClickCell[1]}] to [${q}, ${r}]`)
       const cells = getCellsBetween(firstClickCell, [q, r])
       const cellKeys = cells.map(([cellQ, cellR]) => `${cellQ},${cellR}`)
       setSelectedZoneCells(new Set(cellKeys))
-      console.log(`Selected zone cells:`, Array.from(cellKeys))
+      logger.debug(`Selected zone cells:`, Array.from(cellKeys))
     }
     
     // If in zone extension mode - update preview with fixed cells
     if (isZoneMode && firstClickCell && zoneSelectionMode === 'extending') {
-      console.log(`Updating zone extension preview from [${firstClickCell[0]}, ${firstClickCell[1]}] to [${q}, ${r}]`)
+      logger.debug(`Updating zone extension preview from [${firstClickCell[0]}, ${firstClickCell[1]}] to [${q}, ${r}]`)
       const cells = getCellsBetween(firstClickCell, [q, r])
       const cellKeys = cells.map(([cellQ, cellR]) => `${cellQ},${cellR}`)
       
       // Combine fixed cells with new ones
       const allCells = new Set([...fixedZoneCells, ...cellKeys])
       setSelectedZoneCells(allCells)
-      console.log(`Fixed zone cells:`, Array.from(fixedZoneCells))
-      console.log(`New cell keys:`, Array.from(cellKeys))
-      console.log(`Extended zone cells:`, Array.from(allCells))
-      console.log(`Total cells in zone:`, allCells.size)
+      logger.debug(`Fixed zone cells:`, Array.from(fixedZoneCells))
+      logger.debug(`New cell keys:`, Array.from(cellKeys))
+      logger.debug(`Extended zone cells:`, Array.from(allCells))
+      logger.debug(`Total cells in zone:`, allCells.size)
     }
     
     // If in zone extension mode, update preview with currently selected cells
@@ -1336,7 +1337,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Mouse leave cell handler
   const handleCellLeave = useCallback((_q: number, _r: number) => {
-    console.log(`🖱️ handleCellLeave called for [${_q}, ${_r}]`)
+    logger.debug(`🖱️ handleCellLeave called for [${_q}, ${_r}]`)
     setHoveredCell(null)
     // setHoveredZoneColor(null)
     setHoveredCellType(null)
@@ -1344,7 +1345,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Отладка обработчиков
   useEffect(() => {
-    console.log(`🔧 HexGridSystem обработчики: handleCellHover=${!!handleCellHover}, handleCellLeave=${!!handleCellLeave}`)
+    logger.debug(`🔧 HexGridSystem обработчики: handleCellHover=${!!handleCellHover}, handleCellLeave=${!!handleCellLeave}`)
   }, [handleCellHover, handleCellLeave])
 
   // Handlers for creating tickets inside zone objects
@@ -1355,8 +1356,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     priority: 'v-low' | 'low' | 'medium' | 'high' | 'veryhigh'
     assignee_id?: string | null
   }) => {
-    console.log('Creating ticket:', objectData)
-    console.log('Cell position:', modalConfig.cell)
+    logger.debug('Creating ticket:', objectData)
+    logger.debug('Cell position:', modalConfig.cell)
 
     if (modalConfig.cell) {
       // Найдём центральный объект зоны на этой ячейке (без зависимости от функции ниже по файлу)
@@ -1388,7 +1389,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       })
 
       if (ticket) {
-        console.log('Ticket created:', ticket)
+        logger.debug('Ticket created:', ticket)
         // Ничего не перезагружаем — тикет уже добавлен в локальный state и сразу появится в сайдбаре
       } else {
         console.error('Failed to create ticket')
@@ -1408,14 +1409,14 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Function for getting zone information for a cell
   const getZoneInfo = (q: number, r: number) => {
-    console.log(`getZoneInfo called for cell [${q}, ${r}]`)
-    console.log('localZones:', localZones)
+    logger.debug(`getZoneInfo called for cell [${q}, ${r}]`)
+    logger.debug('localZones:', localZones)
     
     // First check local zones (they have priority)
     for (const zone of localZones) {
-      console.log(`Checking zone ${zone.id}:`, zone.cells)
+      logger.debug(`Checking zone ${zone.id}:`, zone.cells)
       if (zone && zone.cells && Array.isArray(zone.cells) && zone.cells.some(([cellQ, cellR]: [number, number]) => cellQ === q && cellR === r)) {
-        console.log(`Found zone in localZones:`, zone)
+        logger.debug(`Found zone in localZones:`, zone)
         return {
           id: zone.id,
           name: zone.name,
@@ -1429,7 +1430,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     // Then check server zones
     const zone = getZoneForCell(q, r)
     if (zone) {
-      console.log(`Found zone in server zones:`, zone)
+      logger.debug(`Found zone in server zones:`, zone)
       // Check if this zone is being edited
       const editedZone = localZones.find(localZone => localZone && localZone.id === zone.id)
       if (editedZone) {
@@ -1447,7 +1448,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           }
         } else {
           // Cell was removed from local version - don't return zone
-          console.log(`Cell [${q}, ${r}] was removed from edited zone ${zone.id}`)
+          logger.debug(`Cell [${q}, ${r}] was removed from edited zone ${zone.id}`)
           return null
         }
       } else {
@@ -1455,7 +1456,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         const zoneCellsForZone = effectiveZoneCells.filter(cell => cell.zone_id === zone.id)
         const cells = zoneCellsForZone.map(cell => [cell.q, cell.r] as [number, number])
         
-        console.log(`Zone cells from server:`, cells)
+        logger.debug(`Zone cells from server:`, cells)
         
         return {
           id: zone.id,
@@ -1467,15 +1468,15 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       }
     }
     
-    console.log(`No zone found for cell [${q}, ${r}]`)
+    logger.debug(`No zone found for cell [${q}, ${r}]`)
     return null
   }
 
   // Radial menu object selection handler
   const handleRadialMenuSelect = useCallback(async (objectType: string) => {
-    console.log('=== RADIAL MENU SELECTION ===')
-    console.log('Selected object type:', objectType)
-    console.log('Radial menu position:', radialMenuPosition)
+    logger.debug('=== RADIAL MENU SELECTION ===')
+    logger.debug('Selected object type:', objectType)
+    logger.debug('Radial menu position:', radialMenuPosition)
     
     if (radialMenuPosition) {
       
@@ -1497,11 +1498,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         return [cellQ, cellR] as [number, number]
       })
       
-      console.log('=== CREATING ZONE ===')
-      console.log('Zone name:', randomName)
-      console.log('Zone color:', randomColor)
-      console.log('Zone cells:', zoneCells)
-      console.log('Selected cells count:', selectedZoneCells.size)
+      logger.debug('=== CREATING ZONE ===')
+      logger.debug('Zone name:', randomName)
+      logger.debug('Zone color:', randomColor)
+      logger.debug('Zone cells:', zoneCells)
+      logger.debug('Selected cells count:', selectedZoneCells.size)
       
       // Map UI option to canonical object type (hoisted so it's available in both branches)
       const typeMap: Record<string, 'mountain' | 'castle' | 'house' | 'garden' | 'factory' | 'helipad'> = {
@@ -1518,7 +1519,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       const serverZone = await createZone(randomName, randomColor, zoneCells as Array<[number, number]>)
 
       if (serverZone) {
-        console.log('Created zone:', serverZone)
+        logger.debug('Created zone:', serverZone)
 
         // Create object in zone center on server
         // Используем новый правильный алгоритм центрирования
@@ -1529,8 +1530,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }
         
         const [centerQ, centerR] = centerCoordinates
-        console.log('Zone center calculated:', { centerQ, centerR })
-        console.log('Zone cells for center calculation:', zoneCells)
+        logger.debug('Zone center calculated:', { centerQ, centerR })
+        logger.debug('Zone cells for center calculation:', zoneCells)
 
         const centerObject = await createZoneObject({
           zone_id: serverZone.id,
@@ -1551,7 +1552,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         })
 
         if (centerObject) {
-          console.log('Created center object:', centerObject)
+          logger.debug('Created center object:', centerObject)
 
           setNotification({
             type: 'info',
@@ -1619,19 +1620,19 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Zone creation handler
   const handleZoneCreate = async (zone: ZoneMarking) => {
-    console.log('Creating zone:', zone)
+    logger.debug('Creating zone:', zone)
     
     // Add zone to local state
     setLocalZones(prev => [...prev, zone])
-    console.log('Zone added to local state')
+    logger.debug('Zone added to local state')
     
     // Try to create zone on server
     if (createZone) {
-      console.log('createZone function exists, attempting server creation')
+      logger.debug('createZone function exists, attempting server creation')
       try {
         const serverZone = await createZone(zone.name, zone.color, zone.cells)
         if (serverZone) {
-          console.log('Zone created on server:', serverZone)
+          logger.debug('Zone created on server:', serverZone)
         } else {
           console.warn('createZone returned null/undefined')
         }
@@ -1668,13 +1669,13 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     ))
 
     // TODO: Обновить на сервере
-    console.log('Zone updated:', updatedZone)
+    logger.debug('Zone updated:', updatedZone)
 
     // Обновляем позицию объектов зоны на основе нового центра
     if (updateZoneObjectPosition) {
       try {
         await updateZoneObjectPosition(editingZoneId)
-        console.log('Zone object positions updated successfully')
+        logger.debug('Zone object positions updated successfully')
       } catch (error) {
         console.error('Failed to update zone object positions:', error)
       }
@@ -1695,15 +1696,15 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Обработчик отмены редактирования зоны
   const handleCancelZoneEdit = () => {
-    console.log('=== handleCancelZoneEdit called ===')
-    console.log('editingZoneId:', editingZoneId)
+    logger.debug('=== handleCancelZoneEdit called ===')
+    logger.debug('editingZoneId:', editingZoneId)
     
     if (editingZoneId) {
       // Удаляем измененную зону из localZones, возвращая к исходному состоянию
       setLocalZones(prev => {
         const updatedZones = prev.filter(zone => zone.id !== editingZoneId)
-        console.log('Removed edited zone from localZones:', editingZoneId)
-        console.log('Updated localZones:', updatedZones)
+        logger.debug('Removed edited zone from localZones:', editingZoneId)
+        logger.debug('Updated localZones:', updatedZones)
         return updatedZones
       })
     }
@@ -1752,15 +1753,15 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     
     setGridCells(updatedCells as unknown as EnhancedHexCell[])
     
-    console.log('Zone edit cancelled, returned to original state')
-    console.log('=== handleCancelZoneEdit finished ===')
+    logger.debug('Zone edit cancelled, returned to original state')
+    logger.debug('=== handleCancelZoneEdit finished ===')
   }
 
   // Обработчик удаления зоны
   const handleDeleteZone = async () => {
     if (!editingZoneId) return
 
-    console.log('Deleting zone:', editingZoneId)
+    logger.debug('Deleting zone:', editingZoneId)
     
     // Удаляем зону из локального состояния
     setLocalZones(prev => prev.filter(zone => zone.id !== editingZoneId))
@@ -1769,7 +1770,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     if (deleteZone) {
       try {
         await deleteZone(editingZoneId)
-        console.log('Zone deleted on server:', editingZoneId)
+        logger.debug('Zone deleted on server:', editingZoneId)
       } catch (error) {
         console.error('Failed to delete zone on server:', error)
       }
@@ -1787,7 +1788,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     setSelectedZoneCells(new Set())
     setExtendingZoneId(null)
     
-    console.log('Zone deletion completed')
+    logger.debug('Zone deletion completed')
   }
 
 
@@ -1795,18 +1796,18 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Обработчик удаления ячейки из зоны
   const handleRemoveCellFromZone = (q: number, r: number) => {
     if (!editingZoneId) {
-      console.log('No editingZoneId, cannot remove cell')
+      logger.debug('No editingZoneId, cannot remove cell')
       return
     }
 
-    console.log(`Attempting to remove cell [${q}, ${r}] from zone ${editingZoneId}`)
+    logger.debug(`Attempting to remove cell [${q}, ${r}] from zone ${editingZoneId}`)
     
     // Обновляем локальные зоны
     setLocalZones(prev => {
       const updatedZones = prev.map(zone => {
         if (zone && zone.id === editingZoneId && zone.cells && Array.isArray(zone.cells)) {
           const newCells = zone.cells.filter(([cellQ, cellR]: [number, number]) => !(cellQ === q && cellR === r))
-          console.log(`Zone ${zone.id}: removed cell [${q}, ${r}], cells count: ${zone.cells.length} -> ${newCells.length}`)
+          logger.debug(`Zone ${zone.id}: removed cell [${q}, ${r}], cells count: ${zone.cells.length} -> ${newCells.length}`)
           return {
             ...zone,
             cells: newCells
@@ -1814,7 +1815,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }
         return zone
       })
-      console.log('Updated local zones:', updatedZones)
+      logger.debug('Updated local zones:', updatedZones)
       return updatedZones
     })
 
@@ -1859,20 +1860,20 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     setTimeout(() => {
       const zoneColor = getZoneColor(q, r)
       const zoneInfo = getZoneInfo(q, r)
-      console.log(`After removal - cell [${q}, ${r}]: zoneColor=${zoneColor}, zoneInfo=${zoneInfo ? zoneInfo.name : 'null'}`)
+      logger.debug(`After removal - cell [${q}, ${r}]: zoneColor=${zoneColor}, zoneInfo=${zoneInfo ? zoneInfo.name : 'null'}`)
     }, 100)
 
-    console.log(`Removed cell [${q}, ${r}] from zone ${editingZoneId}`)
+    logger.debug(`Removed cell [${q}, ${r}] from zone ${editingZoneId}`)
   }
 
   // Функция для добавления ячейки к редактируемой зоне
   const handleAddCellToZone = (q: number, r: number) => {
     if (!editingZoneId) {
-      console.log('No editingZoneId, cannot add cell')
+      logger.debug('No editingZoneId, cannot add cell')
       return
     }
 
-    console.log(`Attempting to add cell [${q}, ${r}] to zone ${editingZoneId}`)
+    logger.debug(`Attempting to add cell [${q}, ${r}] to zone ${editingZoneId}`)
     
     // Обновляем локальные зоны
     setLocalZones(prev => {
@@ -1882,7 +1883,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           const cellExists = zone.cells.some(([cellQ, cellR]: [number, number]) => cellQ === q && cellR === r)
           if (!cellExists) {
             const newCells = [...zone.cells, [q, r] as [number, number]]
-            console.log(`Zone ${zone.id}: added cell [${q}, ${r}], cells count: ${zone.cells.length} -> ${newCells.length}`)
+            logger.debug(`Zone ${zone.id}: added cell [${q}, ${r}], cells count: ${zone.cells.length} -> ${newCells.length}`)
             return {
               ...zone,
               cells: newCells
@@ -1891,7 +1892,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }
         return zone
       })
-      console.log('Updated local zones:', updatedZones)
+      logger.debug('Updated local zones:', updatedZones)
       return updatedZones
     })
 
@@ -1927,7 +1928,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     
     setGridCells(updatedCells as unknown as EnhancedHexCell[])
 
-    console.log(`Added cell [${q}, ${r}] to zone ${editingZoneId}`)
+    logger.debug(`Added cell [${q}, ${r}] to zone ${editingZoneId}`)
   }
 
   // Обработчик очистки выделения
@@ -1967,7 +1968,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Функция для получения цвета зоны для ячейки
   const getZoneColor = useCallback((q: number, r: number) => {
-    console.log(`getZoneColor called for cell [${q}, ${r}]`)
+    logger.debug(`getZoneColor called for cell [${q}, ${r}]`)
     const zone = getZoneForCell(q, r)
     if (!zone) return null
     const zoneColor = zone.color
@@ -1993,7 +1994,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   }, [])
 
   const openSprintSidebar = useCallback((zoneObject: any, q: number, r: number) => {
-    console.log('[DEBUG] openSprintSidebar invoked for', zoneObject?.id, zoneObject?.object_type, 'coords', q, r)
+    logger.debug('[DEBUG] openSprintSidebar invoked for', zoneObject?.id, zoneObject?.object_type, 'coords', q, r)
     const data = buildZoneObjectData(zoneObject, q, r)
     setSelectedZoneObject(data as any)
     setSprintObjectId(zoneObject.id)
@@ -2006,9 +2007,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Обработчик клика по ячейке
   const handleCellClick = useCallback(async (q: number, r: number, isRightClick: boolean = false, mousePosition?: [number, number]) => {
-    console.log('🖱️ handleCellClick called:', { q, r, mousePosition })
-    console.log('🖱️ Available zoneObjects:', zoneObjects)
-    console.log('🖱️ Looking for object at [', q, ',', r, ']')
+    logger.debug('🖱️ handleCellClick called:', { q, r, mousePosition })
+    logger.debug('🖱️ Available zoneObjects:', zoneObjects)
+    logger.debug('🖱️ Looking for object at [', q, ',', r, ']')
     
     // Проверяем, есть ли здание на этой клетке (локальное или серверное)
     const localBuilding = localBuildings.find(b => b.q === q && b.r === r)
@@ -2017,7 +2018,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     const zoneColor = getZoneColor(q, r)
     const isProjectCenter = q === 0 && r === 0
     
-    console.log('🖱️ Cell analysis:', {
+    logger.debug('🖱️ Cell analysis:', {
       q, r,
       localBuilding: !!localBuilding,
       serverBuilding: !!serverBuilding,
@@ -2029,17 +2030,17 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     
     // Если в режиме редактирования зоны, обрабатываем удаление и добавление ячеек
     if (isZoneEditMode && editingZoneId) {
-      console.log(`In edit mode, editingZoneId: ${editingZoneId}`)
+      logger.debug(`In edit mode, editingZoneId: ${editingZoneId}`)
       const currentZone = localZones.find(z => z && z.id === editingZoneId) || effectiveZones.find(z => z && z.id === editingZoneId)
-      console.log(`Current zone:`, currentZone)
+      logger.debug(`Current zone:`, currentZone)
       
       if (currentZone && (currentZone as any).cells && Array.isArray((currentZone as any).cells) && (currentZone as any).cells.some(([cellQ, cellR]: [number, number]) => cellQ === q && cellR === r)) {
-        console.log(`Cell [${q}, ${r}] belongs to editing zone, removing...`)
+        logger.debug(`Cell [${q}, ${r}] belongs to editing zone, removing...`)
         // Клик на ячейку редактируемой зоны - удаляем её
         handleRemoveCellFromZone(q, r)
         return
       } else {
-        console.log(`Cell [${q}, ${r}] does not belong to editing zone, adding...`)
+        logger.debug(`Cell [${q}, ${r}] does not belong to editing zone, adding...`)
         // Клик на ячейку вне редактируемой зоны - добавляем её
         handleAddCellToZone(q, r)
         return
@@ -2051,11 +2052,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     
     // Проверяем, есть ли объект зоны на этой ячейке
     const zoneObject = getZoneObjectForCellLocal(q, r)
-    console.log('Zone object found:', zoneObject)
+    logger.debug('Zone object found:', zoneObject)
     
     // Если есть объект зоны и это не правый клик - открываем детальную панель
     if (zoneObject && !isRightClick) {
-      console.log('Found zone object:', zoneObject)
+      logger.debug('Found zone object:', zoneObject)
       try {
         window.dispatchEvent(new CustomEvent('sprint-click-debug', { detail: { zoneObject } }))
       } catch (error) {
@@ -2064,7 +2065,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       // Special case: Sprint (mapped type 'mountain') opens Sprint modal instead of sidebar
       const rawZoneType = (zoneObject as any).object_type ?? (zoneObject as any).type ?? ''
       const zoneObjectType = String(rawZoneType).toLowerCase()
-      console.log('[SprintSidebar Routing] resolved type:', zoneObjectType, {
+      logger.debug('[SprintSidebar Routing] resolved type:', zoneObjectType, {
         object_type: (zoneObject as any).object_type,
         type: (zoneObject as any).type
       })
@@ -2080,7 +2081,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       )
       
         if (isMeetBuilding) {
-          console.log('Opening Meet panel for Meet building:', zoneObject)
+          logger.debug('Opening Meet panel for Meet building:', zoneObject)
           const meetBuildingData = buildZoneObjectData(zoneObject, q, r)
           setSelectedMeetBuilding(meetBuildingData)
           setIsMeetPanelOpen(true)
@@ -2095,31 +2096,31 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       // Создаем объект для ZoneObjectDetailsPanel (с прогрессом зоны для центральных объектов)
       const zoneObjectData = buildZoneObjectData(zoneObject, q, r)
       
-      console.log('Opening ZoneObjectDetailsPanel with data:', zoneObjectData)
+      logger.debug('Opening ZoneObjectDetailsPanel with data:', zoneObjectData)
       setSelectedZoneObject(zoneObjectData as any)
       setIsZoneObjectDetailsOpen(true)
       
       // Move robot car to neighbor cell of the clicked building
-      console.log(`🚗 Looking for neighbor cell for building at [${q}, ${r}]`)
+      logger.debug(`🚗 Looking for neighbor cell for building at [${q}, ${r}]`)
       const neighborCell = findFreeNeighborCell(q, r)
-      console.log(`🚗 Found neighbor cell:`, neighborCell)
+      logger.debug(`🚗 Found neighbor cell:`, neighborCell)
       
       if (neighborCell) {
         const [targetQ, targetR] = neighborCell
         const [targetX, , targetZ] = hexToWorldPosition(targetQ, targetR)
-        console.log(`🚗 Setting robot car target: [${targetQ}, ${targetR}] at world position [${targetX}, 0.4, ${targetZ}]`)
+        logger.debug(`🚗 Setting robot car target: [${targetQ}, ${targetR}] at world position [${targetX}, 0.4, ${targetZ}]`)
         setRobotCarTarget([targetQ, targetR])
         setRobotCarPosition([targetX, 0.4, targetZ])
-        console.log(`🚗 Robot car state updated!`)
+        logger.debug(`🚗 Robot car state updated!`)
       } else {
-        console.log(`🚗 No neighbor cell found!`)
+        logger.debug(`🚗 No neighbor cell found!`)
       }
       return
     }
     
     // Создание объектов на ячейках внутри зон отключено
     if (currentZoneColor && !isZoneEditMode) {
-      console.log('Cell is in zone but no object found, and not in edit mode - ignoring click')
+      logger.debug('Cell is in zone but no object found, and not in edit mode - ignoring click')
       return
     }
     
@@ -2134,9 +2135,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     }
 
     if (!isRightClick && !localBuilding && !serverBuilding && !zoneInfo && !zoneColor && !isProjectCenter && isZoneMode) {
-      console.log('Starting zone creation mode for empty cell:', { q, r })
-      console.log('Current isZoneMode:', isZoneMode)
-      console.log('Current zoneSelectionMode:', zoneSelectionMode)
+      logger.debug('Starting zone creation mode for empty cell:', { q, r })
+      logger.debug('Current isZoneMode:', isZoneMode)
+      logger.debug('Current zoneSelectionMode:', zoneSelectionMode)
       
       if (zoneSelectionMode === 'idle') {
         const neighbors = getNeighbors(q, r)
@@ -2152,11 +2153,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         setShowTopPanel(false)
         
         const worldPos = hexToWorldPosition(q, r)
-        console.log('=== RADIAL MENU POSITIONING ===')
-        console.log('Cell coordinates:', [q, r])
-        console.log('World position:', worldPos)
-        console.log('Mouse position:', mousePosition)
-        console.log('Window dimensions:', { width: window.innerWidth, height: window.innerHeight })
+        logger.debug('=== RADIAL MENU POSITIONING ===')
+        logger.debug('Cell coordinates:', [q, r])
+        logger.debug('World position:', worldPos)
+        logger.debug('Mouse position:', mousePosition)
+        logger.debug('Window dimensions:', { width: window.innerWidth, height: window.innerHeight })
         
         setShowRadialMenu(true)
         setRadialMenuPosition([q, r] as [number, number])
@@ -2165,11 +2166,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         
         setLastExtendingClick(Date.now())
         
-        console.log('Set isZoneMode to true')
-        console.log('Set zoneSelectionMode to fixed')
-        console.log('Set firstClickCell to:', [q, r])
-        console.log('Set selectedZoneCells to:', zoneCells)
-        console.log('Showing radial menu for object selection')
+        logger.debug('Set isZoneMode to true')
+        logger.debug('Set zoneSelectionMode to fixed')
+        logger.debug('Set firstClickCell to:', [q, r])
+        logger.debug('Set selectedZoneCells to:', zoneCells)
+        logger.debug('Showing radial menu for object selection')
         
         return
       }
@@ -2180,34 +2181,34 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Функция для получения центра зоны
   const getZoneCenter = (zoneId: string): [number, number] | null => {
-    console.log(`getZoneCenter called for zoneId: ${zoneId}`)
+    logger.debug(`getZoneCenter called for zoneId: ${zoneId}`)
     
     // Проверяем локальные зоны
     const localZone = localZones.find(zone => zone.id === zoneId)
     if (localZone && localZone.cells.length > 0) {
-      console.log(`Found local zone:`, localZone)
+      logger.debug(`Found local zone:`, localZone)
       const center = calculateHexZoneCenter(localZone.cells)
-      console.log(`Calculated center:`, center)
+      logger.debug(`Calculated center:`, center)
       return center
     }
     
     // Проверяем серверные зоны
     const zone = effectiveZones.find(z => z && z.id === zoneId)
     if (!zone) {
-      console.log(`No zone found with id: ${zoneId}`)
+      logger.debug(`No zone found with id: ${zoneId}`)
       return null
     }
 
     // Получаем все ячейки этой зоны из zoneCells
     const zoneCellsForZone = effectiveZoneCells.filter(cell => cell.zone_id === zoneId)
     if (zoneCellsForZone.length === 0) {
-      console.log(`No cells found for zone: ${zoneId}`)
+      logger.debug(`No cells found for zone: ${zoneId}`)
       return null
     }
 
     // Используем новый правильный алгоритм центрирования
     const center = calculateHexZoneCenter(zoneCellsForZone)
-    console.log(`Calculated server zone center:`, center)
+    logger.debug(`Calculated server zone center:`, center)
     
     return center
   }
@@ -2216,16 +2217,16 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Функция для определения центра зоны
   const isZoneCenter = (q: number, r: number) => {
-    console.log(`isZoneCenter called for cell [${q}, ${r}]`)
+    logger.debug(`isZoneCenter called for cell [${q}, ${r}]`)
     
     // Проверяем локальные зоны
     for (const zone of localZones) {
-      console.log(`Checking local zone ${zone.id}:`, zone.cells)
+      logger.debug(`Checking local zone ${zone.id}:`, zone.cells)
       if (zone.cells.some(([cellQ, cellR]: [number, number]) => cellQ === q && cellR === r)) {
         const center = getZoneCenter(zone.id)
-        console.log(`Local zone center:`, center)
+        logger.debug(`Local zone center:`, center)
         const isCenter = center ? q === center[0] && r === center[1] : false
-        console.log(`Is center:`, isCenter)
+        logger.debug(`Is center:`, isCenter)
         return isCenter
       }
     }
@@ -2233,35 +2234,35 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     // Проверяем серверные зоны
     const zone = getZoneForCell(q, r)
     if (!zone) {
-      console.log(`No zone found for cell [${q}, ${r}]`)
+      logger.debug(`No zone found for cell [${q}, ${r}]`)
       return false
     }
 
     const center = getZoneCenter(zone.id)
-    console.log(`Server zone center:`, center)
+    logger.debug(`Server zone center:`, center)
     const isCenter = center ? q === center[0] && r === center[1] : false
-    console.log(`Is center:`, isCenter)
+    logger.debug(`Is center:`, isCenter)
     return isCenter
   }
 
   // ЕДИНАЯ ФУНКЦИЯ для правильного вычисления места дропа
   const calculateDropTarget = useCallback((clientX: number, clientY: number) => {
-    console.log('🎯 Calculating drop target for:', { clientX, clientY })
+    logger.debug('🎯 Calculating drop target for:', { clientX, clientY })
     
     // Находим ячейку под курсором
     const cell = findCellUnderCursor(clientX, clientY)
     if (!cell) {
-      console.log('❌ No cell found under cursor')
+      logger.debug('❌ No cell found under cursor')
       return null
     }
     
-    console.log('🎯 Found cell:', cell)
+    logger.debug('🎯 Found cell:', cell)
     
     // Получаем зону для ячейки
     const zone = getZoneForCell(cell.q, cell.r)
     const isCenter = isZoneCenter(cell.q, cell.r)
     
-    console.log('🏢 Zone info:', {
+    logger.debug('🏢 Zone info:', {
       hasZone: !!zone,
       zoneName: zone?.name, 
       isCenter,
@@ -2270,18 +2271,18 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     
     // Проверяем, что дроп на центр зоны
     if (!zone || !isCenter) {
-      console.log('❌ Drop not on zone center - invalid target')
+      logger.debug('❌ Drop not on zone center - invalid target')
       return null
     }
     
     // Получаем zone object для этой ячейки
     const zoneObject = getZoneObjectForCell(cell.q, cell.r)
     if (!zoneObject) {
-      console.log('❌ No zone object found for center cell')
+      logger.debug('❌ No zone object found for center cell')
       return null
     }
     
-    console.log('✅ Valid drop target found:', {
+    logger.debug('✅ Valid drop target found:', {
       cell: [cell.q, cell.r],
       zone: zone.name,
       zoneObject: zoneObject.title
@@ -3040,38 +3041,38 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Гибридные обработчики drag & drop
   useEffect(() => {
-    console.log('🔧 HexGridSystem: Setting up hybrid drag & drop event listeners')
+    logger.debug('🔧 HexGridSystem: Setting up hybrid drag & drop event listeners')
     
     const handleHybridDragStart = (e: any) => {
-      console.log('🎯 Hybrid dragstart received:', e.detail)
+      logger.debug('🎯 Hybrid dragstart received:', e.detail)
       
       isDraggingRef.current = true
       setIsDraggingTicket(true)
       
       const dragData: HybridDragData = e.detail
       if (dragData.isNewTicket && dragData.type) {
-        console.log('🆕 Hybrid new ticket drag detected:', dragData.type)
+        logger.debug('🆕 Hybrid new ticket drag detected:', dragData.type)
         setPendingTicketType(dragData.type as any)
       }
     }
     
     const handleHybridDragEnd = (e: any) => {
-      console.log('🎯 Hybrid dragend received')
+      logger.debug('🎯 Hybrid dragend received')
       isDraggingRef.current = false
       setIsDraggingTicket(false)
       setPendingTicketType(null)
     }
     
     const handleHybridDrop = (e: any) => {
-      console.log('🎯 Hybrid drop received:', e.detail)
+      logger.debug('🎯 Hybrid drop received:', e.detail)
 
       const { dragData, clientX, clientY } = e.detail
       if (!dragData) {
-        console.log('❌ No dragData found, returning')
+        logger.debug('❌ No dragData found, returning')
         return
       }
 
-      console.log('🎯 DragData:', dragData)
+      logger.debug('🎯 DragData:', dragData)
 
       const dropTarget = calculateDropTarget(clientX, clientY)
       const targetZoneObject = dropTarget?.zoneObject || null
@@ -3081,29 +3082,29 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         : sprintObjectId
 
       if (dragData.isSprintGhostRemoval && dragData.ticketId && !isSprintStarted) {
-        console.log('🧹 Removing rocket copy via free drop (sprint not started)')
+        logger.debug('🧹 Removing rocket copy via free drop (sprint not started)')
         removeRocketCopy(dragData.ticketId)
         return
       }
 
       if (!dropTarget) {
         if (dragData.isSprintGhostRemoval && dragData.ticketId) {
-          console.log('🧹 Removing rocket copy after drop outside sprint')
+          logger.debug('🧹 Removing rocket copy after drop outside sprint')
           removeRocketCopy(dragData.ticketId)
         } else {
-          console.log('❌ Invalid drop target')
+          logger.debug('❌ Invalid drop target')
         }
         return
       }
 
       if (isSprintTarget && isSprintStarted && dragData.isNewTicket) {
-        console.log('🚫 Sprint is active, ignoring new ticket drop into sprint')
+        logger.debug('🚫 Sprint is active, ignoring new ticket drop into sprint')
         return
       }
 
       if (dragData.isSprintGhostRemoval && dragData.ticketId) {
         if (!isSprintTarget) {
-          console.log('🧹 Removing rocket copy via ghost removal drop')
+          logger.debug('🧹 Removing rocket copy via ghost removal drop')
           removeRocketCopy(dragData.ticketId)
         }
         return
@@ -3116,7 +3117,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
         if (!existing && sprintZoneId) {
           if (isSprintStarted) {
-            console.log('🚫 Sprint is active, skipping new ticket addition to sprint')
+            logger.debug('🚫 Sprint is active, skipping new ticket addition to sprint')
             return
           }
           const cached = getCachedRocketCopy(sprintZoneId, ticketId)
@@ -3162,7 +3163,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           return
         }
 
-        console.log('🚀 Updating rocket copy for ticket:', ticketId, 'status:', nextStatus)
+        logger.debug('🚀 Updating rocket copy for ticket:', ticketId, 'status:', nextStatus)
         upsertRocketCopy(ticketId, nextStatus, origin)
         if (!isSprintStarted && nextStatus === 'planned') {
           scheduleBadgeAnimation(sprintZoneId ?? sprintObjectId ?? null, 'gain')
@@ -3194,7 +3195,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
       // Используем единую функцию для вычисления места дропа
       if (dragData.isNewTicket) {
-        console.log('🆕 Opening modal for new ticket:', dragData.type, 'on zone center:', dropTarget.cell)
+        logger.debug('🆕 Opening modal for new ticket:', dragData.type, 'on zone center:', dropTarget.cell)
         setModalConfig({
           isOpen: true,
           ticketType: dragData.type,
@@ -3202,10 +3203,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         })
       } else if (dragData.isExistingTicket) {
         if (isSprintTarget && isSprintStarted) {
-          console.log('🚫 Sprint is active, ignoring new ticket drop from non-sprint source')
+          logger.debug('🚫 Sprint is active, ignoring new ticket drop from non-sprint source')
           return
         }
-        console.log('🔄 Moving existing ticket:', dragData.ticketId, 'to zone center:', dropTarget.cell)
+        logger.debug('🔄 Moving existing ticket:', dragData.ticketId, 'to zone center:', dropTarget.cell)
         if (dragData.fromZoneObjectId !== dropTarget.zoneObject.id) {
           moveTicket(dragData.ticketId, dragData.fromZoneObjectId, dropTarget.zoneObject.id)
         }
@@ -3217,7 +3218,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     addHybridEventListener('hybrid-dragend', handleHybridDragEnd)
     addHybridEventListener('hybrid-drop', handleHybridDrop)
     
-    console.log('✅ HexGridSystem: Hybrid event listeners added successfully')
+    logger.debug('✅ HexGridSystem: Hybrid event listeners added successfully')
     
     return () => {
       removeHybridEventListener('hybrid-dragstart', handleHybridDragStart)
@@ -3253,21 +3254,21 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     ) || null
     
     if (foundObject) {
-      console.log(`Found object for [${q}, ${r}]:`, foundObject)
+      logger.debug(`Found object for [${q}, ${r}]:`, foundObject)
     } else {
       // Ячейка пустая - это нормально
       console.debug(`Cell [${q}, ${r}] is empty`)
     }
     
     if (foundObject) {
-      console.log(`=== PROCESSING FOUND OBJECT ===`)
-      console.log('Raw object from database:', foundObject)
-      console.log('Object ID:', foundObject.id)
-      console.log('Object title:', foundObject.title)
-      console.log('Object description:', foundObject.description)
-      console.log('Object status:', foundObject.status)
-      console.log('Object priority:', foundObject.priority)
-      console.log('Object story_points:', foundObject.story_points)
+      logger.debug(`=== PROCESSING FOUND OBJECT ===`)
+      logger.debug('Raw object from database:', foundObject)
+      logger.debug('Object ID:', foundObject.id)
+      logger.debug('Object title:', foundObject.title)
+      logger.debug('Object description:', foundObject.description)
+      logger.debug('Object status:', foundObject.status)
+      logger.debug('Object priority:', foundObject.priority)
+      logger.debug('Object story_points:', foundObject.story_points)
       
       // Проверяем, является ли это центральным объектом зоны
       const isCenterObject = isZoneCenter(foundObject.q, foundObject.r)
@@ -3309,15 +3310,15 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         ]
       }
       
-      console.log(`=== PROCESSED OBJECT ===`)
-      console.log('Processed object for UI:', processedObject)
-      console.log('Processed status:', processedObject.status)
-      console.log('Processed status type:', typeof processedObject.status)
+      logger.debug(`=== PROCESSED OBJECT ===`)
+      logger.debug('Processed object for UI:', processedObject)
+      logger.debug('Processed status:', processedObject.status)
+      logger.debug('Processed status type:', typeof processedObject.status)
       
       return processedObject
     }
     
-    console.log(`No object found for cell [${q}, ${r}]`)
+    logger.debug(`No object found for cell [${q}, ${r}]`)
     return null
   }
 
@@ -3413,20 +3414,20 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     
     // Функция для поиска ячейки под курсором
     const findCellUnderCursor = (e: DragEvent) => {
-      console.log('🔍 findCellUnderCursor called with event:', e)
+      logger.debug('🔍 findCellUnderCursor called with event:', e)
       
       const mouse = getMouseNDC(e)
-      console.log('📍 Mouse NDC coordinates:', mouse)
+      logger.debug('📍 Mouse NDC coordinates:', mouse)
       
       raycaster.current.setFromCamera(mouse, camera)
       
       // Получаем все объекты для проверки
       const targets = Array.from(hoverTargetsRef.current.values())
-      console.log('🎯 Available hover targets:', targets.length)
+      logger.debug('🎯 Available hover targets:', targets.length)
       
       // Логируем информацию о первых нескольких объектах
       targets.slice(0, 3).forEach((target, index) => {
-        console.log(`🎯 Target ${index}:`, {
+        logger.debug(`🎯 Target ${index}:`, {
           type: target.type,
           userData: target.userData,
           position: target.position,
@@ -3435,21 +3436,21 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       })
       
       const intersects = raycaster.current.intersectObjects(targets, false)
-      console.log('💥 Raycaster intersections:', intersects.length)
+      logger.debug('💥 Raycaster intersections:', intersects.length)
       
       if (intersects.length > 0) {
         const hit = intersects[0]
         const userData = hit.object.userData
-        console.log('🎯 Hit object userData:', userData)
+        logger.debug('🎯 Hit object userData:', userData)
         
         if (userData && userData.isBuilding) {
-          console.log('✅ Found building cell:', { q: userData.q, r: userData.r })
+          logger.debug('✅ Found building cell:', { q: userData.q, r: userData.r })
           return { q: userData.q, r: userData.r, object: hit.object }
         } else {
-          console.log('❌ Hit object is not a building')
+          logger.debug('❌ Hit object is not a building')
         }
       } else {
-        console.log('❌ No intersections found')
+        logger.debug('❌ No intersections found')
       }
       
       return null
@@ -3460,8 +3461,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     useEffect(() => {
       const handleDragEnter = (e: DragEvent) => {
         e.preventDefault()
-        console.log('🎯 DRAG ENTER EVENT!')
-        console.log('🎯 DataTransfer types:', e.dataTransfer?.types)
+        logger.debug('🎯 DRAG ENTER EVENT!')
+        logger.debug('🎯 DataTransfer types:', e.dataTransfer?.types)
         setIsDraggingTicket(true)
       }
       
@@ -3475,10 +3476,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         // Устанавливаем правильный dropEffect
         e.dataTransfer!.dropEffect = isExistingTicket ? 'move' : 'copy'
         
-        console.log('🎯 DRAG OVER EVENT!', { isExistingTicket, dropEffect: e.dataTransfer!.dropEffect })
+        logger.debug('🎯 DRAG OVER EVENT!', { isExistingTicket, dropEffect: e.dataTransfer!.dropEffect })
         
         const cell = findCellUnderCursor(e)
-        console.log('🎯 DragOver: findCellUnderCursor result:', cell)
+        logger.debug('🎯 DragOver: findCellUnderCursor result:', cell)
         
         if (cell) {
           setHoveredCellDuringDrag([cell.q, cell.r])
@@ -3488,7 +3489,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           setCandidateCenterCell(isCenter ? [cell.q, cell.r] : null)
           
           const zone = getZoneForCell(cell.q, cell.r)
-          console.log('🎯 DragOver: Cell found', {
+          logger.debug('🎯 DragOver: Cell found', {
             cell: [cell.q, cell.r],
             isCenter,
             candidateCenterCell: isCenter ? [cell.q, cell.r] : null,
@@ -3521,7 +3522,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             const zone = getZoneForCell(approxQ, approxR)
             const isCenter = zone && isZoneCenter(approxQ, approxR)
             
-            console.log('🎯 DragOver: Zone info:', {
+            logger.debug('🎯 DragOver: Zone info:', {
               approxCell: [approxQ, approxR],
               hasZone: !!zone,
               zoneName: zone?.name,
@@ -3578,7 +3579,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       }
       
       const handleDrop = (e: DragEvent) => {
-        console.log('🎯 DropHandler: handleDrop called')
+        logger.debug('🎯 DropHandler: handleDrop called')
         // Простое логирование - основная логика в div wrapper
       }
       
@@ -3612,7 +3613,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     const debugDropHandler = (e: DragEvent) => {
       const ticketType = e.dataTransfer?.getData('text/plain')
       if (ticketType && ['story', 'task', 'bug', 'test'].includes(ticketType)) {
-        console.log('🎯 DEBUG: Global drop event detected!', {
+        logger.debug('🎯 DEBUG: Global drop event detected!', {
           ticketType,
           target: e.target,
           currentTarget: e.currentTarget,
@@ -3624,7 +3625,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     const debugDragStartHandler = (e: DragEvent) => {
       const ticketType = e.dataTransfer?.getData('text/plain')
       if (ticketType && ['story', 'task', 'bug', 'test'].includes(ticketType)) {
-        console.log('🎯 DEBUG: Global dragstart event detected!', {
+        logger.debug('🎯 DEBUG: Global dragstart event detected!', {
           ticketType,
           target: e.target,
           currentTarget: e.currentTarget,
@@ -3649,18 +3650,18 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Исправленная функция computeHexUnder с правильным округлением координат
   const computeHexUnder = useCallback((clientX: number, clientY: number) => {
-    console.log('🔍 computeHexUnder called', { clientX, clientY, isDragging: isDraggingTicket, isDraggingRef: isDraggingRef.current })
+    logger.debug('🔍 computeHexUnder called', { clientX, clientY, isDragging: isDraggingTicket, isDraggingRef: isDraggingRef.current })
     
     // Проверяем состояние dragging - используем ref для актуального значения
     if (!isDraggingRef.current) {
-      console.log('❌ Skipping hex calculation - not dragging (isDraggingTicket:', isDraggingTicket, ', isDraggingRef:', isDraggingRef.current, ')')
+      logger.debug('❌ Skipping hex calculation - not dragging (isDraggingTicket:', isDraggingTicket, ', isDraggingRef:', isDraggingRef.current, ')')
       return
     }
     
     // Получаем canvas элемент правильным способом
     const canvas = document.querySelector('canvas')
     if (!canvas) {
-      console.log('❌ Canvas not found')
+      logger.debug('❌ Canvas not found')
       return
     }
     
@@ -3670,13 +3671,13 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     const nx = ((clientX - rect.left) / rect.width) * 2 - 1
     const ny = -((clientY - rect.top) / rect.height) * 2 + 1
     
-    console.log('📍 Mouse normalized coords:', { nx, ny })
+    logger.debug('📍 Mouse normalized coords:', { nx, ny })
     
     // Используем raycaster для определения позиции в мире
     const raycaster = new THREE.Raycaster()
     const camera = cameraRef.current
     if (!camera) {
-      console.log('❌ Camera not found')
+      logger.debug('❌ Camera not found')
       return
     }
     raycaster.setFromCamera({ x: nx, y: ny } as any, camera)
@@ -3691,7 +3692,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       const hexQ = Math.round((2/3 * intersectionPoint.x) / hexSize)
       const hexR = Math.round((-1/3 * intersectionPoint.x + Math.sqrt(3)/3 * intersectionPoint.z) / hexSize)
       
-      console.log('🎯 Hex under cursor:', { q: hexQ, r: hexR })
+      logger.debug('🎯 Hex under cursor:', { q: hexQ, r: hexR })
       
       // Сохраняем координаты в window для использования другими обработчиками
       ;(window as any).__hoveredCell = [hexQ, hexR]
@@ -3701,11 +3702,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Глобальные слушатели mousemove - всегда активны, но обрабатывают только при isDraggingTicket
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
-      console.log('🖱️ mousemove event:', { x: e.clientX, y: e.clientY, isDragging: isDraggingTicket, isDraggingRef: isDraggingRef.current })
+      logger.debug('🖱️ mousemove event:', { x: e.clientX, y: e.clientY, isDragging: isDraggingTicket, isDraggingRef: isDraggingRef.current })
       computeHexUnder(e.clientX, e.clientY)
     }
     const onPointerMove = (e: PointerEvent) => {
-      console.log('👆 pointermove event:', { x: e.clientX, y: e.clientY, isDragging: isDraggingTicket, isDraggingRef: isDraggingRef.current })
+      logger.debug('👆 pointermove event:', { x: e.clientX, y: e.clientY, isDragging: isDraggingTicket, isDraggingRef: isDraggingRef.current })
       computeHexUnder(e.clientX, e.clientY)
     }
     
@@ -3926,7 +3927,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       <div 
         className={`canvas-container ${isDraggingTicket ? 'is-dragging' : ''}`}
         onDrop={(e) => {
-          console.log('🎯 SIMPLE DROP on canvas container!')
+          logger.debug('🎯 SIMPLE DROP on canvas container!')
           e.preventDefault()
           e.stopPropagation()
 
@@ -3937,10 +3938,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
               const ticketId = typeof parsed?.ticketId === 'string' ? parsed.ticketId : null
               if (ticketId) {
                 if (!isSprintStarted) {
-                  console.log('🧹 Removing rocket copy via simple drop (sprint not started)')
+                  logger.debug('🧹 Removing rocket copy via simple drop (sprint not started)')
                   removeRocketCopy(ticketId)
                 } else {
-                  console.log('🚫 Sprint active, ignoring simple drop removal for ticket', ticketId)
+                  logger.debug('🚫 Sprint active, ignoring simple drop removal for ticket', ticketId)
                 }
                 return
               }
@@ -3951,7 +3952,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
           const existingTicketPayload = e.dataTransfer?.getData('application/x-existing-ticket')
           if (existingTicketPayload) {
-            console.log('🎯 Existing ticket drop detected:', existingTicketPayload)
+            logger.debug('🎯 Existing ticket drop detected:', existingTicketPayload)
             try {
               const parsed = JSON.parse(existingTicketPayload)
               const ticketId = parsed?.ticketId as string | undefined
@@ -3969,7 +3970,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
               const dropTarget = calculateDropTarget(e.clientX, e.clientY)
               if (!dropTarget) {
-                console.log('❌ Existing ticket drop target invalid, skipping modal')
+                logger.debug('❌ Existing ticket drop target invalid, skipping modal')
                 return
               }
 
@@ -3987,7 +3988,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 queuePendingSprintDrop(ticketId, nextStatus, fromZoneObjectId, sprintZoneId)
                 return
               }
-                console.log('🚀 Updating rocket copy via fallback drop handler', { ticketId, nextStatus })
+                logger.debug('🚀 Updating rocket copy via fallback drop handler', { ticketId, nextStatus })
                 upsertRocketCopy(ticketId, nextStatus, fromZoneObjectId)
                 if (!isSprintStarted && nextStatus === 'planned') {
                   scheduleBadgeAnimation(sprintZoneId ?? sprintObjectId ?? null, 'gain')
@@ -3996,11 +3997,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
               }
 
               if (dropTarget.zoneObject.id === fromZoneObjectId) {
-                console.log('⚠️ Existing ticket dropped onto the same zone object, no move needed')
+                logger.debug('⚠️ Existing ticket dropped onto the same zone object, no move needed')
                 return
               }
 
-              console.log('🔄 Moving existing ticket via fallback drop handler', {
+              logger.debug('🔄 Moving existing ticket via fallback drop handler', {
                 ticketId,
                 fromZoneObjectId,
                 toZoneObjectId: dropTarget.zoneObject.id
@@ -4015,15 +4016,15 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           }
 
           const ticketType = e.dataTransfer?.getData('text/plain') || e.dataTransfer?.getData('application/x-ticket-type')
-          console.log('🎯 Simple drop ticketType:', ticketType)
+          logger.debug('🎯 Simple drop ticketType:', ticketType)
 
           if (ticketType && ['story', 'task', 'bug', 'test'].includes(ticketType)) {
-            console.log('🎯 SIMPLE: Opening modal for ticket type:', ticketType)
+            logger.debug('🎯 SIMPLE: Opening modal for ticket type:', ticketType)
             
             // Локальная функция для вычисления места дропа
             const cell = findCellUnderCursor(e.clientX, e.clientY)
             if (!cell) {
-              console.log('❌ No cell found under cursor')
+              logger.debug('❌ No cell found under cursor')
               return
             }
             
@@ -4031,17 +4032,17 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             const isCenter = isZoneCenter(cell.q, cell.r)
             
             if (!zone || !isCenter) {
-              console.log('❌ Drop not on zone center - modal will NOT open')
+              logger.debug('❌ Drop not on zone center - modal will NOT open')
               return
             }
             
             const zoneObject = getZoneObjectForCell(cell.q, cell.r)
             if (!zoneObject) {
-              console.log('❌ No zone object found for center cell')
+              logger.debug('❌ No zone object found for center cell')
               return
             }
             
-            console.log('🎯 SIMPLE: Valid drop target found:', [cell.q, cell.r])
+            logger.debug('🎯 SIMPLE: Valid drop target found:', [cell.q, cell.r])
             setModalConfig({
               isOpen: true,
               ticketType: ticketType,
@@ -4054,11 +4055,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           e.dataTransfer.dropEffect = 'move'
         }}
         onDragEnter={(e) => {
-          console.log('🎯 onDragEnter triggered on canvas container')
+          logger.debug('🎯 onDragEnter triggered on canvas container')
           e.preventDefault()
         }}
         onDragLeave={(e) => {
-          console.log('🎯 onDragLeave triggered on canvas container')
+          logger.debug('🎯 onDragLeave triggered on canvas container')
         }}
         style={{ 
           width: '100vw', 
@@ -4086,11 +4087,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
               e.dataTransfer.dropEffect = existingTicket ? 'move' : 'copy'
             }}
             onDragEnter={(e) => {
-              console.log('🎯 onDragEnter triggered on Canvas')
+              logger.debug('🎯 onDragEnter triggered on Canvas')
               e.preventDefault()
             }}
             onDragLeave={(e) => {
-              console.log('🎯 onDragLeave triggered on Canvas')
+              logger.debug('🎯 onDragLeave triggered on Canvas')
             }}
           onPointerDown={(e) => { if (isTicketModalOpen || isSidebarHover) { e.stopPropagation(); e.preventDefault() } }}
           onWheel={(e) => { if (isTicketModalOpen || isSidebarHover) { e.stopPropagation(); e.preventDefault() } }}
@@ -4118,7 +4119,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             alpha: true // Включаем прозрачность для показа CSS фона
           }}
           onCreated={({ gl, scene, camera }) => {
-            console.log('🎨 Canvas created successfully')
+            logger.debug('🎨 Canvas created successfully')
             if (isTicketModalOpen) {
               gl.domElement.style.pointerEvents = 'none'
             } else {
@@ -4134,7 +4135,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 try {
                   const newContext = gl.domElement.getContext('webgl2') || gl.domElement.getContext('webgl')
                   if (newContext) {
-                    console.log('✅ WebGL context recovered')
+                    logger.debug('✅ WebGL context recovered')
                     // Force re-render
                     gl.render(scene, camera)
                   } else {
@@ -4150,7 +4151,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             }
             
             const handleContextRestored = () => {
-              console.log('✅ WebGL context restored')
+              logger.debug('✅ WebGL context restored')
               // Перезапускаем рендеринг
               try {
                 gl.render(scene, camera)
@@ -4348,7 +4349,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 : 0)
 
             if (buildingNotifications) {
-              console.log('[HexGridSystem] notifications for building', {
+              logger.debug('[HexGridSystem] notifications for building', {
                 buildingId: building.id,
                 title: building.title,
                 hasMentions,
@@ -4359,7 +4360,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             }
 
             if (building) {
-              console.log('[HexGridSystem] building badge state', JSON.stringify({
+              logger.debug('[HexGridSystem] building badge state', JSON.stringify({
                   buildingId: building.id,
                   buildingTitle: building.title,
                   zoneId: building.zone_id,
@@ -4376,7 +4377,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             // Debug mentions for zone centers
             if (isZoneCenterCell && building) {
               if (hasMentions) {
-                console.log('💬 Building has unread mentions!', {
+                logger.debug('💬 Building has unread mentions!', {
                   buildingId: building.id,
                   buildingTitle: building.title,
                   hasMentions,
@@ -4389,7 +4390,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
               
               // Also log when no mentions but we have a building with tickets
               if (!hasMentions && (ticketsByZoneObject[building.id] || []).length > 0) {
-                console.log('📭 Building has tickets but no unread mentions', {
+                logger.debug('📭 Building has tickets but no unread mentions', {
                   buildingId: building.id,
                   buildingTitle: building.title,
                   ticketCount: (ticketsByZoneObject[building.id] || []).length,
@@ -4400,7 +4401,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             
             // Отладка: проверяем данные тикетов
             if (isZoneCenterCell && zone) {
-              console.log('🔍 Zone ticket debug:', {
+              logger.debug('🔍 Zone ticket debug:', {
                 zoneId: zone.id,
                 zoneName: zone.name,
                 buildingId: building?.id,
@@ -4507,10 +4508,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
             // Отладка для камней и деревьев
             if (finalShouldShowStone) {
-              console.log(`🪨 ${stoneCount} камней размещены на ячейке [${q}, ${r}] в зоне "${zone?.name}" (${zoneColor})`)
+              logger.debug(`🪨 ${stoneCount} камней размещены на ячейке [${q}, ${r}] в зоне "${zone?.name}" (${zoneColor})`)
             }
             if (finalShouldShowTrees) {
-              console.log(`🌳 ${treeCount} деревьев размещены на ячейке [${q}, ${r}] в зоне "${zone?.name}" (${zoneColor})`)
+              logger.debug(`🌳 ${treeCount} деревьев размещены на ячейке [${q}, ${r}] в зоне "${zone?.name}" (${zoneColor})`)
             }
 
             const buildingId = building?.id ?? null
@@ -4585,7 +4586,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                   const participants = getRoomParticipants(roomId)
                   
                   // Debug logging
-                  console.log('🔍 HexGridSystem: Meeting participants lookup:', {
+                  logger.debug('🔍 HexGridSystem: Meeting participants lookup:', {
                     buildingId: building.id,
                     buildingTitle: building.title,
                     roomId,
@@ -4745,7 +4746,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
               const [targetQ, targetR] = robotCarTarget
               const [targetX, , targetZ] = hexToWorldPosition(targetQ, targetR)
               const targetPos = [targetX, 0.4, targetZ] as [number, number, number]
-              console.log(`🚗 RobotCar targetPosition:`, targetPos)
+              logger.debug(`🚗 RobotCar targetPosition:`, targetPos)
               return targetPos
             })() : undefined}
           />
@@ -4766,13 +4767,13 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         onClose={() => setColorPickerOpen(false)}
         currentColor={colorPickerColor}
         onColorChange={(color) => {
-          console.log('🎨 Color picker onColorChange called:', { color, colorPickerZoneId })
+          logger.debug('🎨 Color picker onColorChange called:', { color, colorPickerZoneId })
           setColorPickerColor(color)
           if (colorPickerZoneId) {
-            console.log('🎨 Calling saveZoneColor with:', { colorPickerZoneId, color })
+            logger.debug('🎨 Calling saveZoneColor with:', { colorPickerZoneId, color })
             saveZoneColor(colorPickerZoneId, color)
           } else {
-            console.error('❌ colorPickerZoneId is null/undefined, cannot save color')
+            logger.error('❌ colorPickerZoneId is null/undefined, cannot save color')
           }
         }}
         position={colorPickerPosition}
@@ -4862,19 +4863,19 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         zoneColor={selectedZoneObject ? getZoneColor(selectedZoneObject.cellPosition[0], selectedZoneObject.cellPosition[1]) || undefined : undefined}
         isDragging={isDraggingTicket}
         zoneTickets={(() => {
-          console.log('🔍 ZoneObjectDetailsPanel tickets debug:')
-          console.log('- selectedZoneObject:', selectedZoneObject)
-          console.log('- selectedZoneObject.id:', selectedZoneObject?.id)
-          console.log('- ticketsByZoneObject keys:', Object.keys(ticketsByZoneObject))
-          console.log('- ticketsByZoneObject:', ticketsByZoneObject)
+          logger.debug('🔍 ZoneObjectDetailsPanel tickets debug:')
+          logger.debug('- selectedZoneObject:', selectedZoneObject)
+          logger.debug('- selectedZoneObject.id:', selectedZoneObject?.id)
+          logger.debug('- ticketsByZoneObject keys:', Object.keys(ticketsByZoneObject))
+          logger.debug('- ticketsByZoneObject:', ticketsByZoneObject)
           
           if (selectedZoneObject) {
             const tickets = ticketsByZoneObject[selectedZoneObject.id] || []
-            console.log('- tickets for selectedZoneObject.id:', tickets)
-            console.log('- tickets length:', tickets.length)
+            logger.debug('- tickets for selectedZoneObject.id:', tickets)
+            logger.debug('- tickets length:', tickets.length)
             
             return tickets.map(t => {
-              console.log('Mapping ticket for ZoneObjectDetailsPanel:', {
+              logger.debug('Mapping ticket for ZoneObjectDetailsPanel:', {
                 id: t.id,
                 title: t.title,
                 sprint_id: (t as any).sprint_id,
@@ -4893,7 +4894,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             })
           }
           
-          console.log('- No selectedZoneObject, returning empty array')
+          logger.debug('- No selectedZoneObject, returning empty array')
           return []
         })()}
         onOpenTicket={(ticketId, position) => {
@@ -4912,16 +4913,16 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         sprintLabelByTicketId={plannedTicketNames}
         ticketNotifications={selectedTicketNotifications}
         onSprintBadgeClick={(sprintId) => {
-          console.log('HexGridSystem onSprintBadgeClick called with sprintId:', sprintId)
+          logger.debug('HexGridSystem onSprintBadgeClick called with sprintId:', sprintId)
           
           // Найти sprint здание на карте (тип 'mountain')
           const sprintBuilding = zoneObjects.find(obj => obj.object_type === 'mountain')
-          console.log('Found sprint building:', sprintBuilding)
+          logger.debug('Found sprint building:', sprintBuilding)
           
           if (sprintBuilding) {
             // Переместить камеру к sprint зданию
             const [x, y, z] = hexToWorldPosition(sprintBuilding.q, sprintBuilding.r)
-            console.log('Sprint building position:', { q: sprintBuilding.q, r: sprintBuilding.r, world: [x, y, z] })
+            logger.debug('Sprint building position:', { q: sprintBuilding.q, r: sprintBuilding.r, world: [x, y, z] })
             
             // Отправить событие для перемещения камеры
             window.dispatchEvent(new CustomEvent('camera-focus', {
@@ -4930,9 +4931,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 zoom: 2.0 // Приблизить к зданию
               }
             }))
-            console.log('Camera focus event dispatched to sprint building')
+            logger.debug('Camera focus event dispatched to sprint building')
           } else {
-            console.log('No sprint building found on map')
+            logger.debug('No sprint building found on map')
           }
         }}
       />
@@ -5026,7 +5027,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
       {/* Bottom Tapbar */}
       <BottomTapbar 
-        onSelect={(id) => console.log('create type:', id)} 
+        onSelect={(id) => logger.debug('create type:', id)} 
       />
 
       {/* Bottom-panel ghost overlay removed: we now use unified HTML5 drag image like Sidebar */}
@@ -5049,11 +5050,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         }}
         onSaveToDatabase={async (ticketId, updates) => {
           try {
-            console.log('🔄 Saving to database via useProjectData:', { ticketId, updates })
+            logger.debug('🔄 Saving to database via useProjectData:', { ticketId, updates })
             // Use hook helper so realtime broadcast + state stay in sync
             const zoneObjectId = selectedTicket?.zone_object_id || updates.zone_object_id || ''
             if (!zoneObjectId) {
-              console.warn('⚠️ Missing zone_object_id for ticket save, falling back to direct service call')
+              logger.warn('⚠️ Missing zone_object_id for ticket save, falling back to direct service call')
               const { ticketService } = await import('../lib/supabase')
               const directResult = await ticketService.updateTicket(ticketId, updates)
               return !!directResult
@@ -5061,7 +5062,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
             const result = await updateTicket(ticketId, zoneObjectId, updates as any)
             return !!result
           } catch (error) {
-            console.error('❌ Error saving ticket to database:', error)
+            logger.error('❌ Error saving ticket to database:', error)
             return false
           }
         }}
