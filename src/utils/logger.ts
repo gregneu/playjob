@@ -1,6 +1,6 @@
 // Utility for conditional logging based on environment
-const isDevelopment = process.env.NODE_ENV === 'development'
-const isDebug = process.env.NODE_ENV === 'development' && process.env.REACT_APP_DEBUG === 'true'
+const isDevelopment = import.meta.env.DEV
+const isDebug = import.meta.env.DEV && import.meta.env.VITE_DEBUG === 'true'
 
 export const logger = {
   // Always log errors and warnings
@@ -23,7 +23,7 @@ export const logger = {
   
   // Log verbose only for critical debugging
   verbose: (...args: any[]) => {
-    if (isDebug && process.env.REACT_APP_VERBOSE === 'true') {
+    if (isDebug && import.meta.env.VITE_VERBOSE === 'true') {
       console.log('[VERBOSE]', ...args)
     }
   },
@@ -44,5 +44,5 @@ export const logger = {
 export const isLoggingEnabled = {
   info: isDevelopment,
   debug: isDebug,
-  verbose: isDebug && process.env.REACT_APP_VERBOSE === 'true'
+  verbose: isDebug && import.meta.env.VITE_VERBOSE === 'true'
 }
