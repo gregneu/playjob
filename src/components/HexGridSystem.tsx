@@ -1387,6 +1387,17 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         return
       }
 
+      // Check if this is a Meet building - if so, prevent ticket creation
+      const isMeetBuilding = centerObject.object_type === 'meet' ||
+                            centerObject.title?.toLowerCase().includes('meet') ||
+                            centerObject.description?.toLowerCase().includes('meet')
+      
+      if (isMeetBuilding) {
+        console.warn('Cannot create tickets in Meet buildings')
+        setModalConfig({ isOpen: false, ticketType: null, cell: null })
+        return
+      }
+
       // Создаём тикет в object_tickets
       const ticket = await createTicketForZoneObject(centerObject.id, {
         type: objectData.type,
@@ -4568,7 +4579,15 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                     hoveredCell[0] === q && 
                     hoveredCell[1] === r
                   const isCenter = isZoneCenterCell
-                  return Boolean(isDraggingTicket && isHovered && isCenter)
+                  
+                  // Check if this is a Meet building - if so, disable drag and drop
+                  const isMeetBuilding = building && (
+                    building.object_type === 'meet' ||
+                    building.title?.toLowerCase().includes('meet') ||
+                    building.description?.toLowerCase().includes('meet')
+                  )
+                  
+                  return Boolean(isDraggingTicket && isHovered && isCenter && !isMeetBuilding)
                 })()}
                 registerHoverTarget={registerHoverTarget}
                 unregisterHoverTarget={unregisterHoverTarget}

@@ -152,7 +152,29 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
     return classes.join(' ')
   }, [ticketBadgeAnimation])
   const badgeDomKey = ticketBadgeAnimationKey != null ? `badge-${ticketBadgeAnimationKey}` : 'badge-default'
-  const showTicketBubble = ticketCount > 0
+  // Check if this is a Meet building first
+  const isMeetBuilding = useMemo(() => {
+    if (!zoneObject) return false
+    const title = zoneObject.title?.toLowerCase() || ''
+    const description = zoneObject.description?.toLowerCase() || ''
+    const isMeet = title.includes('meet') || description.includes('meet') || 
+                   title.includes('meeting') || description.includes('meeting')
+    
+    // Debug logging
+    if (isMeet) {
+      console.log('🏢 UnifiedHexCell: Meet building detected:', {
+        buildingId: zoneObject.id,
+        title: zoneObject.title,
+        description: zoneObject.description,
+        isMeet
+      })
+    }
+    
+    return isMeet
+  }, [zoneObject])
+  
+  // Don't show ticket bubble for Meet buildings
+  const showTicketBubble = ticketCount > 0 && !isMeetBuilding
   const showCommentNotification = commentCount > 0
   const showAssignmentNotification = (assignmentCount ?? 0) > 0
   const notificationItems: Array<{ key: string; icon: string; count: number; showCount: boolean; animationClass: string }> = useMemo(() => {
@@ -180,27 +202,6 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
     return items
   }, [showCommentNotification, showAssignmentNotification, commentCount, assignmentCount])
   const showNotificationPanel = notificationItems.length > 0
-  
-  // Check if this is a Meet building
-  const isMeetBuilding = useMemo(() => {
-    if (!zoneObject) return false
-    const title = zoneObject.title?.toLowerCase() || ''
-    const description = zoneObject.description?.toLowerCase() || ''
-    const isMeet = title.includes('meet') || description.includes('meet') || 
-                   title.includes('meeting') || description.includes('meeting')
-    
-    // Debug logging
-    if (isMeet) {
-      console.log('🏢 UnifiedHexCell: Meet building detected:', {
-        buildingId: zoneObject.id,
-        title: zoneObject.title,
-        description: zoneObject.description,
-        isMeet
-      })
-    }
-    
-    return isMeet
-  }, [zoneObject])
   
   const showMeetingBadge = isMeetBuilding && meetingParticipants && meetingParticipants.length > 0
   
