@@ -4598,8 +4598,14 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
                 })()}
                 onMeetingClick={() => {
                   // Handle meeting click - open meeting panel
+                  if (!projectId) {
+                    console.error('❌ No projectId available for meeting click')
+                    return
+                  }
+                  
                   if (building) {
                     const roomId = `playjoob-meet-${building.id}`
+                    console.log('🎥 Opening meeting for room:', roomId, 'project:', projectId)
                     setSelectedZoneObject(building)
                     // The meeting panel will be opened automatically when selectedZoneObject is set
                   }

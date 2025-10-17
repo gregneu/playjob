@@ -20,6 +20,46 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
   const [meetingParticipants, setMeetingParticipants] = useState<MeetingParticipantsMap>({})
   const [isLoading, setIsLoading] = useState(false)
 
+  // Cleanup old participants
+  const cleanupOldParticipants = useCallback(async () => {
+    if (!projectId) return
+    
+    try {
+      console.log('🧹 useMeetingParticipants: Cleaning up old participants...')
+      
+      // Remove inactive participants older than 1 hour
+      const { error: inactiveError } = await supabase
+        .from('meeting_participants')
+        .delete()
+        .eq('project_id', projectId)
+        .eq('is_active', false)
+        .lt('left_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+      
+      if (inactiveError) {
+        console.error('❌ Error cleaning up inactive participants:', inactiveError)
+      } else {
+        console.log('✅ Cleaned up old inactive participants')
+      }
+      
+      // Remove active participants older than 24 hours (likely forgotten records)
+      const { error: activeError } = await supabase
+        .from('meeting_participants')
+        .delete()
+        .eq('project_id', projectId)
+        .eq('is_active', true)
+        .lt('joined_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      
+      if (activeError) {
+        console.error('❌ Error cleaning up old active participants:', activeError)
+      } else {
+        console.log('✅ Cleaned up old active participants')
+      }
+      
+    } catch (err) {
+      console.error('❌ Exception during cleanup:', err)
+    }
+  }, [projectId])
+
   const loadMeetingParticipants = useCallback(async () => {
     if (!projectId || !userId) {
       setMeetingParticipants({})
@@ -29,6 +69,9 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     setIsLoading(true)
     try {
       console.log('🔍 useMeetingParticipants: Loading participants for project:', projectId)
+      
+      // Clean up old participants first
+      await cleanupOldParticipants()
       
       // Get all active meeting participants from the database
       const { data, error } = await supabase
@@ -101,7 +144,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     } finally {
       setIsLoading(false)
     }
-  }, [projectId, userId])
+  }, [projectId, userId, cleanupOldParticipants])
 
   // Add participant to a room
   const addParticipant = useCallback(async (roomId: string, participant: Omit<MeetingParticipant, 'id' | 'joinedAt'>) => {

@@ -915,7 +915,14 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
         <Html position={[0, totalHeight + 1.5, 0]} center zIndexRange={[2050, 2000]}>
           <MeetingBadge
             participants={meetingParticipants}
-            onClick={onMeetingClick}
+            onClick={() => {
+              if (onMeetingClick) {
+                console.log('🎥 Meeting badge clicked')
+                onMeetingClick()
+              } else {
+                console.warn('⚠️ No onMeetingClick handler provided')
+              }
+            }}
           />
         </Html>
       )}
