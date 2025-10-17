@@ -101,6 +101,19 @@ export const ZoneSelectionTool = ({
   onZoneColorEditChange,
   onDeleteZone
 }: ZoneSelectionToolProps) => {
+  console.log('🔨 ZoneSelectionTool rendered with props:', {
+    isZoneMode,
+    hasOnZoneModeToggle: !!onZoneModeToggle,
+    showTopPanel,
+    zoneSelectionMode,
+    isZoneEditMode
+  })
+  
+  // Отслеживание изменений isZoneMode
+  useEffect(() => {
+    console.log('🔨 ZoneSelectionTool: isZoneMode prop changed to:', isZoneMode)
+  }, [isZoneMode])
+  
   // Отладочная информация для режима редактирования
   console.log('ZoneSelectionTool props:', {
     isZoneEditMode,
@@ -260,6 +273,8 @@ export const ZoneSelectionTool = ({
   }
 
   const handleZoneModeToggle = () => {
+    console.log('🔨 ZoneSelectionTool: handleZoneModeToggle called')
+    console.log('🔨 ZoneSelectionTool: current isZoneMode prop:', isZoneMode)
     onZoneModeToggle()
     if (!isZoneMode) {
       onSelectionClear()
@@ -293,7 +308,10 @@ export const ZoneSelectionTool = ({
       }}>
         {/* Кнопка создания зон */}
         <button
-          onClick={handleZoneModeToggle}
+          onClick={() => {
+            console.log('🔨 Build button clicked!')
+            handleZoneModeToggle()
+          }}
             style={{
               display: 'flex',
               flexDirection: 'column',

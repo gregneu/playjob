@@ -463,6 +463,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set())
   const [isZoneMode, setIsZoneMode] = useState(false)
   
+  // Отслеживание изменений isZoneMode
+  useEffect(() => {
+    console.log('🔨 isZoneMode state changed to:', isZoneMode)
+  }, [isZoneMode])
+  
   const [isFlagMode, setIsFlagMode] = useState(false)
   const [flagCells, setFlagCells] = useState<Set<string>>(new Set())
   const [currentZonePath, setCurrentZonePath] = useState<Array<[number, number]>>([])
@@ -1949,12 +1954,17 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
   // Обработчик переключения режима зон
   const handleZoneModeToggle = () => {
+    console.log('🔨 handleZoneModeToggle called, current isZoneMode:', isZoneMode)
     setIsZoneMode(!isZoneMode)
+    console.log('🔨 handleZoneModeToggle: isZoneMode changed to:', !isZoneMode)
+    
     if (!isZoneMode) {
       // Включаем режим строительства
+      console.log('🔨 Enabling zone construction mode')
       handleSelectionClear()
     } else {
       // Выключаем режим строительства
+      console.log('🔨 Disabling zone construction mode')
       // При входе в режим зон сбрасываем hover цвет
       // setHoveredZoneColor(null)
       setHoveredCellType(null)
