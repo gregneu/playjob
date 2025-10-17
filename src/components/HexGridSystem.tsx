@@ -4963,6 +4963,8 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         onClose={() => {
           setIsMeetPanelOpen(false)
           setSelectedMeetBuilding(null)
+          // Reset sidebar hover state to ensure camera controls work
+          setIsSidebarHover(false)
         }}
         roomId={selectedMeetBuilding ? `playjoob-meet-${selectedMeetBuilding.id}` : 'default-room'}
         buildingTitle={selectedMeetBuilding?.title || 'Meet Object'}

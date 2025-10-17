@@ -73,6 +73,11 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
       setIsConnected(false)
       setConnectionError(null)
       
+      // Reset sidebar hover state to ensure camera controls work
+      try { 
+        window.dispatchEvent(new CustomEvent('sidebar-hover', { detail: { hover: false } })) 
+      } catch {}
+      
       // Call parent close handler to close the panel
       console.log('🚪 Calling parent onClose...')
       onClose()
