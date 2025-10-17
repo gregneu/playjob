@@ -527,6 +527,7 @@ export const MeetVideoGrid = React.forwardRef<
   const roomRef = useRef<Room | null>(null)
   const [participants, setParticipants] = useState<ParticipantVideo[]>([])
   const [isConnecting, setIsConnecting] = useState(false)
+  const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [participantCount, setParticipantCount] = useState(0)
 
@@ -752,7 +753,7 @@ export const MeetVideoGrid = React.forwardRef<
 
   // Update participants list
   const updateParticipants = useCallback(async () => {
-    if (!roomRef.current) {
+    if (!roomRef.current || isDisconnecting) {
       setParticipants([])
       setParticipantCount(0)
       return
@@ -816,7 +817,7 @@ export const MeetVideoGrid = React.forwardRef<
         onConnectionChange?.(true, participantVideos.length)
         
         // Sync participants with database for realtime updates
-        if (projectId && userId) {
+        if (projectId && userId && !isDisconnecting) {
           // Add local participant to database
           const localParticipant = participantVideos.find(p => p.isLocal)
           if (localParticipant) {
@@ -829,7 +830,7 @@ export const MeetVideoGrid = React.forwardRef<
             })
           }
         }
-  }, [onConnectionChange, userName, userEmail, userAvatarUrl, userAvatarConfig, userId, fetchUserData, projectId, roomId, addParticipant])
+  }, [onConnectionChange, userName, userEmail, userAvatarUrl, userAvatarConfig, userId, fetchUserData, projectId, roomId, addParticipant, isDisconnecting])
 
   // Disconnect from room and stop all tracks
   const disconnectFromRoom = useCallback(async () => {
@@ -839,6 +840,7 @@ export const MeetVideoGrid = React.forwardRef<
     }
 
     console.log('🎥 Disconnecting from LiveKit room...')
+    setIsDisconnecting(true)
     
     const room = roomRef.current
     const localParticipant = room.localParticipant
@@ -914,6 +916,7 @@ export const MeetVideoGrid = React.forwardRef<
       setParticipants([])
       setParticipantCount(0)
       setIsConnecting(false)
+      setIsDisconnecting(false)
       setConnectionError(null)
       onConnectionChange?.(false, 0)
       
