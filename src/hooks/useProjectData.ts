@@ -1351,9 +1351,8 @@ export const useProjectData = (projectId: string) => {
 
   // Загрузка данных при изменении projectId
   useEffect(() => {
-    console.log('🔄 useProjectData useEffect triggered')
-    console.log('🔄 projectId:', projectId)
-    console.log('🔄 loadProjectData function:', typeof loadProjectData)
+    // Removed excessive logging - this was called on every useEffect trigger
+    // Removed excessive logging - this was called on every useEffect trigger
     loadProjectData()
   }, [loadProjectData])
 

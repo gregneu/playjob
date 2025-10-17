@@ -171,7 +171,7 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
     return cells
   }, [zoneCells, isZoneMode])
 
-  console.log(`🎯 SmartHexGrid: Рендерим ${interactiveCells.length} ячеек (${zoneCells.length} зон + интерактивные)`)
+  // Removed excessive logging - this was called on every render
 
   return (
     <group>
@@ -185,12 +185,12 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
         
         // Отладка для центральной ячейки
         if (cell.q === 0 && cell.r === 0) {
-          console.log(`🏠 Центральная ячейка: hovered=${isHovered}, state=${cell.state}, finalState=${finalState}`)
+          // Removed excessive logging - this was called on every render for central cell
         }
         
         // Отладка обработчиков
         if (cell.q === 0 && cell.r === 0) {
-          console.log(`🔧 Центральная ячейка обработчики: onCellHover=${!!onCellHover}, onCellLeave=${!!onCellLeave}`)
+          // Removed excessive logging - this was called on every render for central cell
         }
 
         // Проверяем, является ли эта ячейка центром зоны

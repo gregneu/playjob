@@ -3256,8 +3256,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     if (foundObject) {
       logger.debug(`Found object for [${q}, ${r}]:`, foundObject)
     } else {
-      // Ячейка пустая - это нормально
-      console.debug(`Cell [${q}, ${r}] is empty`)
+      // Ячейка пустая - это нормально (убрали избыточное логирование)
     }
     
     if (foundObject) {

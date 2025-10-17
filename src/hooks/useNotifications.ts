@@ -145,22 +145,13 @@ export function useNotifications({
       return result[buildingId]
     }
 
-    console.log('[useNotifications] tickets snapshot', JSON.stringify({
-      total: tickets.length,
-      ticketIds: tickets.map((t) => t?.id ?? null)
-    }, null, 2))
+    // Removed excessive logging - this was called on every tickets change
 
     // Process comment mentions
     const seenAssignments = seenAssignmentTicketsRef.current
 
     tickets.forEach(ticket => {
-      console.log('[useNotifications] processing ticket', JSON.stringify({
-        ticketId: ticket?.id ?? null,
-        zoneObjectId: ticket?.zone_object_id ?? null,
-        title: ticket?.title ?? null,
-        hasComments: Array.isArray(ticket?.comments) ? ticket.comments.length : undefined,
-        hasUnread: hasUnreadMentions(ticket?.id)
-      }, null, 2))
+      // Removed excessive logging - this was called for every ticket on every change
       const buildingId = ticket.zone_object_id
       if (!buildingId) return
 
@@ -253,18 +244,7 @@ export function useNotifications({
   }, [tickets, unreadMentions, hasUnreadMentions, userId, assignmentSeenVersion])
 
   useEffect(() => {
-    console.log('[useNotifications] notifications snapshot raw', { userId, notificationsByBuilding })
-    try {
-      console.log('[useNotifications] notifications snapshot', JSON.stringify({
-        userId,
-        notificationsByBuilding
-      }, null, 2))
-    } catch (err) {
-      console.log('[useNotifications] notifications snapshot (serialization failed)', {
-        userId,
-        error: err instanceof Error ? err.message : err
-      })
-    }
+    // Removed excessive logging - this was called on every notifications change
 
     try {
       const totals = Object.values(notificationsByBuilding || {}).reduce(

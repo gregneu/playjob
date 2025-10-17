@@ -132,12 +132,12 @@ const progressPercent = Math.min(100, Math.max(0, stats.totalTickets > 0 ? (stat
 
   // Обновляем заголовок страницы
   React.useEffect(() => {
-    console.log('🔄 Title useEffect triggered with:', { assignedTicketsCount, projectName: project.name })
+    // Removed excessive logging - this was called on every title update
     const title = assignedTicketsCount > 0 
       ? `(${assignedTicketsCount}) ${project.name}` 
       : project.name
     document.title = title
-    console.log('📝 Updated page title:', title)
+    // Removed excessive logging - this was called on every title update
   }, [assignedTicketsCount, project.name])
 
   React.useEffect(() => {
