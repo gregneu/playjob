@@ -104,7 +104,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   }, [userProfile?.avatar_url])
 
   const show3D = renderHex3D && size > 48 && !(window as any).isIn3DScene
-  console.log(`🎭 UserAvatar show3D: renderHex3D=${renderHex3D}, size=${size}, isIn3DScene=${(window as any).isIn3DScene}, show3D=${show3D}`)
+  // Removed excessive logging - this was called on every render
 
   // AvatarModel component removed to fix linter warning
   try { useGLTF.preload(avatarModelUrl) } catch {}

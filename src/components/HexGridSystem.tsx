@@ -3692,7 +3692,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       const hexQ = Math.round((2/3 * intersectionPoint.x) / hexSize)
       const hexR = Math.round((-1/3 * intersectionPoint.x + Math.sqrt(3)/3 * intersectionPoint.z) / hexSize)
       
-      logger.debug('🎯 Hex under cursor:', { q: hexQ, r: hexR })
+      // Removed excessive logging - this was called on every mouse move
       
       // Сохраняем координаты в window для использования другими обработчиками
       ;(window as any).__hoveredCell = [hexQ, hexR]
@@ -3702,11 +3702,11 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Глобальные слушатели mousemove - всегда активны, но обрабатывают только при isDraggingTicket
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
-      logger.debug('🖱️ mousemove event:', { x: e.clientX, y: e.clientY, isDragging: isDraggingTicket, isDraggingRef: isDraggingRef.current })
+      // Removed excessive logging - this was called on every mouse move
       computeHexUnder(e.clientX, e.clientY)
     }
     const onPointerMove = (e: PointerEvent) => {
-      logger.debug('👆 pointermove event:', { x: e.clientX, y: e.clientY, isDragging: isDraggingTicket, isDraggingRef: isDraggingRef.current })
+      // Removed excessive logging - this was called on every pointer move
       computeHexUnder(e.clientX, e.clientY)
     }
     

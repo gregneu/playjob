@@ -124,13 +124,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   meetingParticipants = [],
   onMeetingClick,
 }) => {
-  console.log(`🏠 UnifiedHexCell [${q},${r}] rendering:`, {
-    state,
-    isZoneCenter,
-    cellType,
-    hasRegisterFunction: !!registerHoverTarget,
-    hasUnregisterFunction: !!unregisterHoverTarget
-  })
+  // Removed excessive logging - this was called on every render for every cell
   const isSprintObject = Boolean(zoneObject && typeof zoneObject.type === 'string' && ['sprint', 'mountain'].includes(zoneObject.type.toLowerCase()))
   const meshRef = useRef<THREE.Mesh>(null!)
   const outlineRef = useRef<THREE.Mesh>(null!)
@@ -301,25 +295,21 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
   
   // Регистрируем mesh для hover detection
   useEffect(() => {
-    console.log(`🔧 UnifiedHexCell [${q},${r}]: useEffect triggered`, {
-      hasMeshRef: !!meshRef.current,
-      hasRegisterFunction: !!registerHoverTarget,
-      hasUnregisterFunction: !!unregisterHoverTarget
-    })
+    // Removed excessive logging - this was called for every cell on every render
     
     if (meshRef.current && registerHoverTarget) {
       const key = `${q}_${r}`
-      console.log(`🎯 UnifiedHexCell [${q},${r}]: Registering hover target with key:`, key)
+      // Removed excessive logging - this was called for every cell on every render
       registerHoverTarget(key, meshRef.current)
       
       return () => {
         if (unregisterHoverTarget) {
-          console.log(`🎯 UnifiedHexCell [${q},${r}]: Unregistering hover target with key:`, key)
+          // Removed excessive logging - this was called for every cell cleanup
           unregisterHoverTarget(key)
         }
       }
     } else {
-      console.log(`❌ UnifiedHexCell [${q},${r}]: Cannot register - missing meshRef or registerHoverTarget`)
+      // Removed excessive logging - this was called for every cell without proper setup
     }
   }, [q, r, registerHoverTarget, unregisterHoverTarget])
   

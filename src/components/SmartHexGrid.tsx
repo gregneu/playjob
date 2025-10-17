@@ -349,19 +349,19 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
               isZoneCenter={isCenter}
               cellType={cell.cellType as any}
               onClick={(q, r, mousePosition) => {
-                console.log(`🖱️ SmartHexGrid: onClick called for [${q}, ${r}]`)
+                // Removed excessive logging - this was called on every cell click
                 if (onCellClick) {
                   onCellClick(q, r, mousePosition)
                 }
               }}
               onPointerEnter={(q, r) => {
-                console.log(`🖱️ SmartHexGrid: onPointerEnter called for [${q}, ${r}]`)
+                // Removed excessive logging - this was called on every cell hover
                 if (onCellHover) {
                   onCellHover(q, r)
                 }
               }}
               onPointerLeave={(q, r) => {
-                console.log(`🖱️ SmartHexGrid: onPointerLeave called for [${q}, ${r}]`)
+                // Removed excessive logging - this was called on every cell leave
                 if (onCellLeave) {
                   onCellLeave(q, r)
                 }
