@@ -142,24 +142,45 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     try {
       console.log('➖ useMeetingParticipants: Removing participant from room:', roomId, participantUserId)
       
-      const { error } = await supabase
+      // First try to update existing record
+      const { error: updateError } = await supabase
         .from('meeting_participants')
         .update({ is_active: false, left_at: new Date().toISOString() })
         .eq('project_id', projectId)
         .eq('room_id', roomId)
         .eq('user_id', participantUserId)
 
-      if (error) {
-        console.error('❌ Error removing meeting participant:', error)
-        return
+      if (updateError) {
+        console.error('❌ Error updating meeting participant:', updateError)
+        
+        // Fallback: try to delete the record completely
+        console.log('🔄 Trying to delete participant record as fallback...')
+        const { error: deleteError } = await supabase
+          .from('meeting_participants')
+          .delete()
+          .eq('project_id', projectId)
+          .eq('room_id', roomId)
+          .eq('user_id', participantUserId)
+        
+        if (deleteError) {
+          console.error('❌ Error deleting meeting participant:', deleteError)
+          return
+        }
+        console.log('✅ useMeetingParticipants: Participant deleted successfully (fallback)')
+      } else {
+        console.log('✅ useMeetingParticipants: Participant removed successfully')
       }
-
-
-      console.log('✅ useMeetingParticipants: Participant removed successfully')
+      
+      // Force reload participants to ensure UI updates
+      setTimeout(() => {
+        console.log('🔄 Force reloading participants after removal...')
+        loadMeetingParticipants()
+      }, 100)
+      
     } catch (err) {
       console.error('❌ Exception removing meeting participant:', err)
     }
-  }, [projectId, userId])
+  }, [projectId, userId, loadMeetingParticipants])
 
   // Get participants for a specific room
   const getRoomParticipants = useCallback((roomId: string): MeetingParticipant[] => {
@@ -233,6 +254,20 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
         console.log('✅ useMeetingParticipants: Realtime subscription active')
       } else if (status === 'CHANNEL_ERROR') {
         console.error('❌ useMeetingParticipants: Realtime subscription error')
+        // Fallback: reload participants manually every 5 seconds if realtime fails
+        const fallbackInterval = setInterval(() => {
+          console.log('🔄 useMeetingParticipants: Fallback reload due to realtime error')
+          loadMeetingParticipants()
+        }, 5000)
+        
+        // Clean up fallback interval when component unmounts
+        return () => {
+          clearInterval(fallbackInterval)
+        }
+      } else if (status === 'CLOSED') {
+        console.log('🔔 useMeetingParticipants: Realtime subscription closed')
+      } else if (status === 'TIMED_OUT') {
+        console.warn('⏰ useMeetingParticipants: Realtime subscription timed out')
       }
     })
 

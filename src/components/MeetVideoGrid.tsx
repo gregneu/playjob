@@ -882,7 +882,12 @@ export const MeetVideoGrid = React.forwardRef<
       // Remove participant from database before disconnecting
       if (projectId && userId) {
         console.log('🗑️ Removing participant from database...')
-        await removeParticipant(roomId, userId)
+        try {
+          await removeParticipant(roomId, userId)
+          console.log('✅ Participant removed from database successfully')
+        } catch (err) {
+          console.error('❌ Failed to remove participant from database:', err)
+        }
       }
       
       // Disconnect from room
@@ -898,6 +903,7 @@ export const MeetVideoGrid = React.forwardRef<
         console.log('🗑️ Ensuring participant removal from database...')
         try {
           await removeParticipant(roomId, userId)
+          console.log('✅ Participant removal ensured in finally block')
         } catch (err) {
           console.error('⚠️ Error removing participant in finally block:', err)
         }
@@ -934,14 +940,32 @@ export const MeetVideoGrid = React.forwardRef<
         console.log('🚪 Page unloading, cleaning up participant...')
         try {
           await removeParticipant(roomId, userId)
+          console.log('✅ Participant cleaned up on page unload')
         } catch (err) {
           console.error('⚠️ Error removing participant on unload:', err)
         }
       }
     }
-    
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'hidden' && projectId && userId && roomId) {
+        console.log('👁️ Page hidden, cleaning up participant...')
+        try {
+          await removeParticipant(roomId, userId)
+          console.log('✅ Participant cleaned up on page hidden')
+        } catch (err) {
+          console.error('⚠️ Error removing participant on page hidden:', err)
+        }
+      }
+    }
+
     window.addEventListener('beforeunload', handleUnload)
-    return () => window.removeEventListener('beforeunload', handleUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [projectId, userId, roomId, removeParticipant])
 
   // Expose disconnect function for parent component
