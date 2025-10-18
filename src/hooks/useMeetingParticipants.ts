@@ -29,7 +29,7 @@ interface ParticipantProfile {
 export function useMeetingParticipants(projectId: string | null, userId: string | null) {
   const [meetingParticipants, setMeetingParticipants] = useState<MeetingParticipantsMap>({})
   const [isLoading, setIsLoading] = useState(false)
-  const profileCacheRef = useRef<Map<string, ParticipantProfile>(new Map())
+  const profileCacheRef = useRef<Map<string, ParticipantProfile>>(new Map())
   const STALE_THRESHOLD_MS = 20_000
 
   // Cleanup old participants
@@ -74,7 +74,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     }
   }, [projectId])
 
-  const resolveParticipantProfiles = useCallback(async (userIds: string[]): Promise<Map<string, ParticipantProfile> => {
+  const resolveParticipantProfiles = useCallback(async (userIds: string[]): Promise<Map<string, ParticipantProfile>> => {
     const cache = profileCacheRef.current
     const missingIds = userIds.filter((id) => id && !cache.has(id))
 
@@ -88,7 +88,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
       try {
         const { data: profileRows, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, full_name, email, display_name, avatar_url, avatar_config')
+          .select('id, full_name, email, avatar_url, avatar_config')
           .in('id', missingIds)
 
         if (profilesError) {
@@ -98,7 +98,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
             if (!row?.id) continue
             cache.set(row.id, {
               id: row.id,
-              displayName: row.display_name ?? row.full_name ?? row.email ?? null,
+              displayName: row.full_name ?? row.email ?? null,
               fullName: row.full_name ?? null,
               email: row.email ?? null,
               avatarUrl: row.avatar_url ?? null,
