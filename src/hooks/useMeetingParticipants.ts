@@ -74,7 +74,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     }
   }, [projectId])
 
-  const resolveParticipantProfiles = useCallback(async (userIds: string[]): Promise<Map<string, ParticipantProfile> => {
+  const resolveParticipantProfiles = useCallback(async (userIds: string[]): Promise<Map<string, ParticipantProfile>> => {
     const cache = profileCacheRef.current
     const missingIds = userIds.filter((id) => id && !cache.has(id))
 
