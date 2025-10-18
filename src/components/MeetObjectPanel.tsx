@@ -1,11 +1,12 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { MeetVideoGrid } from './MeetVideoGrid'
+import type { MeetingParticipant } from '../hooks/useMeetingParticipants'
 
 interface MeetObjectPanelProps {
   isOpen: boolean
   onClose: () => void
-  roomId: string
+  roomId: string | null
   buildingTitle: string
   userName?: string
   userEmail?: string
@@ -14,6 +15,9 @@ interface MeetObjectPanelProps {
   userId?: string
   projectId?: string
   side?: 'left' | 'right'
+  addParticipant: (roomId: string, participant: Omit<MeetingParticipant, 'id' | 'joinedAt' | 'lastSeen'>) => Promise<void>
+  heartbeatParticipant: (roomId: string, participantUserId: string) => Promise<void>
+  removeParticipant: (roomId: string, participantUserId: string) => Promise<void>
 }
 
 export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
@@ -27,12 +31,23 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
   userAvatarConfig,
   userId,
   projectId,
-  side = 'right'
+  side = 'right',
+  addParticipant,
+  heartbeatParticipant,
+  removeParticipant
 }) => {
   const [participantCount, setParticipantCount] = useState(0)
   const [isConnected, setIsConnected] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const videoGridRef = useRef<{ disconnect: () => Promise<void> } | null>(null)
+  const removalRequestedRef = useRef(false)
+  const effectiveRoomId = roomId && roomId !== 'default-room' ? roomId : null
+
+  React.useEffect(() => {
+    if (isOpen) {
+      removalRequestedRef.current = false
+    }
+  }, [isOpen])
 
   // Handle connection state changes
   const handleConnectionChange = useCallback((connected: boolean, count: number) => {
@@ -62,6 +77,15 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
     } catch (error) {
       console.error('❌ Error during video grid disconnect:', error)
     } finally {
+      if (userId && effectiveRoomId) {
+        try {
+          console.log('🗑️ MeetObjectPanel: Ensuring local participant removal on close')
+          await removeParticipant(effectiveRoomId, userId)
+          removalRequestedRef.current = true
+        } catch (err) {
+          console.error('⚠️ MeetObjectPanel: Failed to remove participant during close', err)
+        }
+      }
       // Always clear state and close panel, even if disconnect failed
       console.log('🧹 Clearing panel state...')
       setParticipantCount(0)
@@ -77,7 +101,7 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
       console.log('🚪 Calling parent onClose...')
       onClose()
     }
-  }, [onClose])
+  }, [onClose, removeParticipant, effectiveRoomId, userId])
 
   // ESC key handler
   React.useEffect(() => {
@@ -101,14 +125,21 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
     return () => {
       if (videoGridRef.current) {
         console.log('🧹 MeetObjectPanel unmounting, cleaning up...')
-        videoGridRef.current.disconnect().catch(error => {
-          console.warn('⚠️ Error during cleanup disconnect:', error)
+        videoGridRef.current.disconnect()
+          .catch(error => {
+            console.warn('⚠️ Error during cleanup disconnect:', error)
+          })
+      }
+      if (userId && effectiveRoomId && !removalRequestedRef.current) {
+        removeParticipant(effectiveRoomId, userId).catch(err => {
+          console.warn('⚠️ MeetObjectPanel cleanup: failed to remove participant', err)
         })
+        removalRequestedRef.current = true
       }
     }
-  }, [])
+  }, [removeParticipant, effectiveRoomId, userId])
 
-  if (!isOpen) return null
+  if (!isOpen || !effectiveRoomId) return null
 
   return createPortal(
     <div style={{
@@ -254,7 +285,7 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
           }}>
                 <MeetVideoGrid
                   ref={videoGridRef}
-                  roomId={roomId}
+                  roomId={effectiveRoomId}
                   projectId={projectId}
                   userName={userName}
                   userEmail={userEmail}
@@ -263,6 +294,9 @@ export const MeetObjectPanel: React.FC<MeetObjectPanelProps> = ({
                   userId={userId}
                   onConnectionChange={handleConnectionChange}
                   onError={handleError}
+                  addParticipant={addParticipant}
+                  heartbeatParticipant={heartbeatParticipant}
+                  removeParticipant={removeParticipant}
                 />
           </div>
         </div>

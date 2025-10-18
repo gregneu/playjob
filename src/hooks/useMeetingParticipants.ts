@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
-interface MeetingParticipant {
+export interface MeetingParticipant {
   id: string
   name: string
   userId: string
@@ -24,6 +24,21 @@ interface ParticipantProfile {
   email: string | null
   avatarUrl: string | null
   avatarConfig?: any
+}
+
+const buildParticipantId = (roomId: string, userId?: string | null) => {
+  if (userId) {
+    return `${roomId}-${userId}`
+  }
+  try {
+    const randomSource = typeof globalThis !== 'undefined' ? (globalThis as any).crypto : undefined
+    if (randomSource?.randomUUID) {
+      return `${roomId}-${randomSource.randomUUID()}`
+    }
+  } catch {
+    // ignore and fall back below
+  }
+  return `${roomId}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 export function useMeetingParticipants(projectId: string | null, userId: string | null) {
@@ -273,9 +288,40 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
   // Add participant to a room
   const addParticipant = useCallback(async (roomId: string, participant: Omit<MeetingParticipant, 'id' | 'joinedAt' | 'lastSeen'>) => {
     if (!projectId || !userId) return
+    if (!roomId || roomId === 'default-room') {
+      console.warn('⚠️ addParticipant called with invalid roomId, skipping', { roomId, participant })
+      return
+    }
 
     try {
       console.log('➕ useMeetingParticipants: Adding participant to room:', roomId, participant)
+      
+      const nowIso = new Date().toISOString()
+      const optimisticParticipant: MeetingParticipant = {
+        id: buildParticipantId(roomId, participant.userId),
+        name: participant.name,
+        userId: participant.userId,
+        avatarUrl: participant.avatarUrl,
+        avatarConfig: participant.avatarConfig,
+        email: participant.email,
+        joinedAt: nowIso,
+        lastSeen: nowIso
+      }
+      setMeetingParticipants(prev => {
+        const updated: MeetingParticipantsMap = { ...prev }
+        const existing = Array.isArray(updated[roomId]) ? [...updated[roomId]] : []
+        const existingIndex = existing.findIndex(entry => entry.userId === participant.userId)
+        if (existingIndex >= 0) {
+          existing[existingIndex] = {
+            ...existing[existingIndex],
+            ...optimisticParticipant
+          }
+        } else {
+          existing.push(optimisticParticipant)
+        }
+        updated[roomId] = existing
+        return filterStaleParticipants(updated)
+      })
       
       const { error } = await supabase
         .from('meeting_participants')
@@ -299,13 +345,45 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
 
 
       console.log('✅ useMeetingParticipants: Participant added successfully')
+      setTimeout(() => {
+        loadMeetingParticipants()
+      }, 250)
     } catch (err) {
       console.error('❌ Exception adding meeting participant:', err)
+      setMeetingParticipants(prev => {
+        const updated = { ...prev }
+        if (updated[roomId]) {
+          updated[roomId] = updated[roomId].filter(entry => entry.userId !== participant.userId)
+          if (updated[roomId].length === 0) {
+            delete updated[roomId]
+          }
+        }
+        return updated
+      })
     }
-  }, [projectId, userId])
+  }, [projectId, userId, filterStaleParticipants, loadMeetingParticipants])
 
   const heartbeatParticipant = useCallback(async (roomId: string, participantUserId: string) => {
     if (!projectId || !participantUserId) return
+    if (!roomId || roomId === 'default-room') {
+      return
+    }
+    const nowIso = new Date().toISOString()
+    setMeetingParticipants(prev => {
+      const existing = prev[roomId]
+      if (!existing) return prev
+      const index = existing.findIndex(entry => entry.userId === participantUserId)
+      if (index === -1) return prev
+      const updatedRoom = [...existing]
+      updatedRoom[index] = {
+        ...updatedRoom[index],
+        lastSeen: nowIso
+      }
+      return filterStaleParticipants({
+        ...prev,
+        [roomId]: updatedRoom
+      })
+    })
     try {
       const { error } = await supabase
         .from('meeting_participants')
@@ -322,42 +400,78 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     } catch (err) {
       console.error('❌ Exception updating participant heartbeat:', err)
     }
-  }, [projectId])
+  }, [projectId, filterStaleParticipants])
 
   // Remove participant from a room
   const removeParticipant = useCallback(async (roomId: string, participantUserId: string) => {
     if (!projectId || !userId) return
+    if (!roomId || roomId === 'default-room') {
+      console.warn('⚠️ removeParticipant called with invalid roomId, skipping', { roomId, participantUserId })
+      return
+    }
 
     try {
       console.log('➖ useMeetingParticipants: Removing participant from room:', roomId, participantUserId)
       
+      setMeetingParticipants(prev => {
+        const updated: MeetingParticipantsMap = { ...prev }
+        if (!updated[roomId]) {
+          return prev
+        }
+        const filtered = updated[roomId].filter(entry => entry.userId !== participantUserId)
+        if (filtered.length > 0) {
+          updated[roomId] = filtered
+        } else {
+          delete updated[roomId]
+        }
+        return updated
+      })
+      
       // First try to update existing record
-      const { error: updateError } = await supabase
+      const { data: updatedRows, error: updateError } = await supabase
         .from('meeting_participants')
         .update({ is_active: false, left_at: new Date().toISOString(), last_seen: new Date().toISOString() })
         .eq('project_id', projectId)
         .eq('room_id', roomId)
         .eq('user_id', participantUserId)
+        .select('id')
 
-      if (updateError) {
-        console.error('❌ Error updating meeting participant:', updateError)
+      if (updateError || !updatedRows || updatedRows.length === 0) {
+        if (updateError) {
+          console.error('❌ Error updating meeting participant:', updateError)
+        } else {
+          console.warn('⚠️ No meeting participant rows updated, attempting delete fallback', {
+            roomId,
+            participantUserId
+          })
+        }
         
         // Fallback: try to delete the record completely
         console.log('🔄 Trying to delete participant record as fallback...')
-        const { error: deleteError } = await supabase
+        const { data: deletedRows, error: deleteError } = await supabase
           .from('meeting_participants')
           .delete()
           .eq('project_id', projectId)
           .eq('room_id', roomId)
           .eq('user_id', participantUserId)
+          .select('id')
         
-        if (deleteError) {
+        if (deleteError || !deletedRows || deletedRows.length === 0) {
           console.error('❌ Error deleting meeting participant:', deleteError)
+          if (!deleteError) {
+            console.error('❌ Delete fallback matched no rows', {
+              roomId,
+              participantUserId
+            })
+          }
+          setTimeout(() => {
+            loadMeetingParticipants()
+          }, 250)
           return
         }
-        console.log('✅ useMeetingParticipants: Participant deleted successfully (fallback)')
-      } else {
-        console.log('✅ useMeetingParticipants: Participant removed successfully')
+      console.log('✅ useMeetingParticipants: Participant deleted successfully (fallback)')
+    } else {
+      console.log('✅ useMeetingParticipants: Participant removed successfully')
       }
       
       // Force reload participants to ensure UI updates
@@ -368,6 +482,9 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
       
     } catch (err) {
       console.error('❌ Exception removing meeting participant:', err)
+      setTimeout(() => {
+        loadMeetingParticipants()
+      }, 250)
     }
   }, [projectId, userId, loadMeetingParticipants])
 

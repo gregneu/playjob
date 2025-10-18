@@ -3,7 +3,7 @@ import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, RemoteTrac
 import { BackgroundBlur } from '@livekit/track-processors'
 import { getBrowserClient } from '../lib/supabase-browser'
 import { UserAvatar } from './UserAvatar'
-import { useMeetingParticipants } from '../hooks/useMeetingParticipants'
+import type { MeetingParticipant } from '../hooks/useMeetingParticipants'
 
 interface ParticipantVideo {
   id: string
@@ -27,6 +27,9 @@ interface MeetVideoGridProps {
   userId?: string
   onConnectionChange?: (isConnected: boolean, participantCount: number) => void
   onError?: (error: string) => void
+  addParticipant: (roomId: string, participant: Omit<MeetingParticipant, 'id' | 'joinedAt' | 'lastSeen'>) => Promise<void>
+  heartbeatParticipant: (roomId: string, participantUserId: string) => Promise<void>
+  removeParticipant: (roomId: string, participantUserId: string) => Promise<void>
 }
 
 // Separate component for individual video tiles with proper track attachment
@@ -522,7 +525,10 @@ export const MeetVideoGrid = React.forwardRef<
   userAvatarConfig,
   userId,
   onConnectionChange,
-  onError
+  onError,
+  addParticipant,
+  heartbeatParticipant,
+  removeParticipant
 }, ref) => {
   const roomRef = useRef<Room | null>(null)
   const [participants, setParticipants] = useState<ParticipantVideo[]>([])
@@ -532,13 +538,14 @@ export const MeetVideoGrid = React.forwardRef<
   const [participantCount, setParticipantCount] = useState(0)
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const participantRegisteredRef = useRef(false)
+  const shouldStayConnectedRef = useRef(true)
 
-  // Initialize meeting participants hook for realtime sync
-  const {
-    addParticipant,
-    heartbeatParticipant,
-    removeParticipant
-  } = useMeetingParticipants(projectId || null, userId || null)
+  useEffect(() => {
+    shouldStayConnectedRef.current = true
+    return () => {
+      shouldStayConnectedRef.current = false
+    }
+  }, [])
 
   // Handle audio context for Safari
   const resumeAudioContext = useCallback(() => {
@@ -562,7 +569,7 @@ export const MeetVideoGrid = React.forwardRef<
   }, [])
 
   const triggerHeartbeat = useCallback((participantUserId: string) => {
-    if (!participantUserId) return
+    if (!participantUserId || !shouldStayConnectedRef.current) return
     heartbeatParticipant(roomId, participantUserId)
     if (typeof window === 'undefined') return
     if (heartbeatIntervalRef.current) return
@@ -608,6 +615,14 @@ export const MeetVideoGrid = React.forwardRef<
 
   // Connect to LiveKit room
   const connectToRoom = useCallback(async () => {
+    if (!roomId || roomId === 'default-room') {
+      console.warn('⚠️ connectToRoom skipped due to invalid roomId', { roomId })
+      return
+    }
+    if (!shouldStayConnectedRef.current) {
+      console.warn('⚠️ connectToRoom aborted because component is disconnecting')
+      return
+    }
     if (roomRef.current) {
       console.log('🎥 Already connected to room')
       return
@@ -620,6 +635,10 @@ export const MeetVideoGrid = React.forwardRef<
       const tokenData = await getLiveKitToken()
       if (!tokenData) {
         throw new Error('Failed to get LiveKit token')
+      }
+      if (!shouldStayConnectedRef.current) {
+        console.warn('⚠️ Token received but component is disconnecting, aborting connect')
+        return
       }
 
       console.log('🎥 Connecting to LiveKit room...')
@@ -695,6 +714,11 @@ export const MeetVideoGrid = React.forwardRef<
       // Connect to room
       console.log('🔗 Connecting to LiveKit room with URL:', tokenData.wsUrl)
       await room.connect(tokenData.wsUrl, tokenData.token)
+      if (!shouldStayConnectedRef.current) {
+        console.warn('⚠️ Connected but component is disconnecting, tearing down connection')
+        await room.disconnect(true)
+        return
+      }
       
       // Create and publish local tracks manually
       console.log('📡 Creating local video track...')
@@ -702,6 +726,12 @@ export const MeetVideoGrid = React.forwardRef<
         resolution: { width: 1280, height: 720 },
         facingMode: 'user'
       })
+      if (!shouldStayConnectedRef.current) {
+        console.warn('⚠️ Local video track created but component is disconnecting, stopping track')
+        localVideoTrack.stop()
+        await room.disconnect(true)
+        return
+      }
       
       console.log('📡 Creating local audio track...')
       try {
@@ -775,7 +805,7 @@ export const MeetVideoGrid = React.forwardRef<
 
   // Update participants list
   const updateParticipants = useCallback(async () => {
-    if (!roomRef.current || isDisconnecting) {
+    if (!shouldStayConnectedRef.current || !roomRef.current || isDisconnecting) {
       setParticipants([])
       setParticipantCount(0)
       return
@@ -839,7 +869,7 @@ export const MeetVideoGrid = React.forwardRef<
         onConnectionChange?.(true, participantVideos.length)
         
         // Sync participants with database for realtime updates
-        if (projectId && userId && !isDisconnecting) {
+        if (projectId && userId && !isDisconnecting && roomId && roomId !== 'default-room') {
           // Add local participant to database
           const localParticipant = participantVideos.find(p => p.isLocal)
           if (localParticipant) {
@@ -861,6 +891,7 @@ export const MeetVideoGrid = React.forwardRef<
 
   // Disconnect from room and stop all tracks
   const disconnectFromRoom = useCallback(async () => {
+    shouldStayConnectedRef.current = false
     if (!roomRef.current) {
       console.log('🎥 No room to disconnect from')
       return
@@ -910,7 +941,7 @@ export const MeetVideoGrid = React.forwardRef<
       }
       
       // Remove participant from database before disconnecting
-      if (projectId && userId) {
+      if (projectId && userId && roomId && roomId !== 'default-room') {
         console.log('🗑️ Removing participant from database...')
         try {
           await removeParticipant(roomId, userId)
@@ -929,7 +960,7 @@ export const MeetVideoGrid = React.forwardRef<
       console.error('❌ Error during disconnect:', error)
     } finally {
       // Remove participant from database ALWAYS
-      if (projectId && userId) {
+      if (projectId && userId && roomId && roomId !== 'default-room') {
         console.log('🗑️ Ensuring participant removal from database...')
         try {
           await removeParticipant(roomId, userId)

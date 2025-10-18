@@ -185,7 +185,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Use meeting participants hook for realtime sync
   const {
     meetingParticipants: meetingParticipantsMap,
-    getRoomParticipants
+    getRoomParticipants,
+    addParticipant: addMeetingParticipant,
+    heartbeatParticipant: heartbeatMeetingParticipant,
+    removeParticipant: removeMeetingParticipant
   } = useMeetingParticipants(projectId || null, user?.id || null)
 
   const meetingParticipantsByBuildingId = useMemo(() => {
@@ -4617,7 +4620,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           // Reset sidebar hover state to ensure camera controls work
           setIsSidebarHover(false)
         }}
-        roomId={selectedMeetBuilding ? `playjoob-meet-${selectedMeetBuilding.id}` : 'default-room'}
+        roomId={selectedMeetBuilding ? `playjoob-meet-${selectedMeetBuilding.id}` : null}
         buildingTitle={selectedMeetBuilding?.title || 'Meet Object'}
         userName={user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email || 'Guest'}
         userEmail={user?.email}
@@ -4626,6 +4629,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         userId={user?.id}
         side="right"
         projectId={projectId}
+        addParticipant={addMeetingParticipant}
+        heartbeatParticipant={heartbeatMeetingParticipant}
+        removeParticipant={removeMeetingParticipant}
       />
 
       {isSprintOpen && (
