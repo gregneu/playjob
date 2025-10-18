@@ -80,6 +80,13 @@ export const getNeighbors = (q: number, r: number): [number, number][] => {
 };
 
 /**
+ * Возвращает footprint зоны (центр + шесть соседей)
+ */
+export const getZoneFootprintCells = (q: number, r: number): Array<[number, number]> => {
+  return [[q, r], ...getNeighbors(q, r)];
+};
+
+/**
  * Вычисление расстояния между двумя гексагональными ячейками
  */
 export const hexDistance = (q1: number, r1: number, q2: number, r2: number): number => {

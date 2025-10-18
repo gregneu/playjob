@@ -3,7 +3,7 @@ import { UnifiedHexCell, HexCellState } from './UnifiedHexCell'
 import { ZoneObjectComponent } from './buildings/BuildingComponents'
 import * as THREE from 'three'
 // import { HexFillComponent } from './buildings/HexFillComponent'
-import { hexToWorldPosition } from '../lib/hex-utils'
+import { hexToWorldPosition, getZoneFootprintCells } from '../lib/hex-utils'
 // import { useZoneHexFilling } from '../hooks/useZoneHexFilling'
 import type { BuildingNotifications } from '../types/notifications'
 
@@ -63,6 +63,7 @@ interface HexGridProps {
   energyPulseMap?: Record<string, { type: 'source' | 'target'; key: string; color: string }>
   badgeAnimationMap?: Record<string, { type: 'gain' | 'lose'; key: string }>
   meetingParticipantsByBuildingId?: Record<string, MeetingParticipantInfo[]>
+  isZonePlacementValid?: (q: number, r: number) => boolean
 }
 
 export const SmartHexGrid: React.FC<HexGridProps> = ({ 
@@ -90,7 +91,8 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
   sprintProgressMap = {},
   energyPulseMap,
   badgeAnimationMap,
-  meetingParticipantsByBuildingId
+  meetingParticipantsByBuildingId,
+  isZonePlacementValid
 }) => {
   const hexSize = 2.0
 
@@ -136,7 +138,7 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
 
   // Создаем сетку для интерактивности (только видимые ячейки)
   const interactiveCells = useMemo(() => {
-    const cells: Array<{ q: number; r: number; state: HexCellState; cellType: string }> = []
+    const cells: Array<{ q: number; r: number; state: HexCellState; cellType: string; color?: string; canPlaceZone?: boolean }> = []
     const addedCells = new Set<string>() // Для избежания дубликатов
     
     // Добавляем центральную ячейку проекта
@@ -162,24 +164,57 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
     
     // Добавляем соседние ячейки для создания зон (только в режиме зон)
     if (isZoneMode) {
-      zoneCells.forEach(cell => {
-        // Добавляем соседей каждой ячейки зоны
-        const neighbors = [
-          [cell.q + 1, cell.r], [cell.q + 1, cell.r - 1], [cell.q, cell.r - 1],
-          [cell.q - 1, cell.r], [cell.q - 1, cell.r + 1], [cell.q, cell.r + 1]
+      const addCandidateCell = (q: number, r: number) => {
+        const key = `${q},${r}`
+        if (!addedCells.has(key)) {
+          const canPlace = typeof isZonePlacementValid === 'function' ? isZonePlacementValid(q, r) : true
+          const color = canPlace ? '#34d399' : '#f87171'
+          cells.push({ q, r, state: HexCellState.EMPTY, cellType: 'building-slot', color, canPlaceZone: canPlace })
+          addedCells.add(key)
+        }
+      }
+
+      const addRingAround = (centerQ: number, centerR: number, radius: number) => {
+        if (radius <= 0) return
+        if (radius === 1) {
+          const neighbors: Array<[number, number]> = [
+            [centerQ + 1, centerR], [centerQ + 1, centerR - 1], [centerQ, centerR - 1],
+            [centerQ - 1, centerR], [centerQ - 1, centerR + 1], [centerQ, centerR + 1]
+          ]
+          neighbors.forEach(([nq, nr]) => addCandidateCell(nq, nr))
+          return
+        }
+
+        // Генерируем кольцо произвольного радиуса
+        const directions: Array<[number, number]> = [
+          [0, -1], [-1, 0], [-1, 1],
+          [0, 1], [1, 0], [1, -1]
         ]
-        neighbors.forEach(([nq, nr]) => {
-          const key = `${nq},${nr}`
-          if (!addedCells.has(key)) {
-            cells.push({ q: nq, r: nr, state: HexCellState.EMPTY, cellType: 'building-slot' })
-            addedCells.add(key)
+        let q = centerQ + radius
+        let r = centerR
+
+        directions.forEach(([dq, dr]) => {
+          for (let step = 0; step < radius; step++) {
+            addCandidateCell(q, r)
+            q += dq
+            r += dr
           }
         })
-      })
+      }
+
+      if (zoneCells.length === 0) {
+        addRingAround(0, 0, 1)
+        addRingAround(0, 0, 2)
+      } else {
+        zoneCells.forEach(cell => {
+          addRingAround(cell.q, cell.r, 1)
+          addRingAround(cell.q, cell.r, 2)
+        })
+      }
     }
     
     return cells
-  }, [zoneCells, isZoneMode])
+  }, [zoneCells, isZoneMode, isZonePlacementValid])
 
   // Removed excessive logging - this was called on every render
 
@@ -188,7 +223,8 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
       {interactiveCells.map((cell) => {
         const isHovered = (hoveredCell && hoveredCell[0] === cell.q && hoveredCell[1] === cell.r) || 
                          (hoveredCellDuringDrag && hoveredCellDuringDrag[0] === cell.q && hoveredCellDuringDrag[1] === cell.r)
-        const showPlusIcon = Boolean(isZoneMode && isHovered && hoveredCellType === 'empty')
+        const canPlaceZone = cell.canPlaceZone !== false
+        const showPlusIcon = Boolean(isZoneMode && isHovered && hoveredCellType === 'empty' && canPlaceZone)
         
         // Определяем финальное состояние с учетом hover
         const finalState = isHovered ? HexCellState.HOVER : cell.state
@@ -359,6 +395,7 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
               q={cell.q}
               r={cell.r}
               state={finalState}
+              color={cell.color}
               zoneColor={cell.state === 'zone' ? zoneCells.find(zc => zc.q === cell.q && zc.r === cell.r)?.zoneColor : undefined}
               isZoneCenter={isCenter}
               cellType={cell.cellType as any}

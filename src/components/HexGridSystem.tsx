@@ -11,7 +11,7 @@ import RadialMenu from './RadialMenu'
 import { setDragImage, type DragGhostData } from '../utils/dragGhost'
 
 
-import { hexToWorldPosition, getNeighbors, calculateHexZoneCenter } from '../lib/hex-utils'
+import { hexToWorldPosition, getNeighbors, calculateHexZoneCenter, getZoneFootprintCells } from '../lib/hex-utils'
 
 // import { getBuildingCategory, generateTaskName } from '../types/cellCategories'
 import { useProjectData } from '../hooks/useProjectData'
@@ -486,6 +486,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   // Используем реальные данные из базы данных
   const effectiveZones = zones
   const effectiveZoneCells = zoneCells
+
   logger.debug('Zone cells:', zoneCells)
   logger.debug('Zone objects:', zoneObjects)
   logger.debug('Loading:', loading)
@@ -554,7 +555,22 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
   const [colorPickerPosition, setColorPickerPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [colorPickerColor, setColorPickerColor] = useState('#ef4444')
   const [colorPickerZoneId, setColorPickerZoneId] = useState<string | null>(null)
-  
+
+  const occupiedZoneCellKeys = useMemo(() => {
+    const keys = new Set<string>()
+    effectiveZoneCells.forEach(cell => keys.add(`${cell.q},${cell.r}`))
+    localZones.forEach(zone => {
+      if (!zone?.cells) return
+      zone.cells.forEach(([q, r]) => keys.add(`${q},${r}`))
+    })
+    return keys
+  }, [effectiveZoneCells, localZones])
+
+  const canPlaceZoneAt = useCallback((q: number, r: number) => {
+    const footprint = getZoneFootprintCells(q, r)
+    return footprint.every(([fq, fr]) => !occupiedZoneCellKeys.has(`${fq},${fr}`))
+  }, [occupiedZoneCellKeys])
+
   
   
   
@@ -1103,9 +1119,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     logger.debug(`Generating ${gridHexCells.length} cells for radius 12`)
     
     const initialCells: EnhancedHexCell[] = gridHexCells.map(({ q, r }) => {
-      const distance = Math.abs(q) + Math.abs(r) + Math.abs(-q - r)
+      const axialDistance = (Math.abs(q) + Math.abs(r) + Math.abs(-q - r)) / 2
       const isCenter = q === 0 && r === 0
-      const isNeighbor = distance === 1
+      const isNeighbor = axialDistance === 1
       
       // Find server cell from database
       const serverCell = Array.isArray(hexCells) ? hexCells.find(cell => cell.q === q && cell.r === r) : null
@@ -1880,9 +1896,9 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     // Принудительно перегенерируем сетку для полного перерендера
     const gridHexCells = generateHexGrid(12)
     const updatedCells = gridHexCells.map(({ q: cellQ, r: cellR }) => {
-      const distance = Math.abs(cellQ) + Math.abs(cellR) + Math.abs(-cellQ - cellR)
+      const axialDistance = (Math.abs(cellQ) + Math.abs(cellR) + Math.abs(-cellQ - cellR)) / 2
       const isCenter = cellQ === 0 && cellR === 0
-      const isNeighbor = distance === 1
+      const isNeighbor = axialDistance === 1
       
       // Находим серверную ячейку из базы данных
       const serverCell = hexCells.find(cell => cell.q === cellQ && cell.r === cellR)
@@ -2198,6 +2214,10 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
       logger.debug('Current zoneSelectionMode:', zoneSelectionMode)
       
       if (zoneSelectionMode === 'idle') {
+        if (!canPlaceZoneAt(q, r)) {
+          logger.debug('Zone placement denied due to collision at cell:', { q, r })
+          return
+        }
         const neighbors = getNeighbors(q, r)
         const zoneCells = [`${q},${r}`, ...neighbors.map(([nq, nr]) => `${nq},${nr}`)]
         
@@ -2233,7 +2253,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
         return
       }
     }
-  }, [localBuildings, getBuildingForCell, getZoneInfo, getZoneColor, zones, getAvailableZoneColor, buildZoneObjectData, openSprintSidebar])
+  }, [localBuildings, getBuildingForCell, getZoneInfo, getZoneColor, zones, getAvailableZoneColor, buildZoneObjectData, openSprintSidebar, canPlaceZoneAt])
 
   // Удалено: функции для выбора зданий
 
@@ -4331,6 +4351,7 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
           energyPulseMap={energyPulseMap}
           badgeAnimationMap={badgeAnimations}
           meetingParticipantsByBuildingId={meetingParticipantsByBuildingId}
+          isZonePlacementValid={canPlaceZoneAt}
         />
           
           {/* UnifiedHexCell components are now rendered only through SmartHexGrid to avoid duplication */}

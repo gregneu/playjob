@@ -437,7 +437,7 @@ export const UnifiedHexCell: React.FC<UnifiedHexCellProps> = ({
       return isDragValid ? '#00ff88' : '#e0e0e0' // Убираем красный цвет
     }
     if (hovered) {
-      return '#88ccff'
+      return color || '#88ccff'
     }
     return zoneColor || color || '#e0e0e0'
   }
