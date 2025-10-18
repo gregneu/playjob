@@ -10,6 +10,7 @@ interface MeetingParticipant {
   avatarConfig?: any
   email?: string
   joinedAt: string
+  lastSeen?: string | null
 }
 
 interface MeetingParticipantsMap {
@@ -28,7 +29,8 @@ interface ParticipantProfile {
 export function useMeetingParticipants(projectId: string | null, userId: string | null) {
   const [meetingParticipants, setMeetingParticipants] = useState<MeetingParticipantsMap>({})
   const [isLoading, setIsLoading] = useState(false)
-  const profileCacheRef = useRef<Map<string, ParticipantProfile>>(new Map())
+  const profileCacheRef = useRef<Map<string, ParticipantProfile>(new Map())
+  const STALE_THRESHOLD_MS = 20_000
 
   // Cleanup old participants
   const cleanupOldParticipants = useCallback(async () => {
@@ -72,7 +74,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     }
   }, [projectId])
 
-  const resolveParticipantProfiles = useCallback(async (userIds: string[]): Promise<Map<string, ParticipantProfile>> => {
+  const resolveParticipantProfiles = useCallback(async (userIds: string[]): Promise<Map<string, ParticipantProfile> => {
     const cache = profileCacheRef.current
     const missingIds = userIds.filter((id) => id && !cache.has(id))
 
@@ -161,6 +163,23 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     return cache
   }, [projectId])
 
+  const filterStaleParticipants = useCallback((input: MeetingParticipantsMap): MeetingParticipantsMap => {
+    const result: MeetingParticipantsMap = {}
+    const now = Date.now()
+    Object.entries(input).forEach(([roomId, participants]) => {
+      const fresh = participants.filter(participant => {
+        const reference = participant.lastSeen ?? participant.joinedAt
+        if (!reference) return false
+        const diff = now - new Date(reference).getTime()
+        return diff < STALE_THRESHOLD_MS
+      })
+      if (fresh.length > 0) {
+        result[roomId] = fresh
+      }
+    })
+    return result
+  }, [STALE_THRESHOLD_MS])
+
   const loadMeetingParticipants = useCallback(async () => {
     if (!projectId || !userId) {
       setMeetingParticipants({})
@@ -180,7 +199,9 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
         .select(`
           room_id,
           user_id,
-          joined_at
+          joined_at,
+          last_seen,
+          is_active
         `)
         .eq('project_id', projectId)
         .eq('is_active', true)
@@ -211,6 +232,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
           }
           
           if (record.user_id) {
+            const lastSeenValue = record.last_seen ?? record.joined_at
             participantsMap[roomId].push({
               id: `${roomId}-${record.user_id}`,
               name: fallbackName,
@@ -218,7 +240,8 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
               avatarUrl: profile?.avatarUrl ?? null,
               avatarConfig: profile?.avatarConfig,
               email: profile?.email ?? null,
-              joinedAt: record.joined_at
+              joinedAt: record.joined_at,
+              lastSeen: lastSeenValue ?? null
             })
           } else {
             participantsMap[roomId].push({
@@ -228,24 +251,27 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
               avatarUrl: null,
               avatarConfig: null,
               email: null,
-              joinedAt: record.joined_at
+              joinedAt: record.joined_at,
+              lastSeen: record.last_seen ?? record.joined_at ?? null
             })
           }
         })
       }
 
-      console.log('📊 useMeetingParticipants: Loaded participants:', participantsMap)
-      setMeetingParticipants(participantsMap)
+      const filtered = filterStaleParticipants(Object.keys(participantsMap).length ? participantsMap : {})
+
+      console.log('📊 useMeetingParticipants: Loaded participants:', filtered)
+      setMeetingParticipants(filtered)
     } catch (err) {
       console.error('❌ Exception loading meeting participants:', err)
       setMeetingParticipants({})
     } finally {
       setIsLoading(false)
     }
-  }, [projectId, userId, cleanupOldParticipants])
+  }, [projectId, userId, cleanupOldParticipants, filterStaleParticipants])
 
   // Add participant to a room
-  const addParticipant = useCallback(async (roomId: string, participant: Omit<MeetingParticipant, 'id' | 'joinedAt'>) => {
+  const addParticipant = useCallback(async (roomId: string, participant: Omit<MeetingParticipant, 'id' | 'joinedAt' | 'lastSeen'>) => {
     if (!projectId || !userId) return
 
     try {
@@ -258,7 +284,9 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
           room_id: roomId,
           user_id: participant.userId,
           is_active: true,
-          joined_at: new Date().toISOString()
+          joined_at: new Date().toISOString(),
+          last_seen: new Date().toISOString(),
+          left_at: null
         }, { 
           onConflict: 'project_id, room_id, user_id',
           ignoreDuplicates: false 
@@ -276,6 +304,26 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     }
   }, [projectId, userId])
 
+  const heartbeatParticipant = useCallback(async (roomId: string, participantUserId: string) => {
+    if (!projectId || !participantUserId) return
+    try {
+      const { error } = await supabase
+        .from('meeting_participants')
+        .update({
+          last_seen: new Date().toISOString(),
+          is_active: true
+        })
+        .eq('project_id', projectId)
+        .eq('room_id', roomId)
+        .eq('user_id', participantUserId)
+      if (error) {
+        console.error('❌ Error updating participant heartbeat:', error)
+      }
+    } catch (err) {
+      console.error('❌ Exception updating participant heartbeat:', err)
+    }
+  }, [projectId])
+
   // Remove participant from a room
   const removeParticipant = useCallback(async (roomId: string, participantUserId: string) => {
     if (!projectId || !userId) return
@@ -286,7 +334,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
       // First try to update existing record
       const { error: updateError } = await supabase
         .from('meeting_participants')
-        .update({ is_active: false, left_at: new Date().toISOString() })
+        .update({ is_active: false, left_at: new Date().toISOString(), last_seen: new Date().toISOString() })
         .eq('project_id', projectId)
         .eq('room_id', roomId)
         .eq('user_id', participantUserId)
@@ -424,6 +472,7 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     getRoomParticipants,
     hasActiveParticipants,
     addParticipant,
+    heartbeatParticipant,
     removeParticipant,
     reload: loadMeetingParticipants
   }

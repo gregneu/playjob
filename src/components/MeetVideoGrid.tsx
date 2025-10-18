@@ -530,10 +530,13 @@ export const MeetVideoGrid = React.forwardRef<
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [participantCount, setParticipantCount] = useState(0)
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const participantRegisteredRef = useRef(false)
 
   // Initialize meeting participants hook for realtime sync
   const {
     addParticipant,
+    heartbeatParticipant,
     removeParticipant
   } = useMeetingParticipants(projectId || null, userId || null)
 
@@ -550,6 +553,23 @@ export const MeetVideoGrid = React.forwardRef<
       }
     }
   }, [])
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current)
+      heartbeatIntervalRef.current = null
+    }
+  }, [])
+
+  const triggerHeartbeat = useCallback((participantUserId: string) => {
+    if (!participantUserId) return
+    heartbeatParticipant(roomId, participantUserId)
+    if (typeof window === 'undefined') return
+    if (heartbeatIntervalRef.current) return
+    heartbeatIntervalRef.current = window.setInterval(() => {
+      heartbeatParticipant(roomId, participantUserId)
+    }, 10_000)
+  }, [heartbeatParticipant, roomId])
 
   // Function to get LiveKit token from Supabase Edge Function
   const getLiveKitToken = useCallback(async (): Promise<{ token: string; wsUrl: string } | null> => {
@@ -623,6 +643,8 @@ export const MeetVideoGrid = React.forwardRef<
         setParticipants([])
         setParticipantCount(0)
         roomRef.current = null
+        participantRegisteredRef.current = false
+        stopHeartbeat()
         onConnectionChange?.(false, 0)
       })
 
@@ -717,7 +739,7 @@ export const MeetVideoGrid = React.forwardRef<
       onError?.(errorMessage)
       setIsConnecting(false)
     }
-  }, [getLiveKitToken, onConnectionChange, onError, resumeAudioContext])
+  }, [getLiveKitToken, onConnectionChange, onError, resumeAudioContext, stopHeartbeat])
 
   // Fetch user data from Supabase
   const fetchUserData = useCallback(async (identity: string) => {
@@ -821,16 +843,21 @@ export const MeetVideoGrid = React.forwardRef<
           // Add local participant to database
           const localParticipant = participantVideos.find(p => p.isLocal)
           if (localParticipant) {
-            await addParticipant(roomId, {
-              name: localParticipant.name,
-              userId: localParticipant.userId || userId,
-              avatarUrl: localParticipant.avatarUrl,
-              avatarConfig: localParticipant.avatarConfig,
-              email: localParticipant.email
-            })
+            const participantUserId = localParticipant.userId || userId
+            if (!participantRegisteredRef.current) {
+              await addParticipant(roomId, {
+                name: localParticipant.name,
+                userId: participantUserId,
+                avatarUrl: localParticipant.avatarUrl,
+                avatarConfig: localParticipant.avatarConfig,
+                email: localParticipant.email
+              })
+              participantRegisteredRef.current = true
+            }
+            triggerHeartbeat(participantUserId)
           }
         }
-  }, [onConnectionChange, userName, userEmail, userAvatarUrl, userAvatarConfig, userId, fetchUserData, projectId, roomId, addParticipant, isDisconnecting])
+  }, [onConnectionChange, userName, userEmail, userAvatarUrl, userAvatarConfig, userId, fetchUserData, projectId, roomId, addParticipant, triggerHeartbeat, isDisconnecting])
 
   // Disconnect from room and stop all tracks
   const disconnectFromRoom = useCallback(async () => {
@@ -841,6 +868,7 @@ export const MeetVideoGrid = React.forwardRef<
 
     console.log('🎥 Disconnecting from LiveKit room...')
     setIsDisconnecting(true)
+    stopHeartbeat()
     
     const room = roomRef.current
     const localParticipant = room.localParticipant
@@ -917,12 +945,13 @@ export const MeetVideoGrid = React.forwardRef<
       setParticipantCount(0)
       setIsConnecting(false)
       setIsDisconnecting(false)
+      participantRegisteredRef.current = false
       setConnectionError(null)
       onConnectionChange?.(false, 0)
       
       console.log('🧹 Cleaned up room state')
     }
-  }, [onConnectionChange, projectId, userId, roomId, removeParticipant])
+  }, [onConnectionChange, projectId, userId, roomId, removeParticipant, stopHeartbeat])
 
   // Connect when component mounts
   useEffect(() => {
@@ -942,6 +971,7 @@ export const MeetVideoGrid = React.forwardRef<
       if (projectId && userId && roomId) {
         console.log('🚪 Page unloading, cleaning up participant...')
         try {
+          stopHeartbeat()
           await removeParticipant(roomId, userId)
           console.log('✅ Participant cleaned up on page unload')
         } catch (err) {
@@ -954,6 +984,7 @@ export const MeetVideoGrid = React.forwardRef<
       if (document.visibilityState === 'hidden' && projectId && userId && roomId) {
         console.log('👁️ Page hidden, cleaning up participant...')
         try {
+          stopHeartbeat()
           await removeParticipant(roomId, userId)
           console.log('✅ Participant cleaned up on page hidden')
         } catch (err) {
@@ -969,7 +1000,7 @@ export const MeetVideoGrid = React.forwardRef<
       window.removeEventListener('beforeunload', handleUnload)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [projectId, userId, roomId, removeParticipant])
+  }, [projectId, userId, roomId, removeParticipant, stopHeartbeat])
 
   // Expose disconnect function for parent component
   React.useImperativeHandle(ref, () => ({

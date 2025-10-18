@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS meeting_participants (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   is_active BOOLEAN DEFAULT true,
   joined_at TIMESTAMPTZ DEFAULT NOW(),
+  last_seen TIMESTAMPTZ DEFAULT NOW(),
   left_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -18,29 +19,42 @@ CREATE TABLE IF NOT EXISTS meeting_participants (
 CREATE INDEX IF NOT EXISTS idx_meeting_participants_project_room ON meeting_participants(project_id, room_id);
 CREATE INDEX IF NOT EXISTS idx_meeting_participants_user ON meeting_participants(user_id);
 CREATE INDEX IF NOT EXISTS idx_meeting_participants_active ON meeting_participants(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_meeting_participants_last_seen ON meeting_participants(last_seen);
 
 -- Enable RLS
 ALTER TABLE meeting_participants ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 -- Users can view participants in projects they have access to
-CREATE POLICY "Users can view meeting participants in accessible projects" ON meeting_participants
+CREATE POLICY "Members can view meeting participants" ON meeting_participants
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM projects p
       WHERE p.id = meeting_participants.project_id
       AND p.owner_id = auth.uid()
     )
+    OR EXISTS (
+      SELECT 1 FROM project_memberships pm
+      WHERE pm.project_id = meeting_participants.project_id
+      AND pm.user_id = auth.uid()
+    )
   );
 
 -- Users can insert their own participation
-CREATE POLICY "Users can join meetings" ON meeting_participants
+CREATE POLICY "Members can join meetings" ON meeting_participants
   FOR INSERT WITH CHECK (
     user_id = auth.uid()
-    AND EXISTS (
-      SELECT 1 FROM projects p
-      WHERE p.id = meeting_participants.project_id
-      AND p.owner_id = auth.uid()
+    AND (
+      EXISTS (
+        SELECT 1 FROM projects p
+        WHERE p.id = meeting_participants.project_id
+        AND p.owner_id = auth.uid()
+      )
+      OR EXISTS (
+        SELECT 1 FROM project_memberships pm
+        WHERE pm.project_id = meeting_participants.project_id
+        AND pm.user_id = auth.uid()
+      )
     )
   );
 
