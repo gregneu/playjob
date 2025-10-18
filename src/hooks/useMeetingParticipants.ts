@@ -1,5 +1,5 @@
 // Hook to track meeting participants in realtime
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 interface MeetingParticipant {
@@ -16,9 +16,19 @@ interface MeetingParticipantsMap {
   [roomId: string]: MeetingParticipant[]
 }
 
+interface ParticipantProfile {
+  id: string
+  displayName: string | null
+  fullName: string | null
+  email: string | null
+  avatarUrl: string | null
+  avatarConfig?: any
+}
+
 export function useMeetingParticipants(projectId: string | null, userId: string | null) {
   const [meetingParticipants, setMeetingParticipants] = useState<MeetingParticipantsMap>({})
   const [isLoading, setIsLoading] = useState(false)
+  const profileCacheRef = useRef<Map<string, ParticipantProfile>>(new Map())
 
   // Cleanup old participants
   const cleanupOldParticipants = useCallback(async () => {
@@ -62,6 +72,95 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
     }
   }, [projectId])
 
+  const resolveParticipantProfiles = useCallback(async (userIds: string[]): Promise<Map<string, ParticipantProfile>> => {
+    const cache = profileCacheRef.current
+    const missingIds = userIds.filter((id) => id && !cache.has(id))
+
+    if (missingIds.length === 0) {
+      return cache
+    }
+
+    const unresolved = new Set(missingIds)
+
+    if (missingIds.length > 0) {
+      try {
+        const { data: profileRows, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, display_name, avatar_url, avatar_config')
+          .in('id', missingIds)
+
+        if (profilesError) {
+          console.warn('⚠️ Error loading profiles directly:', profilesError)
+        } else {
+          for (const row of profileRows ?? []) {
+            if (!row?.id) continue
+            cache.set(row.id, {
+              id: row.id,
+              displayName: row.display_name ?? row.full_name ?? row.email ?? null,
+              fullName: row.full_name ?? null,
+              email: row.email ?? null,
+              avatarUrl: row.avatar_url ?? null,
+              avatarConfig: row.avatar_config ?? null
+            })
+            unresolved.delete(row.id)
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Exception while loading profiles directly:', err)
+      }
+    }
+
+    if (unresolved.size > 0 && projectId) {
+      try {
+        const { data: memberPayload, error: memberError } = await supabase.functions.invoke<{
+          members?: Array<{
+            user_id: string | null
+            display_name: string | null
+            email: string | null
+            avatar_url: string | null
+            status: 'member' | 'invited'
+          }>
+        }>('list-project-members', {
+          body: { projectId }
+        })
+
+        if (memberError) {
+          console.warn('⚠️ list-project-members fallback error:', memberError)
+        } else {
+          const members = memberPayload?.members ?? []
+          for (const member of members) {
+            if (!member?.user_id || member.status !== 'member') continue
+            if (cache.has(member.user_id)) continue
+            cache.set(member.user_id, {
+              id: member.user_id,
+              displayName: member.display_name ?? member.email ?? 'Participant',
+              fullName: member.display_name ?? member.email ?? null,
+              email: member.email ?? null,
+              avatarUrl: member.avatar_url ?? null
+            })
+            unresolved.delete(member.user_id)
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ list-project-members fallback exception:', err)
+      }
+    }
+
+    if (unresolved.size > 0) {
+      for (const id of unresolved) {
+        cache.set(id, {
+          id,
+          displayName: 'Participant',
+          fullName: null,
+          email: null,
+          avatarUrl: null
+        })
+      }
+    }
+
+    return cache
+  }, [projectId])
+
   const loadMeetingParticipants = useCallback(async () => {
     if (!projectId || !userId) {
       setMeetingParticipants({})
@@ -98,40 +197,37 @@ export function useMeetingParticipants(projectId: string | null, userId: string 
       
       if (data && data.length > 0) {
         // Get unique user IDs
-        const userIds = [...new Set(data.map(record => record.user_id))]
-        
-        // Fetch profiles for all users
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, email, avatar_url, avatar_config')
-          .in('id', userIds)
-        
-        if (profilesError) {
-          console.error('❌ Error loading profiles:', profilesError)
-          setMeetingParticipants({})
-          return
-        }
-        
-        // Create a map of user profiles
-        const profilesMap = new Map(profiles?.map(p => [p.id, p]) || [])
+        const userIds = [...new Set(data.map(record => record.user_id).filter((id): id is string => Boolean(id)))]
+        const profilesMap = await resolveParticipantProfiles(userIds)
         
         // Group participants by room_id
         data.forEach(record => {
           const roomId = record.room_id
           const profile = profilesMap.get(record.user_id)
+          const fallbackName = profile?.displayName ?? profile?.fullName ?? profile?.email ?? 'Participant'
           
           if (!participantsMap[roomId]) {
             participantsMap[roomId] = []
           }
           
-          if (profile) {
+          if (record.user_id) {
             participantsMap[roomId].push({
-              id: `${roomId}-${profile.id}`,
-              name: profile.full_name || profile.email || 'Unknown',
-              userId: profile.id,
-              avatarUrl: profile.avatar_url,
-              avatarConfig: profile.avatar_config,
-              email: profile.email,
+              id: `${roomId}-${record.user_id}`,
+              name: fallbackName,
+              userId: record.user_id,
+              avatarUrl: profile?.avatarUrl ?? null,
+              avatarConfig: profile?.avatarConfig,
+              email: profile?.email ?? null,
+              joinedAt: record.joined_at
+            })
+          } else {
+            participantsMap[roomId].push({
+              id: `${roomId}-anonymous`,
+              name: 'Participant',
+              userId: null as unknown as string,
+              avatarUrl: null,
+              avatarConfig: null,
+              email: null,
               joinedAt: record.joined_at
             })
           }

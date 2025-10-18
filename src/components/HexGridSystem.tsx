@@ -187,7 +187,56 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
     meetingParticipants: meetingParticipantsMap,
     getRoomParticipants
   } = useMeetingParticipants(projectId || null, user?.id || null)
-  
+
+  const meetingParticipantsByBuildingId = useMemo(() => {
+    const result: Record<string, Array<{
+      id: string
+      name: string
+      avatarUrl?: string
+      avatarConfig?: any
+      userId?: string
+    }>> = {}
+
+    Object.entries(meetingParticipantsMap || {}).forEach(([roomId, participants]) => {
+      if (!Array.isArray(participants) || participants.length === 0) {
+        return
+      }
+
+      const normalizedParticipants = [...participants]
+        .filter(Boolean)
+        .sort((a, b) => {
+          const aTime = a?.joinedAt ? new Date(a.joinedAt).getTime() : 0
+          const bTime = b?.joinedAt ? new Date(b.joinedAt).getTime() : 0
+          return aTime - bTime
+        })
+        .map((participant, index) => ({
+          id: participant.id || `${roomId}-${participant.userId || index}`,
+          name: participant.name,
+          avatarUrl: participant.avatarUrl,
+          avatarConfig: participant.avatarConfig,
+          userId: participant.userId
+        }))
+
+      const trimmedRoomId = roomId?.trim()
+      if (!trimmedRoomId || trimmedRoomId === 'default-room') {
+        return
+      }
+
+      const match = trimmedRoomId.match(/^(?:playjoob-meet-|meet-room-|room:)?(.+)$/i)
+      const buildingId = match && match[1] ? match[1] : trimmedRoomId
+
+      if (buildingId && normalizedParticipants.length > 0) {
+        result[buildingId] = normalizedParticipants
+      }
+    })
+
+    if (Object.keys(result).length > 0) {
+      console.log('👥 Meeting participants by building:', result)
+    }
+
+    return result
+  }, [meetingParticipantsMap])
+
 
   const selectedTicketNotifications = useMemo(() => {
     if (!selectedZoneObject) {
@@ -4242,45 +4291,44 @@ export const HexGridSystem: React.FC<HexGridSystemProps> = ({ projectId }) => {
 
           {/* Вода отключена */}
 
-        {/* Умная сетка для обычного режима */}
-        {!isZoneMode && (
-          <SmartHexGrid
-            zones={zones.map(zone => {
-              // ПРАВИЛЬНЫЙ ПОДХОД: Используем `getZoneCenter`, который знает о локальных изменениях
-              const center = getZoneCenter(zone.id) || [0, 0] as [number, number]
-              const zoneCellsForZone = effectiveZoneCells.filter(zc => zc.zone_id === zone.id)
-              
-              return {
-                id: zone.id,
-                name: zone.name,
-                color: zone.color,
-                center, // <-- Теперь это правильный, авторитетный центр
-                cells: zoneCellsForZone.map(zc => [zc.q, zc.r] as [number, number])
-              }
-            })}
-            zoneObjects={zoneObjects}
-            ticketsByZoneObject={ticketsByZoneObject}
-            notificationsByBuilding={notificationsByBuilding}
-            buildingHasUnreadMentions={buildingHasUnreadMentions}
-            isZoneMode={false}
-            hoveredCell={hoveredCell}
-            hoveredCellType={hoveredCellType}
-            onCellClick={(q, r, mousePosition) => handleCellClick(q, r, false, mousePosition ? [mousePosition.x, mousePosition.y] : undefined)}
-            onCellHover={handleCellHover}
-            onCellLeave={handleCellLeave}
-            showZoneNames={showZoneNames}
-            isDraggingTicket={isDraggingTicket}
-            candidateCenterCell={candidateCenterCell}
-            hoveredCellDuringDrag={hoveredCellDuringDrag}
-            registerHoverTarget={registerHoverTarget}
-            unregisterHoverTarget={unregisterHoverTarget}
-            activeSprintObjectId={sprintObjectId}
-            activeSprintProgress={sprintObjectId ? activeSprintProgress : null}
-            sprintProgressMap={sprintProgressByObject}
-            energyPulseMap={energyPulseMap}
-            badgeAnimationMap={badgeAnimations}
-          />
-        )}
+        {/* Умная сетка отвечает и за обычный, и за строительный режим */}
+        <SmartHexGrid
+          zones={zones.map(zone => {
+            // ПРАВИЛЬНЫЙ ПОДХОД: Используем `getZoneCenter`, который знает о локальных изменениях
+            const center = getZoneCenter(zone.id) || [0, 0] as [number, number]
+            const zoneCellsForZone = effectiveZoneCells.filter(zc => zc.zone_id === zone.id)
+            
+            return {
+              id: zone.id,
+              name: zone.name,
+              color: zone.color,
+              center, // <-- Теперь это правильный, авторитетный центр
+              cells: zoneCellsForZone.map(zc => [zc.q, zc.r] as [number, number])
+            }
+          })}
+          zoneObjects={zoneObjects}
+          ticketsByZoneObject={ticketsByZoneObject}
+          notificationsByBuilding={notificationsByBuilding}
+          buildingHasUnreadMentions={buildingHasUnreadMentions}
+          isZoneMode={Boolean(isZoneMode)}
+          hoveredCell={hoveredCell}
+          hoveredCellType={hoveredCellType}
+          onCellClick={(q, r, mousePosition) => handleCellClick(q, r, false, mousePosition ? [mousePosition.x, mousePosition.y] : undefined)}
+          onCellHover={handleCellHover}
+          onCellLeave={handleCellLeave}
+          showZoneNames={showZoneNames}
+          isDraggingTicket={isDraggingTicket}
+          candidateCenterCell={candidateCenterCell}
+          hoveredCellDuringDrag={hoveredCellDuringDrag}
+          registerHoverTarget={registerHoverTarget}
+          unregisterHoverTarget={unregisterHoverTarget}
+          activeSprintObjectId={sprintObjectId}
+          activeSprintProgress={sprintObjectId ? activeSprintProgress : null}
+          sprintProgressMap={sprintProgressByObject}
+          energyPulseMap={energyPulseMap}
+          badgeAnimationMap={badgeAnimations}
+          meetingParticipantsByBuildingId={meetingParticipantsByBuildingId}
+        />
           
           {/* UnifiedHexCell components are now rendered only through SmartHexGrid to avoid duplication */}
           {/* Removed duplicate gridCells.map block that was causing double rendering */}

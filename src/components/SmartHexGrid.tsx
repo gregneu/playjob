@@ -7,6 +7,14 @@ import { hexToWorldPosition } from '../lib/hex-utils'
 // import { useZoneHexFilling } from '../hooks/useZoneHexFilling'
 import type { BuildingNotifications } from '../types/notifications'
 
+type MeetingParticipantInfo = {
+  id: string
+  name: string
+  avatarUrl?: string
+  avatarConfig?: any
+  userId?: string
+}
+
 interface HexGridProps {
   zones: Array<{
     id: string
@@ -54,6 +62,7 @@ interface HexGridProps {
   sprintProgressMap?: Record<string, { total: number; done: number }>
   energyPulseMap?: Record<string, { type: 'source' | 'target'; key: string; color: string }>
   badgeAnimationMap?: Record<string, { type: 'gain' | 'lose'; key: string }>
+  meetingParticipantsByBuildingId?: Record<string, MeetingParticipantInfo[]>
 }
 
 export const SmartHexGrid: React.FC<HexGridProps> = ({ 
@@ -80,7 +89,8 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
   activeSprintProgress = null,
   sprintProgressMap = {},
   energyPulseMap,
-  badgeAnimationMap
+  badgeAnimationMap,
+  meetingParticipantsByBuildingId
 }) => {
   const hexSize = 2.0
 
@@ -338,6 +348,10 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
           (Array.isArray(buildingNotifications?.notifications)
             ? buildingNotifications.notifications.filter((notification) => notification.type === 'assignment').length
             : 0)
+        const meetingParticipantsForBuilding =
+          building && meetingParticipantsByBuildingId
+            ? meetingParticipantsByBuildingId[building.id] || []
+            : []
 
         return (
           <group key={`smart-${cell.q}-${cell.r}-${cell.state}-${cell.cellType}`}>
@@ -410,6 +424,12 @@ export const SmartHexGrid: React.FC<HexGridProps> = ({
                 }
                 return result
               })()}
+              meetingParticipants={meetingParticipantsForBuilding}
+              onMeetingClick={
+                meetingParticipantsForBuilding.length > 0 && onCellClick
+                  ? () => onCellClick(cell.q, cell.r)
+                  : undefined
+              }
               sprintProgress={sprintProgressForCell || undefined}
             />
             
